@@ -1,0 +1,11 @@
+[Unit]
+Description=Pin NVMe and network IRQs to non-V-Cache CCD (7900X3D)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/irq-affinity-x3d
+
+[Install]
+WantedBy=multi-user.target

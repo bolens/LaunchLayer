@@ -1,0 +1,2 @@
+# Follow `source` directives so lib/*.sh modules are analyzed as one program.
+external-sources=true

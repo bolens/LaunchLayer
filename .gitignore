@@ -1,0 +1,53 @@
+# OS junk
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Local env overrides (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Runtime / launch state (normally under XDG_STATE_HOME)
+*.log
+.state/
+launchlayer-state/
+
+# Script temp files
+*.tmp
+*.bak
+*.orig
+.launchlayer.tmp
+
+# User-specific per-game configs (reference example kept below)
+launch.d/[0-9]*.env
+!launch.d/2357570.env
+
+# Deprecated entry points from pre-rename installs
+steam-game-launch-settings.sh
+steaml
+
+# Test artifacts
+test-results/
+.bats-logs/
+
+# Packaging / install scratch
+dist/
+*.tar.gz
+*.zip

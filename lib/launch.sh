@@ -1,0 +1,104 @@
+# shellcheck shell=bash
+# shellcheck source=common.sh
+# shellcheck source=config.sh
+# shellcheck source=steam.sh
+# shellcheck source=hardware.sh
+# shellcheck source=preflight.sh
+# shellcheck source=runtime.sh
+# shellcheck source=vram.sh
+# lib/launch.sh — Main game-launch orchestration pipeline.
+
+[[ -n "${LAUNCHLAYER_LAUNCH_LOADED:-}" ]] && return 0
+LAUNCHLAYER_LAUNCH_LOADED=1
+
+# prepare_launch_context — Load config and build launch chain without running the game.
+prepare_launch_context() {
+	local appid=$1
+	reset_config_state
+	steam_app_id="$appid"
+	load_launch_config
+	apply_defaults
+	resolve_game_flags
+	apply_auto_hardware_defaults
+	parse_game_extra_args
+	apply_proton_env
+	build_launch_chain
+}
+
+# run_game_launch — Full launch pipeline for Steam's %command% argv.
+#
+# Phases:
+#   1. Recover stale state from prior crashes
+#   2. Load layered config and detect game flags
+#   3. Run preflight checks (skipped in BENCHMARK mode)
+#   4. Pause VRAM hogs and register exit trap
+#   5. Apply runtime tuning and build wrapper chain
+#   6. Exec the final command (or print dry-run output)
+run_game_launch() {
+	local exit_code=0 duration=0 needs_vram_cleanup=0
+
+	recover_stale_vram_state
+	launch_start_time="$(date +%s)"
+
+	steam_app_id=""
+	detect_steam_app_id "$@"
+	load_launch_config
+	apply_defaults
+	resolve_game_flags
+	apply_auto_hardware_defaults
+	parse_game_extra_args
+
+	# shellcheck disable=SC2154  # set by resolve_game_flags / parse_game_extra_args above
+	debug "appid=${steam_app_id:-unknown} name=${steam_game_name:-unknown} native=$is_native eac=$is_anticheat type=${anticheat_type:-} engine=$game_engine_hint"
+
+	if [[ "${BENCHMARK:-0}" != "1" ]]; then
+		check_concurrent_launch
+		check_vm_max_map_count
+		check_shader_cache
+		check_compatdata
+		check_vram_available
+		check_gpu_power
+		check_gpu_vram_processes
+		check_disk_space
+	fi
+
+	warn_missing_tools
+	apply_anticheat_guardrails
+
+	if [[ "${VRAM_HOGS:-0}" == "1" && "$DRY_RUN" != "1" ]]; then
+		pause_vram_hogs
+		needs_vram_cleanup=1
+	fi
+
+	# Trap ensures VRAM services and PipeWire settings restore on normal exit.
+	if [[ "$DRY_RUN" != "1" ]] && [[ "$needs_vram_cleanup" == "1" || "${LAUNCH_WATCHDOG:-0}" == "1" ]]; then
+		trap on_launch_exit EXIT INT TERM
+	fi
+
+	apply_network_tuning
+	apply_pipewire_low_latency
+	apply_cpu_performance
+	apply_nvidia_power_mode
+	apply_proton_env
+	build_launch_chain
+
+	if [[ "$DRY_RUN" == "1" ]]; then
+		print_dry_run "$@"
+		exit 0
+	fi
+
+	run_pre_launch_cmd
+
+	launch+=("$@")
+	# shellcheck disable=SC2154
+	[[ ${#game_extra_argv[@]} -gt 0 ]] && launch+=("${game_extra_argv[@]}")
+
+	echo $$ > "$ACTIVE_LAUNCH_PID_FILE"
+	[[ "${LAUNCH_WATCHDOG:-0}" == "1" ]] && start_launch_watchdog $$
+
+	"${launch[@]}" || exit_code=$?
+	run_post_launch_cmd
+	duration=$(( $(date +%s) - launch_start_time ))
+	log_launch_event "$exit_code" "$duration"
+	exit "$exit_code"
+}

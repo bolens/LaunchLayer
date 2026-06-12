@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# LaunchLayer — layered game launch orchestration for Steam and beyond.
+#
+# Steam launch options MUST include %command%, e.g.:
+#   "/path/to/launchlayer" %command%
+#
+# Config layers (in order):
+#   launch.d/profiles/<profile>.env (LAUNCHLAYER_PROFILE or auto-detected)
+#   launch.d/default.env
+#   launch.d/presets/*.env (via INCLUDE= or auto-selected standard/native)
+#   launch.d/<AppID>.env
+#
+# Utility subcommands:
+#   --list-games [--configured] [--json] [--grep NAME]
+#   --init-appid APPID|NAME [preset] [--force]
+#   --paths APPID|NAME [--json]       shader cache, compatdata, install paths
+#   --show-config APPID|NAME [--json] resolved config + launch chain
+#   --edit-appid APPID|NAME           open/create per-game config in $EDITOR
+#   --validate-config [APPID|all]     lint .env files
+#   --scan-anticheat [--update-list]    find EAC/BattlEye vs anticheat-appids.txt
+#   --scan-detections                   audit heuristic vs list mismatches + hints
+#   --cache-report [--min-gb N] [--grep NAME] [--json] [--shader-only|--compat-only]
+#   --launch-stats [APPID]            summarize launch.log
+#   --status [AppID]                  runtime and cache state
+#   --dry-run %command%               print env + launch chain without running
+#   --show-cpu-topology               V-Cache CCD hints for X3D_CPUS
+#   --detect-environment              print auto-detected platform/hardware state
+#   --help, -h                        grouped command reference
+#   --version, -V                     version and install paths
+#   --completions [status|enable|disable|print] [--shell bash|zsh|fish|all]
+#   --doctor [--json]                 full environment + config health check
+#   --setup [--completions] [--systemd] [--symlink] [--print-launch-option]
+#   --tui                             interactive game/config browser
+#   --install-systemd                 install user maintenance timer (resolved paths)
+#   --sysctl [status|install]         vm.max_map_count helper (install needs root)
+#   --pause-vram-hogs / --resume-vram-hogs / --cleanup-stale-launch [pid]
+#
+# Config root: set LAUNCHLAYER_CONFIG_DIR to use launch.d/ outside the script tree.
+#
+# Machine profiles (layered, before default.env):
+#   LAUNCHLAYER_PROFILES=steam-deck,flatpak-steam   or legacy LAUNCHLAYER_PROFILE=
+#
+# Per-game .env keys (see launch.d/presets/ and 2357570.env for examples):
+#   INCLUDE=presets/competitive.env
+#   LAUNCH_WRAPPERS="dlss-swapper"   LAUNCH_WRAPPERS_BEFORE=""
+#   GAME_EXTRA_ARGS="-flag1 -flag2"  UNSET_VARS="DXVK_ASYNC"
+#   PRE_LAUNCH_CMD=""  POST_LAUNCH_CMD=""
+#   FORCE_NATIVE=1 / FORCE_PROTON=1  BENCHMARK=1  DEBUG=1
+#   GAMEMODE MANGOHUD GAMESCOPE VRAM_HOGS NETWORK_TUNE PIPEWIRE_LOW_LATENCY
+#   GPU_POWER_CHECK DISK_PREFLIGHT_MIN_GB GPU_VRAM_PROCESS_MIN_MB CONCURRENT_LAUNCH_GUARD
+#   SHADER_CACHE_* COMPATDATA_* PROTON_* DXVK_* VKD3D_* __GL_*
+#
+# Module layout (lib/):
+#   common.sh    — paths, globals, logging
+#   keys.sh      — config key registry (reset, summary, validation)
+#   platform.sh  — Steam root, GPU, desktop detection; portable helpers
+#   config.sh    — layered .env loading
+#   vdf.sh       — libraryfolders.vdf parsing
+#   steam.sh     — library discovery, native/EAC detection
+#   hardware.sh  — X3D CPU + display auto-detection
+#   preflight.sh — sysctl, shader cache, compatdata, VRAM/GPU/disk checks
+#   runtime.sh   — env tuning and launch-chain assembly
+#   vram.sh      — VRAM hog pause/resume and watchdog cleanup
+#   inspect.sh   — show-config, cache-report, launch-stats, validation
+#   cli.sh       — help, version, usage hints
+#   commands.sh  — CLI subcommands
+#   completions.sh — shell completion install/remove
+#   setup.sh       — doctor, setup, systemd, sysctl helpers
+#   tui.sh         — interactive terminal UI (--tui)
+#   launch.sh      — main launch orchestration
+
+set -euo pipefail
+
+# Requires bash 4.2+ (associative arrays, mapfile, etc.).
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 2) )); then
+	echo "launchlayer: requires bash >= 4.2 (found ${BASH_VERSION})" >&2
+	exit 1
+fi
+
+# Resolve script location and config root (LAUNCHLAYER_CONFIG_DIR overrides launch.d path).
+# Follow symlinks so ~/.local/bin/launchlayer still finds lib/ next to the real script.
+_script_source="${BASH_SOURCE[0]}"
+if _script_resolved="$(readlink -f "$_script_source" 2>/dev/null)" && [[ -n "$_script_resolved" ]]; then
+	_script_source="$_script_resolved"
+elif command -v python3 >/dev/null 2>&1; then
+	_script_resolved="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$_script_source" 2>/dev/null || true)"
+	[[ -n "$_script_resolved" ]] && _script_source="$_script_resolved"
+fi
+SCRIPT_DIR="$(cd "$(dirname "$_script_source")" && pwd)"
+unset _script_source _script_resolved
+# Legacy env var aliases (deprecated).
+: "${LAUNCHLAYER_CONFIG_DIR:=${STEAM_LAUNCH_CONFIG_DIR:-}}"
+if [[ -n "${LAUNCHLAYER_CONFIG_DIR:-}" ]]; then
+	CONFIG_DIR="$(cd "$LAUNCHLAYER_CONFIG_DIR" && pwd)"
+else
+	CONFIG_DIR="$SCRIPT_DIR"
+fi
+LIB_DIR="$SCRIPT_DIR/lib"
+
+# Exposed for the watchdog subprocess which re-invokes this script.
+# Load modules in dependency order.
+# shellcheck source=lib/common.sh
+source "$LIB_DIR/common.sh"
+# shellcheck source=lib/keys.sh
+source "$LIB_DIR/keys.sh"
+# shellcheck source=lib/platform.sh
+source "$LIB_DIR/platform.sh"
+LAUNCHLAYER_MAIN_SCRIPT="$(realpath_portable "${BASH_SOURCE[0]}")"
+# shellcheck source=lib/vdf.sh
+source "$LIB_DIR/vdf.sh"
+# shellcheck source=lib/config.sh
+source "$LIB_DIR/config.sh"
+# shellcheck source=lib/steam.sh
+source "$LIB_DIR/steam.sh"
+# shellcheck source=lib/hardware.sh
+source "$LIB_DIR/hardware.sh"
+# shellcheck source=lib/gpu.sh
+source "$LIB_DIR/gpu.sh"
+# shellcheck source=lib/preflight.sh
+source "$LIB_DIR/preflight.sh"
+# shellcheck source=lib/runtime.sh
+source "$LIB_DIR/runtime.sh"
+# shellcheck source=lib/vram.sh
+source "$LIB_DIR/vram.sh"
+# shellcheck source=lib/inspect.sh
+source "$LIB_DIR/inspect.sh"
+# shellcheck source=lib/cli.sh
+source "$LIB_DIR/cli.sh"
+# shellcheck source=lib/completions.sh
+source "$LIB_DIR/completions.sh"
+# shellcheck source=lib/commands.sh
+source "$LIB_DIR/commands.sh"
+# shellcheck source=lib/setup.sh
+source "$LIB_DIR/setup.sh"
+# shellcheck source=lib/tui.sh
+source "$LIB_DIR/tui.sh"
+# shellcheck source=lib/launch.sh
+source "$LIB_DIR/launch.sh"
+
+# Global flags (--quiet, --verbose) apply to subcommands and game launches.
+mapfile -t _launchlayer_argv < <(cli_parse_global_flags "$@")
+set -- "${_launchlayer_argv[@]}"
+unset _launchlayer_argv
+
+# --dry-run must be stripped before subcommand or launch dispatch.
+if [[ "${1:-}" == "--dry-run" ]]; then
+	DRY_RUN=1
+	shift
+fi
+
+# Utility verbs exit here; unrecognized --flags error instead of launching.
+if [[ $# -gt 0 && "${1:-}" == --* && "${1:-}" != "--dry-run" ]]; then
+	rc=0
+	handle_subcommand "$@" || rc=$?
+	if (( rc == 0 )); then
+		exit 0
+	fi
+	if cli_is_known_subcommand "${1:-}"; then
+		exit "$rc"
+	fi
+	cli_unknown_subcommand "${1:-}"
+	exit 1
+fi
+
+if [[ $# -eq 0 ]]; then
+	if [[ -t 0 && -t 1 ]] && command -v fzf >/dev/null 2>&1; then
+		run_tui
+		exit 0
+	fi
+	print_usage_brief
+	exit 0
+fi
+
+run_game_launch "$@"

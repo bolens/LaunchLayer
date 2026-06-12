@@ -1,0 +1,10 @@
+# Steam AppIDs confirmed or commonly run as native Linux builds.
+# Auto-detection also checks install dirs; this list is the authoritative override.
+1118310
+1794680
+1868140
+219990
+2379780
+275850
+367520
+588650

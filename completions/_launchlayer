@@ -1,0 +1,112 @@
+# zsh completion for launchlayer
+# Install: add completions/ to fpath before compinit, e.g. in ~/.zshrc:
+#   fpath=(/mnt/games/config/completions $fpath)
+#   autoload -Uz compinit && compinit
+
+_launchlayer() {
+	local -a subcmds presets appids
+	local script=$words[1]
+
+	subcmds=(
+		'--pause-vram-hogs:pause VRAM-heavy systemd units'
+		'--resume-vram-hogs:resume paused VRAM-heavy units'
+		'--cleanup-stale-launch:clean up after a stale launch session'
+		'--status:show runtime and cache state'
+		'--show-cpu-topology:show X3D CPU topology hints'
+		'--detect-environment:show auto-detected platform state'
+		'--doctor:full environment and config health check'
+		'--tui:interactive game and config browser'
+		'--setup:onboarding helper (completions, launch option)'
+		'--completions:manage shell tab completions'
+		'--list-games:list installed Steam games'
+		'--init-appid:scaffold launch.d/<AppID>.env'
+		'--init-unconfigured:scaffold configs for unconfigured games'
+		'--paths:shader cache, compatdata, and install paths'
+		'--show-config:show resolved config for an AppID'
+		'--edit-appid:open per-game config in $EDITOR'
+		'--validate-config:lint .env config files'
+		'--scan-anticheat:scan for EAC/BattlEye titles'
+		'--scan-detections:audit detection heuristics'
+		'--cache-report:report shader/compatdata cache sizes'
+		'--launch-stats:summarize launch.log'
+		'--dry-run:print env and launch chain without running'
+		'--help:show help'
+		'-h:show help'
+		'--version:show version'
+		'-V:show version'
+	)
+
+	presets=(standard competitive lightweight native)
+
+	_arguments -C \
+		'1: :->subcmd' \
+		'*::arg:->args'
+
+	case $state in
+		subcmd)
+			_describe 'subcommand' subcmds
+			;;
+		args)
+			case $line[1] in
+				--status|--show-config|--edit-appid|--launch-stats)
+					appids=("${(@f)$(
+						"$script" --list-games --json 2>/dev/null \
+							| sed -n 's/.*"appid":"\([0-9]*\)".*/\1/p'
+					)}")
+					_arguments '*:appid:($appids)'
+					;;
+				--init-appid)
+					appids=("${(@f)$(
+						"$script" --list-games --json 2>/dev/null \
+							| sed -n 's/.*"appid":"\([0-9]*\)".*/\1/p'
+					)}")
+					_arguments \
+						'1:appid:($appids)' \
+						'2:preset:($presets)'
+					;;
+				--validate-config)
+					appids=("${(@f)$(
+						"$script" --list-games --json 2>/dev/null \
+							| sed -n 's/.*"appid":"\([0-9]*\)".*/\1/p'
+					)}")
+					_arguments '*:target:(all default presets $appids)'
+					;;
+				--init-unconfigured)
+					_arguments \
+						'(--preset)*--preset[preset to apply]:preset:($presets)' \
+						'(--dry-run)*--dry-run[print actions without writing files]' \
+						'(--eac-only)*--eac-only[only anticheat titles]'
+					;;
+				--list-games)
+					_arguments \
+						'(--configured)*--configured[only configured games]' \
+						'(--json)*--json[JSON output]' \
+						'(--grep)*--grep[filter by game name]:pattern:'
+					;;
+				--cache-report)
+					_arguments \
+						'(--min-gb)*--min-gb[minimum size in GB]:size:' \
+						'(--shader-only)*--shader-only[shader caches only]' \
+						'(--compat-only)*--compat-only[compatdata only]'
+					;;
+				--scan-anticheat)
+					_arguments '(--update-list)*--update-list[update anticheat-appids.txt]'
+					;;
+				--completions)
+					_arguments \
+						'1:action:(status enable disable print)' \
+						'(--shell)*--shell[shell to configure]:shell:(bash zsh fish all)'
+					;;
+			esac
+			;;
+	esac
+}
+
+if (( $+functions[compdef] )); then
+	compdef _launchlayer \
+		launchlayer \
+		./launchlayer
+	if [[ -n "${LAUNCHLAYER_CONFIG_DIR:-}" ]]; then
+		compdef _launchlayer "$LAUNCHLAYER_CONFIG_DIR/launchlayer"
+	fi
+fi

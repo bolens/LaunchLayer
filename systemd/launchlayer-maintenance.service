@@ -1,0 +1,14 @@
+# Template — install a user unit with your script path via:
+#   launchlayer --install-systemd
+#
+# Installed copy lives at:
+#   ~/.config/systemd/user/launchlayer-maintenance.service
+#   ~/.config/systemd/user/launchlayer-maintenance.timer
+
+[Unit]
+Description=LaunchLayer maintenance (stale cleanup + cache report)
+
+[Service]
+Type=oneshot
+# ExecStart is rewritten by --install-systemd to use the resolved script path.
+ExecStart=/bin/bash -c 'echo "Run --install-systemd to generate this unit"'
