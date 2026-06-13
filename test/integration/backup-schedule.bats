@@ -132,19 +132,33 @@ EOF
 }
 
 @test "backup-timer enable-service toggles oneshot unit" {
-	local tmp unit_dir
+	local tmp unit_dir mock_bin
 	tmp="$(mktemp -d)"
 	unit_dir="$tmp/systemd/user"
-	mkdir -p "$tmp/launch.d/presets"
+	mock_bin="$tmp/bin"
+	mkdir -p "$mock_bin" "$tmp/launch.d/presets"
+	cat > "$mock_bin/systemctl" <<'EOF'
+#!/usr/bin/env bash
+case " $* " in
+	*" --user daemon-reload "*) exit 0 ;;
+	*" --user enable launchlayer-backup.service"*) echo "Enabled launchlayer-backup.service (manual start)"; exit 0 ;;
+	*" --user disable launchlayer-backup.service"*) echo "Disabled launchlayer-backup.service (manual start)"; exit 0 ;;
+esac
+exit 0
+EOF
+	chmod +x "$mock_bin/systemctl"
 	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
 	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
 	run env \
+		PATH="$mock_bin:$PATH" \
 		LAUNCHLAYER_CONFIG_DIR="$tmp" \
 		XDG_CONFIG_HOME="$tmp" \
 		HOME="$tmp" \
 		"$SCRIPT" --backup-timer install --no-enable
 	[[ $status -eq 0 ]]
+	[[ -f "$unit_dir/launchlayer-backup.service" ]]
 	run env \
+		PATH="$mock_bin:$PATH" \
 		LAUNCHLAYER_CONFIG_DIR="$tmp" \
 		XDG_CONFIG_HOME="$tmp" \
 		HOME="$tmp" \
@@ -152,6 +166,7 @@ EOF
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"Enabled launchlayer-backup.service"* ]]
 	run env \
+		PATH="$mock_bin:$PATH" \
 		LAUNCHLAYER_CONFIG_DIR="$tmp" \
 		XDG_CONFIG_HOME="$tmp" \
 		HOME="$tmp" \
