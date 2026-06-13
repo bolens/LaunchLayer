@@ -354,7 +354,7 @@ warn_enabled_missing_tools() {
 		&& [[ -z "${VRAM_HOG_PIDS:-}" ]]; then
 		warn "VRAM_HOGS=1 but systemd user session is unavailable and VRAM_HOG_PIDS is unset — hogs will not be paused"
 	fi
-	for wrapper in ${LAUNCH_WRAPPERS_BEFORE} ${LAUNCH_WRAPPERS}; do
+	for wrapper in ${LAUNCH_WRAPPERS_BEFORE:-} ${LAUNCH_WRAPPERS:-}; do
 		command_available "$wrapper" && continue
 		hint="$(tool_install_hint "$wrapper" 2>/dev/null || true)"
 		warn "LAUNCH_WRAPPERS expects '$wrapper' but it is not installed${hint:+ — $hint}"

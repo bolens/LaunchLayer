@@ -38,11 +38,22 @@ prepare_launch_context() {
 run_game_launch() {
 	local exit_code=0 duration=0 needs_vram_cleanup=0
 
+	steam_app_id=""
+	detect_steam_app_id "$@"
+
+	if [[ "$DRY_RUN" == "1" ]]; then
+		prepare_launch_context "${steam_app_id:-}"
+		warn_missing_tools
+		apply_anticheat_guardrails
+		# shellcheck disable=SC2154  # set by prepare_launch_context / resolve_game_flags
+		debug "appid=${steam_app_id:-unknown} name=${steam_game_name:-unknown} native=$is_native eac=$is_anticheat type=${anticheat_type:-} engine=$game_engine_hint"
+		print_dry_run "$@"
+		exit 0
+	fi
+
 	recover_stale_vram_state
 	launch_start_time="$(date +%s)"
 
-	steam_app_id=""
-	detect_steam_app_id "$@"
 	load_launch_config
 	apply_defaults
 	apply_detected_defaults
@@ -52,15 +63,6 @@ run_game_launch() {
 
 	# shellcheck disable=SC2154  # set by resolve_game_flags / parse_game_extra_args above
 	debug "appid=${steam_app_id:-unknown} name=${steam_game_name:-unknown} native=$is_native eac=$is_anticheat type=${anticheat_type:-} engine=$game_engine_hint"
-
-	if [[ "$DRY_RUN" == "1" ]]; then
-		warn_missing_tools
-		apply_anticheat_guardrails
-		apply_proton_env
-		build_launch_chain
-		print_dry_run "$@"
-		exit 0
-	fi
 
 	if [[ "${BENCHMARK:-0}" != "1" ]]; then
 		check_concurrent_launch
