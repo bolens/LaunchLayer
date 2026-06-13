@@ -12,7 +12,6 @@ tui_fzf_preview_window() {
 # tui_fzf_list_nav_binds — Home/End jump the list (fzf defaults move the query cursor).
 # Optional suffix chains extra actions (e.g. async header/footer chrome refresh).
 tui_fzf_list_nav_binds() {
-	# shellcheck disable=SC2178 # nameref to caller's array
 	local -n out_arr=$1
 	local suffix=${2:-}
 	[[ -n "$suffix" ]] && suffix="+${suffix}"
@@ -27,7 +26,6 @@ tui_fzf_list_nav_binds() {
 # tui_fzf_sort_binds — Alt-S toggles fzf relevance sort vs stdin order (toggle-sort).
 # Game/multi pickers default to --no-sort so recent-first rows stay grouped when filtering.
 tui_fzf_sort_binds() {
-	# shellcheck disable=SC2178 # nameref to caller's array
 	local -n out_arr=$1
 	local suffix=${2:-} no_sort=${3:-0}
 	[[ -n "$suffix" ]] && suffix="+${suffix}"
@@ -38,7 +36,6 @@ tui_fzf_sort_binds() {
 # tui_fzf_build_args — Shared fzf chrome: borders, footer hints, pointer, help bind.
 tui_fzf_build_args() {
 	local arr_name=$1
-	# shellcheck disable=SC2178 # nameref to caller's array
 	local -n out_arr=$arr_name
 	local header=$2 context=${3:-menu} footer=${4:-}
 	local script_q
@@ -114,7 +111,6 @@ tui_fzf_build_args() {
 # tui_fzf_game_picker_args — Preview pane and editor/dry-run binds for game lists.
 tui_fzf_game_picker_args() {
 	local arr_name=$1
-	# shellcheck disable=SC2178 # nameref to caller's array
 	local -n out_arr=$arr_name
 	local header=$2 mode=${3:-single}
 	local script_q context
@@ -160,7 +156,6 @@ tui_fzf_run_stdin() {
 # tui_fzf_games_async_poll_binds — Spinner in header/footer while loading; list reload only when ready.
 tui_fzf_games_async_poll_binds() {
 	local arr_name=$1
-	# shellcheck disable=SC2178 # nameref to caller's array
 	local -n out_arr=$arr_name
 	local reload_q=$2 resize_q=$3
 	local header_q footer_q chrome

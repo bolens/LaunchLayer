@@ -187,7 +187,6 @@ tui_backup_timer_label() {
 # tui_backup_settings_items — Compact backup preference rows.
 tui_backup_settings_items() {
 	local arr_name=$1
-	# shellcheck disable=SC2178 # nameref to caller's array
 	local -n out_arr=$arr_name
 	local dir_label=${2:-}
 	load_backup_prefs

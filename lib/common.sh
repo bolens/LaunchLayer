@@ -1,5 +1,4 @@
 # shellcheck shell=bash
-# shellcheck disable=SC2034
 # lib/common.sh — Shared paths, runtime state, and logging helpers.
 #
 # Sourced by launchlayer after CONFIG_DIR is set.

@@ -70,7 +70,6 @@ tui_hub_token_glyph() {
 # tui_hub_settings_items — Compact hub.conf menu rows.
 tui_hub_settings_items() {
 	local arr_name=$1
-	# shellcheck disable=SC2178 # nameref to caller's array
 	local -n out_arr=$arr_name
 	local url_label=${2:-} label_label=${3:-} level_label=${4:-}
 	load_hub_prefs

@@ -134,7 +134,6 @@ EOF
 
 # bats_unit_setup — Common setup for test/unit/*.bats.
 bats_unit_setup() {
-	# shellcheck disable=SC1091
 	source "$BATS_TEST_DIRNAME/../helpers.bash"
 	CONFIG_DIR="$(launchlayer_root)"
 	export CONFIG_DIR
@@ -142,7 +141,6 @@ bats_unit_setup() {
 
 # bats_integration_setup — Common setup for test/integration/*.bats.
 bats_integration_setup() {
-	# shellcheck disable=SC1091
 	source "$BATS_TEST_DIRNAME/../helpers.bash"
 	BATS_SAVED_HOME="${HOME:-}"
 	BATS_SAVED_XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-}"
@@ -187,7 +185,9 @@ engine_setup_fixture() {
 	local fake
 	fake="$(fake_steam_root "$appid" "$name" "$installdir")"
 	ENGINE_FAKE_STEAM_ROOTS+=("$fake")
+	# shellcheck disable=SC2034  # fixture paths read by test/unit/engine-detect.bats
 	ENGINE_FIXTURE_STEAM="$fake"
+	# shellcheck disable=SC2034  # fixture paths read by test/unit/engine-detect.bats
 	ENGINE_FIXTURE_DIR="$fake/steamapps/common/$installdir"
 }
 
@@ -248,9 +248,7 @@ source_lib() {
 	repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 	export CONFIG_DIR="${CONFIG_DIR:-$repo}"
 	export LIB_DIR="$repo/lib"
-	# shellcheck disable=SC1091
 	source "$LIB_DIR/common.sh"
-	# shellcheck disable=SC1091
 	[[ -n "${LAUNCHLAYER_LOAD_MODULES_LOADED:-}" ]] || source "$LIB_DIR/load-modules.sh"
 	for module in "$@"; do
 		_source_lib_module "$repo" "$module"

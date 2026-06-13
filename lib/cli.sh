@@ -126,19 +126,19 @@ cli_scan_progress_end() {
 # cli_edit_distance — Levenshtein distance between two strings (bash-only).
 cli_edit_distance() {
 	local a=$1 b=$2
-	local -i i j la=${#a} lb=${#b}
+	local -i i j len_a=${#a} len_b=${#b}
 	local -i cost=0
 	local -a prev curr
 
-	if (( la == 0 )); then echo "$lb"; return; fi
-	if (( lb == 0 )); then echo "$la"; return; fi
+	if (( len_a == 0 )); then echo "$len_b"; return; fi
+	if (( len_b == 0 )); then echo "$len_a"; return; fi
 
 	prev=()
-	for ((i = 0; i <= lb; i++)); do prev[i]=$i; done
+	for ((i = 0; i <= len_b; i++)); do prev[i]=$i; done
 
-	for ((i = 1; i <= la; i++)); do
+	for ((i = 1; i <= len_a; i++)); do
 		curr[0]=$i
-		for ((j = 1; j <= lb; j++)); do
+		for ((j = 1; j <= len_b; j++)); do
 			if [[ ${a:i-1:1} == "${b:j-1:1}" ]]; then
 				cost=${prev[j-1]}
 			else
@@ -150,7 +150,7 @@ cli_edit_distance() {
 		done
 		prev=("${curr[@]}")
 	done
-	echo "${prev[lb]}"
+	echo "${prev[len_b]}"
 }
 
 # cli_suggest_subcommand — Print closest subcommand matches for a typo.

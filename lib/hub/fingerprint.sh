@@ -130,12 +130,12 @@ hub_parse_display() {
 
 # hub_profiles_array — Split space- or comma-separated profiles into a JSON string array.
 hub_profiles_array() {
-	local profiles=${1:-}
+	local profiles_raw=${1:-}
 	local -a parts=()
 	local part first=1
 
-	profiles="${profiles//,/ }"
-	read -r -a parts <<< "$profiles"
+	profiles_raw="${profiles_raw//,/ }"
+	read -r -a parts <<< "$profiles_raw"
 	printf '['
 	for part in "${parts[@]}"; do
 		part="${part#"${part%%[![:space:]]*}"}"

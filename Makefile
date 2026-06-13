@@ -12,7 +12,7 @@ test-hub:
 test-all: test test-hub
 
 lint shellcheck:
-	shellcheck -x -P lib --severity=warning launchlayer lib/*.sh lib/**/*.sh scripts/*.sh test/helpers.bash
+	shellcheck -x -P lib -a --severity=warning launchlayer test/helpers.bash scripts/*.sh
 
 check-hub-git:
 	bash scripts/check-staged-hub-secrets.sh

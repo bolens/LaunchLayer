@@ -24,7 +24,6 @@ tui_prefs_truncate() {
 # tui_prefs_footer — Standard show / reset / save / back rows.
 tui_prefs_footer() {
 	local arr_name=$1 mode=${2:-save}
-	# shellcheck disable=SC2178 # nameref to caller's array
 	local -n footer_items=$arr_name
 	footer_items+=("" "[·] Show all" "[·] Reset defaults")
 	case "$mode" in

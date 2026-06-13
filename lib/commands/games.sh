@@ -214,7 +214,7 @@ bulk_set_include_preset() {
 		fi
 		return 0
 	fi
-	local appid updated=0
+	local -i updated=0
 	for appid in "${appids[@]}"; do
 		set_include_preset "$appid" "$preset" && ((updated++)) || true
 	done

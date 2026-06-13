@@ -649,7 +649,7 @@ Or directly:
 
 ```bash
 bats test/
-shellcheck -x -P lib --severity=warning launchlayer lib/*.sh lib/**/*.sh scripts/*.sh test/helpers.bash
+shellcheck -x -P lib -a --severity=warning launchlayer test/helpers.bash scripts/*.sh
 ```
 
 ---

@@ -221,7 +221,6 @@ compatdata_stamp_file() {
 check_compatdata() {
 	[[ "${COMPATDATA_CHECK:-1}" == "1" ]] || return 0
 	[[ -n "$steam_app_id" ]] || return 0
-	# shellcheck disable=SC2154  # is_native set by resolve_game_flags in launch pipeline
 	[[ "$is_native" == "1" && "${FORCE_PROTON:-0}" != "1" ]] && return 0
 
 	local dir stamp_file interval

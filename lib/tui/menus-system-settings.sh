@@ -79,7 +79,6 @@ tui_interface_fzf_menu() {
 # tui_interface_settings_items — Compact interface preference rows.
 tui_interface_settings_items() {
 	local arr_name=$1
-	# shellcheck disable=SC2178 # nameref to caller's array
 	local -n out_arr=$arr_name
 	local filter=${TUI_GAME_FILTER:-all} preset=${TUI_DEFAULT_PRESET:-standard}
 	out_arr=(

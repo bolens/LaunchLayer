@@ -29,7 +29,7 @@ profile_list_contains() {
 # detect_default_profiles — Space-separated auto-selected profile names (layered).
 detect_default_profiles() {
 	local -a profiles=()
-	local -a seen=()
+	local -a seen_profiles=()
 	local p vendor access
 
 	local profiles_arg="${LAUNCHLAYER_PROFILES:-${STEAM_LAUNCH_PROFILES:-}}"
@@ -57,10 +57,10 @@ detect_default_profiles() {
 	esac
 
 	for p in "${profiles[@]}"; do
-		profile_list_contains "${seen[*]}" "$p" && continue
-		seen+=("$p")
+		profile_list_contains "${seen_profiles[*]}" "$p" && continue
+		seen_profiles+=("$p")
 	done
-	((${#seen[@]} > 0)) && echo "${seen[*]}"
+	((${#seen_profiles[@]} > 0)) && echo "${seen_profiles[*]}"
 }
 
 # detect_default_profile — Legacy single-profile helper (first auto-detected profile).

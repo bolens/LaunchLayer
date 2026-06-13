@@ -45,7 +45,6 @@ run_game_launch() {
 		prepare_launch_context "${steam_app_id:-}"
 		warn_missing_tools
 		apply_anticheat_guardrails
-		# shellcheck disable=SC2154  # set by prepare_launch_context / resolve_game_flags
 		debug "appid=${steam_app_id:-unknown} name=${steam_game_name:-unknown} native=$is_native eac=$is_anticheat type=${anticheat_type:-} engine=$game_engine_hint"
 		print_dry_run "$@"
 		exit 0
@@ -61,7 +60,6 @@ run_game_launch() {
 	apply_auto_hardware_defaults
 	parse_game_extra_args
 
-	# shellcheck disable=SC2154  # set by resolve_game_flags / parse_game_extra_args above
 	debug "appid=${steam_app_id:-unknown} name=${steam_game_name:-unknown} native=$is_native eac=$is_anticheat type=${anticheat_type:-} engine=$game_engine_hint"
 
 	if [[ "${BENCHMARK:-0}" != "1" ]]; then
@@ -98,7 +96,6 @@ run_game_launch() {
 	run_pre_launch_cmd
 
 	launch+=("$@")
-	# shellcheck disable=SC2154
 	[[ ${#game_extra_argv[@]} -gt 0 ]] && launch+=("${game_extra_argv[@]}")
 
 	echo $$ > "$ACTIVE_LAUNCH_PID_FILE"

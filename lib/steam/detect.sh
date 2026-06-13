@@ -629,7 +629,6 @@ detect_dlss_present() {
 get_compatdata_path_for_appid() {
 	local appid=$1
 	collect_compatdata_dirs "$appid"
-	# shellcheck disable=SC2154  # set by collect_compatdata_dirs in preflight.sh
 	[[ ${#compatdata_dirs[@]} -gt 0 ]] && echo "${compatdata_dirs[0]}"
 }
 
@@ -654,7 +653,6 @@ suggest_preset_for_appid() {
 }
 
 # resolve_game_flags — Populate is_native, is_anticheat, engine, and name globals.
-# shellcheck disable=SC2034  # globals defined in common.sh, consumed by other modules
 resolve_game_flags() {
 	is_native=0
 	is_anticheat=0

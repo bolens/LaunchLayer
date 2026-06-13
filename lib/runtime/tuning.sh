@@ -100,7 +100,6 @@ apply_unset_vars() {
 
 # apply_anticheat_guardrails — Conservative defaults for EAC/BattlEye titles.
 apply_anticheat_guardrails() {
-	# shellcheck disable=SC2154  # is_anticheat set by resolve_game_flags
 	[[ "$is_anticheat" == "1" ]] || return 0
 	[[ "${DEBUG:-0}" == "1" ]] && warn "DEBUG=1 with EAC title may cause launch failures"
 	export PROTON_LOG="${PROTON_LOG:-0}"
@@ -114,7 +113,6 @@ apply_anticheat_guardrails() {
 # Skipped entirely for native games unless FORCE_PROTON=1.
 # BENCHMARK=1 uses a stripped profile (no MangoHUD, no VRR).
 apply_proton_env() {
-	# shellcheck disable=SC2154  # is_native set by resolve_game_flags
 	[[ "$is_native" == "1" && "${FORCE_PROTON:-0}" != "1" ]] && {
 		debug "skipping Proton env (native game)"
 		return 0

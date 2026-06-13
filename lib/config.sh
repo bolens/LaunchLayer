@@ -124,7 +124,7 @@ config_file_relative() {
 
 # detect_steam_app_id — Resolve AppID from env vars or Steam launch argv.
 detect_steam_app_id() {
-	local arg prev=""
+	local last_argv=""
 	steam_app_id=""
 
 	if [[ -n "${SteamAppId:-}" && "${SteamAppId}" =~ ^[0-9]+$ ]]; then
@@ -136,21 +136,20 @@ detect_steam_app_id() {
 		return 0
 	fi
 
-	for arg in "$@"; do
-		if [[ "$prev" == "-applaunch" && "$arg" =~ ^[0-9]+$ ]]; then
-			steam_app_id="$arg"
+	for argv_item in "$@"; do
+		if [[ "$last_argv" == "-applaunch" && "$argv_item" =~ ^[0-9]+$ ]]; then
+			steam_app_id="$argv_item"
 			return 0
 		fi
-		if [[ "$arg" =~ (AppId|SteamAppId)=([0-9]+) ]]; then
+		if [[ "$argv_item" =~ (AppId|SteamAppId)=([0-9]+) ]]; then
 			steam_app_id="${BASH_REMATCH[2]}"
 			return 0
 		fi
-		prev="$arg"
+		last_argv="$argv_item"
 	done
 }
 
 # reset_config_state — Clear layered config before a fresh load (show-config / dry-run).
-# shellcheck disable=SC2034  # reset for prepare_launch_context / show-config
 reset_config_state() {
 	local key
 	config_loaded=()

@@ -100,9 +100,7 @@ _gpu_collect_nvidia_smi() {
 
 # _gpu_collect_sysfs — Append GPUs from /sys/class/drm/cardN/device.
 _gpu_collect_sysfs() {
-	# shellcheck disable=SC2178  # nameref to caller's rows[] / seen_pci[] arrays
 	local -n _out=$1
-	# shellcheck disable=SC2178
 	local -n _seen=$2
 	local device vendor_file vendor slug name role slot norm vram idx
 
@@ -132,9 +130,7 @@ _gpu_collect_sysfs() {
 
 # _gpu_collect_pciconf — Append GPUs from pciconf on BSD.
 _gpu_collect_pciconf() {
-	# shellcheck disable=SC2178  # nameref to caller's rows[] / seen_pci[] arrays
 	local -n _out=$1
-	# shellcheck disable=SC2178
 	local -n _seen=$2
 	local line slug name role idx norm
 
@@ -162,6 +158,7 @@ _gpu_collect_pciconf() {
 # detect_gpus_enumerate — TSV rows: vendor role primary index vram_mb pci_slot name.
 detect_gpus_enumerate() {
 	local -a rows=() scored=()
+	# shellcheck disable=SC2034  # mutated by _gpu_collect_* via nameref
 	local -A seen_pci=()
 	local row vendor role pri idx vram pci name best_score=-1 best_i=0 score i
 

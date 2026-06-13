@@ -25,8 +25,7 @@ TUI_GLYPH_BAD=$'✕'
 TUI_GLYPH_NA=$'—'
 TUI_GAME_BOOL_COL_WIDTH=2
 
-# Legacy aliases (tests, no-color fallbacks).
-TUI_GLYPH_NO=$TUI_GLYPH_BAD
+# Legacy alias (tests, no-color fallbacks): use TUI_GLYPH_BAD directly.
 
 # tui_glyph_paint — Apply semantic color to a glyph character.
 tui_glyph_paint() {
