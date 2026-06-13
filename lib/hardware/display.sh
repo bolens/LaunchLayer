@@ -246,7 +246,7 @@ detect_vrr_enabled() {
 	vendor="$(detect_gpu_vendor)"
 	if [[ "$vendor" == nvidia ]] && command -v nvidia-settings >/dev/null 2>&1; then
 		local vrr
-		vrr="$(nvidia-settings -q AllowVRR -t 2>/dev/null | head -1 | tr -d ' ')"
+		vrr="$( { nvidia-settings -q AllowVRR -t 2>/dev/null || true; } | head -1 | tr -d ' ')"
 		[[ "$vrr" == "1" ]] && return 0
 	fi
 	return 1

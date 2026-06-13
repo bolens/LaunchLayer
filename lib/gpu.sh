@@ -14,7 +14,7 @@ apply_nvidia_power_mode() {
 	[[ "$(detect_gpu_vendor)" == nvidia ]] || return 0
 	optional_tool_installed nvidia-settings || return 0
 
-	current="$(nvidia-settings -q GPUPowerMizerMode -t 2>/dev/null | head -1 | tr -d ' ')"
+	current="$( { nvidia-settings -q GPUPowerMizerMode -t 2>/dev/null || true; } | head -1 | tr -d ' ')"
 	[[ "$current" =~ ^[0-2]$ ]] || {
 		warn "could not read GPUPowerMizerMode"
 		return 0

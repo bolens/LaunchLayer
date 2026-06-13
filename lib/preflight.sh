@@ -256,7 +256,7 @@ check_gpu_power() {
 	[[ "${GPU_POWER_CHECK:-0}" == "1" ]] || return 0
 	[[ "$(detect_gpu_vendor)" == nvidia ]] || return 0
 	optional_tool_installed nvidia-smi || return 0
-	pstate="$(nvidia-smi --query-gpu=pstate --format=csv,noheader 2>/dev/null | head -1 | tr -d ' ')"
+	pstate="$( { nvidia-smi --query-gpu=pstate --format=csv,noheader 2>/dev/null || true; } | head -1 | tr -d ' ')"
 	[[ -n "$pstate" ]] || return 0
 	if [[ "$pstate" != "P0" ]]; then
 		warn "GPU pstate is $pstate (expected P0 for gaming)"

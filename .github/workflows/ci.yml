@@ -18,6 +18,9 @@ jobs:
       - name: Shellcheck
         run: make shellcheck
 
+      - name: Prepare vm.max_map_count for doctor tests
+        run: sudo sysctl -w vm.max_map_count=2147483642
+
       - name: Bats
         run: make test
 

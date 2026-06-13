@@ -196,7 +196,10 @@ detect_gpus_json() {
 	local first=1 row vendor role pri idx vram pci name
 
 	mapfile -t rows < <(detect_gpus_enumerate)
-	((${#rows[@]})) || return 1
+	if ((${#rows[@]} == 0)); then
+		printf '[]'
+		return 0
+	fi
 	printf '['
 	for row in "${rows[@]}"; do
 		IFS=$'\t' read -r vendor role pri idx vram pci name <<< "$row"
@@ -268,11 +271,11 @@ gpu_vram_free_mb() {
 				[[ "$pri" == "1" && "$slug" == nvidia ]] && primary_idx=$idx && break
 			done < <(detect_gpus_enumerate)
 			if [[ -n "$primary_idx" ]]; then
-				free_mb="$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits \
-					-i "$primary_idx" 2>/dev/null | head -1 | tr -d ' ')"
+				free_mb="$( { nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits \
+					-i "$primary_idx" 2>/dev/null || true; } | head -1 | tr -d ' ')"
 			else
-				free_mb="$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null \
-					| head -1 | tr -d ' ')"
+				free_mb="$( { nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits \
+					2>/dev/null || true; } | head -1 | tr -d ' ')"
 			fi
 			[[ "$free_mb" =~ ^[0-9]+$ ]] && echo "$free_mb"
 			;;
