@@ -100,7 +100,9 @@ _gpu_collect_nvidia_smi() {
 
 # _gpu_collect_sysfs — Append GPUs from /sys/class/drm/cardN/device.
 _gpu_collect_sysfs() {
+	# shellcheck disable=SC2178  # nameref to caller's rows[] / seen_pci[] arrays
 	local -n _out=$1
+	# shellcheck disable=SC2178
 	local -n _seen=$2
 	local device vendor_file vendor slug name role slot norm vram idx
 
@@ -130,7 +132,9 @@ _gpu_collect_sysfs() {
 
 # _gpu_collect_pciconf — Append GPUs from pciconf on BSD.
 _gpu_collect_pciconf() {
+	# shellcheck disable=SC2178  # nameref to caller's rows[] / seen_pci[] arrays
 	local -n _out=$1
+	# shellcheck disable=SC2178
 	local -n _seen=$2
 	local line slug name role idx norm
 

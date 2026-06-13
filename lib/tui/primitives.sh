@@ -449,7 +449,7 @@ tui_pick_game_appids_multi() {
 
 # tui_bulk_preset_menu — Apply INCLUDE preset to many games at once.
 tui_bulk_preset_menu() {
-	local action scope preset count appid -a appids=()
+	local action scope preset appid -a appids=()
 	local filter_n configured_n
 	filter_n="$(tui_game_scope_count filter)"
 	configured_n="$(tui_game_scope_count configured)"

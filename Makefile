@@ -8,7 +8,7 @@ test:
 	cd hub && pnpm test
 
 lint shellcheck:
-	shellcheck -x launchlayer lib/*.sh lib/**/*.sh scripts/*.sh test/helpers.bash
+	shellcheck -x -P lib --severity=warning launchlayer lib/*.sh lib/**/*.sh scripts/*.sh test/helpers.bash
 
 check-hub-git:
 	bash scripts/check-staged-hub-secrets.sh

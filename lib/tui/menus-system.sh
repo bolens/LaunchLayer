@@ -209,7 +209,7 @@ tui_system_menu() {
 
 # tui_setup_menu — Interactive setup shortcuts.
 tui_setup_menu() {
-	local action flags=()
+	local action
 	while true; do
 		action="$(tui_menu "Setup / onboarding" \
 			"Run full setup (completions + launch option)" \

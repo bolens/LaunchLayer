@@ -17,7 +17,8 @@ launchlayer_script() {
 
 # seed_fake_steam_game — Write a minimal appmanifest + installdir for tests.
 seed_fake_steam_game() {
-	local steam_root=$1 appid=$2 name=$3 installdir=${4:-TestGame${appid}}
+	local steam_root=$1 appid=$2 name=$3 installdir
+	installdir=${4:-TestGame${appid}}
 	mkdir -p "$steam_root/steamapps/common/$installdir"
 	cat > "$steam_root/steamapps/appmanifest_${appid}.acf" <<EOF
 "AppState"
@@ -67,7 +68,10 @@ _source_lib_module() {
 		setup) launchlayer_source_setup ;;
 		commands) launchlayer_source_commands ;;
 		hub) launchlayer_source_hub ;;
-		*) source "$root/lib/${module}.sh" ;;
+		*)
+			# shellcheck source=/dev/null
+			source "$root/lib/${module}.sh"
+			;;
 	esac
 }
 
@@ -129,7 +133,8 @@ EOF
 bats_unit_setup() {
 	# shellcheck disable=SC1091
 	source "$BATS_TEST_DIRNAME/../helpers.bash"
-	export CONFIG_DIR="$(launchlayer_root)"
+	CONFIG_DIR="$(launchlayer_root)"
+	export CONFIG_DIR
 }
 
 # bats_integration_setup — Common setup for test/integration/*.bats.
@@ -137,7 +142,8 @@ bats_integration_setup() {
 	# shellcheck disable=SC1091
 	source "$BATS_TEST_DIRNAME/../helpers.bash"
 	SCRIPT="$(launchlayer_script)"
-	export REPO_ROOT="$(launchlayer_root)"
+	REPO_ROOT="$(launchlayer_root)"
+	export SCRIPT REPO_ROOT
 	export STEAM_ROOT="${STEAM_ROOT:-$HOME/.local/share/Steam}"
 }
 

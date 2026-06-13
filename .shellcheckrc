@@ -1,2 +1,6 @@
 # Follow `source` directives so lib/*.sh modules are analyzed as one program.
 external-sources=true
+# Resolve `# shellcheck source=platform/foo.sh` in lib/load-modules.sh.
+source-path=lib
+# Modular layout: globals and callbacks span sourced files (see lib/common.sh).
+disable=SC2034,SC2154,SC2329
