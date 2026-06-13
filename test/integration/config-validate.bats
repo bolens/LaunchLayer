@@ -24,13 +24,29 @@ setup() {
 }
 
 @test "dry-run includes config layers" {
-	run "$SCRIPT" --dry-run /bin/echo test AppId=2357570
+	[[ -f "$REPO_ROOT/examples/games/2357570.env" ]] || skip "2357570.env missing"
+	local tmp fake_steam
+	tmp="$(temp_config_dir)"
+	fake_steam="$(fake_steam_root 2357570 "Overwatch")"
+	cp "$REPO_ROOT/examples/games/2357570.env" "$tmp/games/"
+	cp "$REPO_ROOT/launch.d/presets/competitive.env" "$tmp/launch.d/presets/"
+	run env STEAM_ROOT="$fake_steam" LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" \
+		LAUNCHLAYER_PROFILES= "$SCRIPT" --dry-run /bin/echo test AppId=2357570
+	rm -rf "$fake_steam"
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"Config layers"* ]]
 }
 
 @test "dry-run verbose includes debug layers" {
-	run "$SCRIPT" --verbose --dry-run /bin/echo test AppId=2357570
+	[[ -f "$REPO_ROOT/examples/games/2357570.env" ]] || skip "2357570.env missing"
+	local tmp fake_steam
+	tmp="$(temp_config_dir)"
+	fake_steam="$(fake_steam_root 2357570 "Overwatch")"
+	cp "$REPO_ROOT/examples/games/2357570.env" "$tmp/games/"
+	cp "$REPO_ROOT/launch.d/presets/competitive.env" "$tmp/launch.d/presets/"
+	run env STEAM_ROOT="$fake_steam" LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" \
+		LAUNCHLAYER_PROFILES= "$SCRIPT" --verbose --dry-run /bin/echo test AppId=2357570
+	rm -rf "$fake_steam"
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"Config layers"* ]]
 }

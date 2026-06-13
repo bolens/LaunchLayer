@@ -53,6 +53,15 @@ run_game_launch() {
 	# shellcheck disable=SC2154  # set by resolve_game_flags / parse_game_extra_args above
 	debug "appid=${steam_app_id:-unknown} name=${steam_game_name:-unknown} native=$is_native eac=$is_anticheat type=${anticheat_type:-} engine=$game_engine_hint"
 
+	if [[ "$DRY_RUN" == "1" ]]; then
+		warn_missing_tools
+		apply_anticheat_guardrails
+		apply_proton_env
+		build_launch_chain
+		print_dry_run "$@"
+		exit 0
+	fi
+
 	if [[ "${BENCHMARK:-0}" != "1" ]]; then
 		check_concurrent_launch
 		check_vm_max_map_count
@@ -83,11 +92,6 @@ run_game_launch() {
 	apply_nvidia_power_mode
 	apply_proton_env
 	build_launch_chain
-
-	if [[ "$DRY_RUN" == "1" ]]; then
-		print_dry_run "$@"
-		exit 0
-	fi
 
 	run_pre_launch_cmd
 

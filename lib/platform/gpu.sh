@@ -62,7 +62,7 @@ _gpu_sysfs_name() {
 	local device=$1 slot="" name="" card=""
 	slot="$(grep -m1 '^PCI_SLOT_NAME=' "$device/uevent" 2>/dev/null | cut -d= -f2- || true)"
 	if [[ -n "$slot" ]] && command -v lspci >/dev/null 2>&1; then
-		name="$(lspci -s "$slot" 2>/dev/null | cut -d: -f3- | sed 's/^[[:space:]]*//')"
+		name="$( { lspci -s "$slot" 2>/dev/null || true; } | cut -d: -f3- | sed 's/^[[:space:]]*//')"
 	fi
 	if [[ -z "$name" ]]; then
 		card="$(basename "$(dirname "$device")")"
