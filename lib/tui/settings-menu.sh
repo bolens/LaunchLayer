@@ -6,9 +6,9 @@ LAUNCHLAYER_TUI_SETTINGS_MENU_LOADED=1
 
 # tui_prefs_path_short — Home-relative path for menu rows.
 tui_prefs_path_short() {
-	local p=${1:-}
+	local p=${1:-} home_prefix="${HOME}/"
 	case "$p" in
-		"$HOME"/*) printf '~/%s' "${p#"$HOME/"}" ;;
+		${home_prefix}*) printf '%s/%s' '~' "${p#"$home_prefix"}" ;;
 		"") printf '(not set)' ;;
 		*) printf '%s' "$p" ;;
 	esac

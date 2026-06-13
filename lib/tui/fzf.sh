@@ -12,6 +12,7 @@ tui_fzf_preview_window() {
 # tui_fzf_list_nav_binds — Home/End jump the list (fzf defaults move the query cursor).
 # Optional suffix chains extra actions (e.g. async header/footer chrome refresh).
 tui_fzf_list_nav_binds() {
+	# shellcheck disable=SC2178 # nameref to caller's array
 	local -n out_arr=$1
 	local suffix=${2:-}
 	[[ -n "$suffix" ]] && suffix="+${suffix}"
@@ -26,6 +27,7 @@ tui_fzf_list_nav_binds() {
 # tui_fzf_sort_binds — Alt-S toggles fzf relevance sort vs stdin order (toggle-sort).
 # Game/multi pickers default to --no-sort so recent-first rows stay grouped when filtering.
 tui_fzf_sort_binds() {
+	# shellcheck disable=SC2178 # nameref to caller's array
 	local -n out_arr=$1
 	local suffix=${2:-} no_sort=${3:-0}
 	[[ -n "$suffix" ]] && suffix="+${suffix}"

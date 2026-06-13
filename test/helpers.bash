@@ -182,7 +182,8 @@ engine_detect_teardown() {
 
 # engine_setup_fixture — Create a fake installed game; sets ENGINE_FIXTURE_DIR/STEAM.
 engine_setup_fixture() {
-	local appid=$1 name=$2 installdir=${3:-Game${appid}}
+	local appid=$1 name=$2
+	local installdir=${3:-Game${appid}}
 	local fake
 	fake="$(fake_steam_root "$appid" "$name" "$installdir")"
 	ENGINE_FAKE_STEAM_ROOTS+=("$fake")
