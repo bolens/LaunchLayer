@@ -23,19 +23,27 @@ tui_press_enter() {
 	read -r -p "Press Enter to continue… " _ </dev/tty
 }
 
+# tui_crumb_init — Ensure breadcrumb stack exists (set -u safe).
+tui_crumb_init() {
+	[[ -v TUI_CRUMB_STACK ]] || TUI_CRUMB_STACK=()
+}
+
 # tui_crumb_enter — Push a breadcrumb segment for nested menu headers.
 tui_crumb_enter() {
+	tui_crumb_init
 	TUI_CRUMB_STACK+=("$1")
 }
 
 # tui_crumb_leave — Pop the innermost breadcrumb segment.
 tui_crumb_leave() {
+	tui_crumb_init
 	((${#TUI_CRUMB_STACK[@]})) && unset 'TUI_CRUMB_STACK[-1]'
 }
 
 # tui_crumb_label — Prefix a menu title with the breadcrumb trail.
 tui_crumb_label() {
 	local header=$1 joined
+	tui_crumb_init
 	((${#TUI_CRUMB_STACK[@]})) || {
 		printf '%s' "$header"
 		return 0
@@ -83,6 +91,7 @@ tui_open_last_menu() {
 		Games) tui_games_menu ;;
 		"Config library") tui_config_menu ;;
 		"Backup & restore") tui_backup_menu ;;
+		"Community hub") tui_hub_menu ;;
 		"System & tools") tui_system_menu ;;
 		"TUI settings") tui_settings_menu ;;
 		*) return 1 ;;
@@ -287,7 +296,7 @@ tui_print_status_banner() {
 		vm_label="low"
 	fi
 	echo "── filter: ${TUI_GAME_FILTER:-all} │ doctor: ${issues} issue(s) │ vm.max_map_count: ${vm_label}"
-	echo "── backup: ${backup_timer} │ maintenance: ${maint_timer} │ ${prune}"
+	echo "── backup: ${backup_timer} │ maintenance: ${maint_timer} │ ${prune} │ hub: $(tui_hub_status_brief)"
 	echo
 }
 

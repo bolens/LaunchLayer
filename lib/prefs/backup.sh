@@ -53,6 +53,7 @@ _backup_prefs_parse_file() {
 			auto_prune|prune) BACKUP_PREFS_AUTO_PRUNE=$val ;;
 		esac
 	done < "$file"
+	return 0
 }
 
 # load_backup_prefs — Load saved backup preferences (defaults when missing).
@@ -60,6 +61,7 @@ load_backup_prefs() {
 	_backup_prefs_set_defaults
 	_backup_prefs_parse_file "$(backup_prefs_path)" || \
 		_backup_prefs_parse_file "$(backup_prefs_example_path)" || true
+	return 0
 }
 
 # save_backup_prefs — Persist backup preferences to the user config dir.

@@ -70,7 +70,7 @@ optional_tools_json_array() {
 # print_detect_environment_report — Formatted hardware/platform summary (no title).
 print_detect_environment_report() {
 	local w h r profiles free_vram access
-	local desktop gpu audio vrr active_output display_line desktop_line
+	local desktop gpu audio vrr active_output primary_output display_line desktop_line
 	local vram_line deck wsl container flatpak systemd_user immutable session_type
 
 	profiles="$(detect_default_profiles 2>/dev/null || true)"
@@ -83,6 +83,8 @@ print_detect_environment_report() {
 	gpu="$(detect_gpu_vendor)"
 	audio="$(detect_audio_server)"
 	active_output="$(detect_active_output 2>/dev/null || true)"
+	primary_output="$(detect_kwin_primary_output 2>/dev/null || true)"
+	[[ -n "$primary_output" ]] || primary_output="$active_output"
 	deck="$(is_steam_deck && echo yes || echo no)"
 	wsl="$(is_wsl2 && echo yes || echo no)"
 	container="$(is_container && echo yes || echo no)"
@@ -111,7 +113,9 @@ print_detect_environment_report() {
 	esac
 
 	display_line="$(cli_bold "${w}×${h} @ ${r} Hz")"
-	[[ -n "$active_output" ]] && display_line+=" · $(cli_dim "$active_output")"
+	[[ -n "$primary_output" ]] && display_line+=" · $(cli_dim "primary: ${primary_output}")"
+	[[ -n "$active_output" && "$active_output" != "$primary_output" ]] \
+		&& display_line+=" · $(cli_dim "focused: ${active_output}")"
 	display_line+=" · VRR ${vrr}"
 
 	cli_section "Gaming profile"
@@ -119,7 +123,8 @@ print_detect_environment_report() {
 	env_report_row "OS" "$(cli_bold "$(detect_os_pretty_name)") $(cli_dim "($(detect_os_family) · $(detect_uname_kernel))")"
 	[[ "$immutable" == yes ]] && env_report_row "Immutable" "$(cli_yesno yes)"
 	env_report_row "Desktop" "$desktop_line"
-	env_report_row "GPU" "$(printf '%s · %s' "$(cli_bold "$gpu")" "$vram_line")"
+	env_report_row "GPUs" "$(detect_gpu_summary 2>/dev/null || cli_bold "$gpu")"
+	env_report_row "Primary GPU" "$(printf '%s · %s' "$(cli_bold "$gpu")" "$vram_line")"
 	env_report_row "Display" "$display_line"
 	env_report_row "Audio" "$audio"
 	env_report_row "CPU affinity" "$(cli_bold "$(detect_x3d_cpus)") $(cli_dim "(X3D V-Cache CCD)")"
@@ -180,7 +185,7 @@ show_detect_environment() {
 		access="$(flatpak_script_access)"
 		active_output="$(detect_active_output 2>/dev/null || true)"
 
-		printf '{"config_dir":%s,"script":%s,"steam_root":%s,"profiles":%s,"os_id":%s,"os_family":%s,"os_pretty":%s,"kernel":%s,"desktop":%s,"compositor":%s,"session_type":%s,"display_backend":%s,"active_output":%s,"immutable":%s,"gpu_vendor":%s,"audio":%s,"wsl2":%s,"container":%s,"flatpak_steam":%s,"flatpak_script_access":%s,"systemd_user":%s,"x3d_cpus":%s,"default_nic":%s,"display":%s,"vrr":%s,"gpu_vram_free_mb":%s,"package_manager":%s,"optional_tools":' \
+		printf '{"config_dir":%s,"script":%s,"steam_root":%s,"profiles":%s,"os_id":%s,"os_family":%s,"os_pretty":%s,"kernel":%s,"desktop":%s,"compositor":%s,"session_type":%s,"display_backend":%s,"active_output":%s,"immutable":%s,"gpu_vendor":%s,"gpus":' \
 			"$(json_string "$CONFIG_DIR")" \
 			"$(json_string "$LAUNCHLAYER_MAIN_SCRIPT")" \
 			"$(json_string "$STEAM_ROOT")" \
@@ -195,7 +200,9 @@ show_detect_environment() {
 			"$(json_string "$(detect_session_type)")" \
 			"$(json_string "${active_output:-}")" \
 			"$(json_bool "$(is_immutable_os && echo 1 || echo 0)")" \
-			"$(json_string "$(detect_gpu_vendor)")" \
+			"$(json_string "$(detect_gpu_vendor)")"
+		detect_gpus_json 2>/dev/null || printf '[]'
+		printf ',"audio":%s,"wsl2":%s,"container":%s,"flatpak_steam":%s,"flatpak_script_access":%s,"systemd_user":%s,"x3d_cpus":%s,"default_nic":%s,"display":%s,"vrr":%s,"gpu_vram_free_mb":%s,"package_manager":%s,"optional_tools":' \
 			"$(json_string "$(detect_audio_server)")" \
 			"$(json_bool "$(is_wsl2 && echo 1 || echo 0)")" \
 			"$(json_bool "$(is_container && echo 1 || echo 0)")" \

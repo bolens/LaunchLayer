@@ -72,7 +72,7 @@ parse_wlr_randr_output() {
 		}'
 }
 
-# detect_kwin_active_output — Primary/focused output name via KDE KWin (Plasma 6).
+# detect_kwin_active_output — Focused output name via KDE KWin (Plasma 6).
 detect_kwin_active_output() {
 	local name=""
 	if command -v qdbus6 >/dev/null 2>&1; then
@@ -126,9 +126,17 @@ detect_display_resolution() {
 
 	if { [[ -z "$w" || -z "$h" ]] || [[ ! "$w" =~ ^[0-9]+$ || ! "$h" =~ ^[0-9]+$ ]]; } \
 		&& command -v xrandr >/dev/null 2>&1; then
-		read -r w h < <(xrandr --query 2>/dev/null | awk '/ connected/ {
-			if (match($0, /([0-9]+)x([0-9]+)/, m)) { print m[1], m[2]; exit }
-		}') || true
+		read -r w h < <(xrandr --query 2>/dev/null | awk '
+			/ connected/ && / primary / {
+				if (match($0, /([0-9]+)x([0-9]+)/, m)) { print m[1], m[2]; exit }
+			}
+			/ connected/ && !fallback {
+				if (match($0, /([0-9]+)x([0-9]+)/, m)) {
+					fw = m[1]; fh = m[2]; fallback = 1
+				}
+			}
+			END { if (fw != "") print fw, fh }
+		') || true
 	fi
 
 	: "${w:=3440}"
@@ -160,8 +168,18 @@ detect_display_refresh() {
 		}')"
 	fi
 	if [[ -z "$rate" ]] && command -v xrandr >/dev/null 2>&1; then
-		rate="$(xrandr --query 2>/dev/null | awk '/ connected/ {print $4; exit}' || true)"
-		rate="$(printf '%s' "$rate" | grep -oE '[0-9]+\.[0-9]+' | head -1 || true)"
+		rate="$(xrandr --query 2>/dev/null | awk '
+			/ connected/ && / primary / { out = $1; primary = 1 }
+			out != "" && $1 == out && /\*/ {
+				if (match($0, /([0-9]+\.[0-9]+)/, m)) { print m[1]; exit }
+			}
+			/ connected/ && !seen {
+				out = $1; seen = 1
+			}
+			seen && out != "" && $1 == out && /\*/ {
+				if (match($0, /([0-9]+\.[0-9]+)/, m)) { print m[1]; exit }
+			}
+		')"
 	fi
 	[[ -n "$rate" ]] && rate="${rate%%.*}"
 	: "${rate:=120}"
@@ -230,6 +248,57 @@ detect_vrr_enabled() {
 		local vrr
 		vrr="$(nvidia-settings -q AllowVRR -t 2>/dev/null | head -1 | tr -d ' ')"
 		[[ "$vrr" == "1" ]] && return 0
+	fi
+	return 1
+}
+
+# detect_displays_json — JSON array of connected outputs [{name,width,height,refresh,primary}, ...].
+detect_displays_json() {
+	local -a lines=() first=1 line name pri w h hz
+	if parse_kscreen_doctor_outputs >/dev/null 2>&1; then
+		mapfile -t lines < <(parse_kscreen_doctor_outputs)
+		((${#lines[@]})) || return 1
+		printf '['
+		for line in "${lines[@]}"; do
+			read -r name pri w h hz <<< "$line"
+			(( first )) || printf ','
+			first=0
+			printf '{"name":%s,"width":%s,"height":%s,"refresh":%s,"primary":%s}' \
+				"$(json_string "$name")" "$w" "$h" "${hz:-0}" \
+				"$(json_bool "$([[ "$pri" == "1" ]] && echo 1 || echo 0)")"
+		done
+		printf ']'
+		return 0
+	fi
+	if command -v xrandr >/dev/null 2>&1; then
+		mapfile -t lines < <(xrandr --query 2>/dev/null | awk '
+			/ connected/ {
+				name = $1
+				primary = ($0 ~ / primary /) ? 1 : 0
+				if (match($0, /([0-9]+)x([0-9]+)/, m)) {
+					printf "%s %s %s %s %s\n", name, m[1], m[2], 0, primary
+				}
+			}
+		')
+		((${#lines[@]})) || return 1
+		printf '['
+		for line in "${lines[@]}"; do
+			read -r name w h hz pri <<< "$line"
+			if [[ "$hz" == "0" ]]; then
+				hz="$(xrandr --query 2>/dev/null | awk -v out="$name" '
+					$1 == out && /\*/ {
+						if (match($0, /([0-9]+\.[0-9]+)/, m)) { print int(m[1] + 0.5); exit }
+					}
+				')"
+			fi
+			(( first )) || printf ','
+			first=0
+			printf '{"name":%s,"width":%s,"height":%s,"refresh":%s,"primary":%s}' \
+				"$(json_string "$name")" "$w" "$h" "${hz:-0}" \
+				"$(json_bool "$pri")"
+		done
+		printf ']'
+		return 0
 	fi
 	return 1
 }

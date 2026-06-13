@@ -1,0 +1,19 @@
+{
+  "name": "launchlayer-hub",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.16.1",
+  "scripts": {
+    "dev": "convex dev",
+    "convex:deploy": "convex deploy",
+    "test": "tsx --test convex/lib/*.test.ts"
+  },
+  "dependencies": {
+    "convex": "^1.41.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.7.0"
+  }
+}

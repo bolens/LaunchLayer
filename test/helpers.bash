@@ -66,9 +66,79 @@ _source_lib_module() {
 		completions) launchlayer_source_completions ;;
 		setup) launchlayer_source_setup ;;
 		commands) launchlayer_source_commands ;;
-		tui) launchlayer_source_tui ;;
+		hub) launchlayer_source_hub ;;
 		*) source "$root/lib/${module}.sh" ;;
 	esac
+}
+
+# stop_hub_mock_server — Stop background hub-mock-server.py if running.
+stop_hub_mock_server() {
+	[[ -n "${HUB_MOCK_PID:-}" ]] || return 0
+	kill "$HUB_MOCK_PID" 2>/dev/null || true
+	wait "$HUB_MOCK_PID" 2>/dev/null || true
+	unset HUB_MOCK_PID HUB_MOCK_URL HUB_MOCK_PORT
+}
+
+# start_hub_mock_server — Start hub-mock-server.py; sets HUB_MOCK_URL and HUB_MOCK_PID.
+# Usage: start_hub_mock_server [token] [open=0|1]
+start_hub_mock_server() {
+	local token=${1:-test-secret} open=${2:-0}
+	local fixtures_dir script port_file args=()
+	fixtures_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/fixtures" && pwd)"
+	script="$fixtures_dir/hub-mock-server.py"
+	[[ -f "$script" ]] || {
+		echo "missing hub mock server: $script" >&2
+		return 1
+	}
+	stop_hub_mock_server
+	args=(--token "$token")
+	[[ "$open" == "1" ]] && args+=(--open)
+	port_file="$(mktemp)"
+	python3 "$script" "${args[@]}" >"$port_file" &
+	HUB_MOCK_PID=$!
+	local i=0
+	while (( i < 50 )); do
+		[[ -s "$port_file" ]] && break
+		sleep 0.05
+		i=$((i + 1))
+	done
+	HUB_MOCK_PORT="$(tr -d '[:space:]' <"$port_file")"
+	rm -f "$port_file"
+	[[ "$HUB_MOCK_PORT" =~ ^[0-9]+$ ]] || {
+		stop_hub_mock_server
+		echo "hub mock server failed to start" >&2
+		return 1
+	}
+	HUB_MOCK_URL="http://127.0.0.1:${HUB_MOCK_PORT}"
+	export HUB_MOCK_PID HUB_MOCK_URL HUB_MOCK_PORT
+}
+
+# write_hub_conf — Write a minimal hub.conf in a temp XDG config dir.
+write_hub_conf() {
+	local xdg=$1 hub_url=$2 publish_token=${3:-} fingerprint_level=${4:-minimal}
+	mkdir -p "$xdg/launchlayer"
+	cat >"$xdg/launchlayer/hub.conf" <<EOF
+hub_url=${hub_url}
+publish_token=${publish_token}
+machine_label=test-machine
+fingerprint_level=${fingerprint_level}
+EOF
+}
+
+# bats_unit_setup — Common setup for test/unit/*.bats.
+bats_unit_setup() {
+	# shellcheck disable=SC1091
+	source "$BATS_TEST_DIRNAME/../helpers.bash"
+	export CONFIG_DIR="$(launchlayer_root)"
+}
+
+# bats_integration_setup — Common setup for test/integration/*.bats.
+bats_integration_setup() {
+	# shellcheck disable=SC1091
+	source "$BATS_TEST_DIRNAME/../helpers.bash"
+	SCRIPT="$(launchlayer_script)"
+	export REPO_ROOT="$(launchlayer_root)"
+	export STEAM_ROOT="${STEAM_ROOT:-$HOME/.local/share/Steam}"
 }
 
 # source_lib — Source lib modules with CONFIG_DIR and LIB_DIR set.

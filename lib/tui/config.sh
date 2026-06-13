@@ -6,7 +6,9 @@ LAUNCHLAYER_TUI_LOADED=1
 TUI_PRESETS=(standard competitive lightweight native)
 TUI_GAME_FILTERS=(all configured unconfigured)
 TUI_PRESS_ENTER_LINES=${TUI_PRESS_ENTER_LINES:-8}
-declare -a TUI_CRUMB_STACK=()
+# Plain assignment (not declare -a): TUI modules load via launchlayer_source_tui(),
+# and declare from a function-sourced file stays function-local in bash.
+TUI_CRUMB_STACK=()
 
 # tui_json_enabled — True when TUI view commands should use --json output.
 tui_json_enabled() {
@@ -99,11 +101,7 @@ tui_validate_game_config_brief() {
 
 # tui_set_include_preset — Point per-game INCLUDE= at a named preset.
 tui_set_include_preset() {
-	local appid=$1 preset=$2 file
-	tui_ensure_appid_env "$appid"
-	file="$(tui_appid_env_path "$appid")"
-	tui_env_upsert "$file" "INCLUDE" "presets/${preset}.env"
-	echo "Set INCLUDE=presets/${preset}.env in $(basename "$file")"
+	set_include_preset "$1" "$2"
 }
 
 # tui_prompt_env_key — Prompt for a string key and write to per-game .env.

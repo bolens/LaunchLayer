@@ -23,6 +23,8 @@ _launchlayer_settings() {
 		--doctor --setup --install-systemd --sysctl --completions --list-games --init-appid
 		--init-unconfigured --prune-uninstalled --export-config --backup-config --import-config
 		--prune-backups --run-scheduled-backup --backup-timer --backup-prefs --tui-prefs
+		--hub-fingerprint --hub-publish --hub-update --hub-delete --hub-recommend --hub-search --hub-apply --hub-prefs
+		--bulk-set-include
 		--show-config --edit-appid --paths --validate-config
 		--scan-anticheat --scan-detections --cache-report --launch-stats --dry-run
 		--help -h --version -V --tui
@@ -49,6 +51,15 @@ _launchlayer_settings() {
 				COMPREPLY=( $(compgen -W "$presets --force" -- "$cur") )
 			elif [[ $cword -ge 4 ]]; then
 				COMPREPLY=( $(compgen -W "--force $presets" -- "$cur") )
+			fi
+			;;
+		--bulk-set-include)
+			local appids
+			appids="$(_launchlayer_appids "$script")"
+			if [[ $cword -eq 2 ]]; then
+				COMPREPLY=( $(compgen -W "$presets" -- "$cur") )
+			else
+				COMPREPLY=( $(compgen -W "--all-configured --all-installed --grep --dry-run --json $presets $appids" -- "$cur") )
 			fi
 			;;
 		--paths)
@@ -90,6 +101,48 @@ _launchlayer_settings() {
 			;;
 		--tui-prefs)
 			COMPREPLY=( $(compgen -W "show reset set --json game_filter cache_min_gb default_preset fzf_height fzf_preview" -- "$cur") )
+			;;
+		--hub-fingerprint)
+			COMPREPLY=( $(compgen -W "--json --fingerprint-level minimal standard detailed" -- "$cur") )
+			;;
+		--hub-publish)
+			local appids
+			appids="$(_launchlayer_appids "$script")"
+			if [[ $cword -eq 2 ]]; then
+				COMPREPLY=( $(compgen -W "$appids --all-configured" -- "$cur") )
+			else
+				COMPREPLY=( $(compgen -W "--note --config-id --all-configured --json $appids" -- "$cur") )
+			fi
+			;;
+		--hub-update)
+			if [[ $cword -eq 2 ]]; then
+				local appids
+				appids="$(_launchlayer_appids "$script")"
+				COMPREPLY=( $(compgen -W "$appids --all-configured" -- "$cur") )
+			else
+				COMPREPLY=( $(compgen -W "--note --all-configured --include-new --json" -- "$cur") )
+			fi
+			;;
+		--hub-recommend)
+			local appids
+			appids="$(_launchlayer_appids "$script")"
+			if [[ $cword -eq 2 ]]; then
+				COMPREPLY=( $(compgen -W "$appids" -- "$cur") )
+			else
+				COMPREPLY=( $(compgen -W "--limit --json $appids" -- "$cur") )
+			fi
+			;;
+		--hub-search)
+			COMPREPLY=( $(compgen -W "--limit --json" -- "$cur") )
+			;;
+		--hub-apply)
+			COMPREPLY=( $(compgen -W "--dry-run --json" -- "$cur") )
+			;;
+		--hub-delete)
+			COMPREPLY=( $(compgen -W "--yes --json" -- "$cur") )
+			;;
+		--hub-prefs)
+			COMPREPLY=( $(compgen -W "show reset set --json hub_url publish_token machine_label fingerprint_level minimal standard detailed" -- "$cur") )
 			;;
 		--list-games)
 			COMPREPLY=( $(compgen -W "--configured --json --grep" -- "$cur") )

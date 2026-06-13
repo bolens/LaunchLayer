@@ -36,6 +36,7 @@ _tui_prefs_parse_file() {
 			fzf_preview) LAUNCHLAYER_TUI_PREVIEW=$val ;;
 		esac
 	done < "$file"
+	return 0
 }
 
 # tui_load_config — Load saved TUI preferences (safe defaults when missing).
@@ -43,6 +44,7 @@ tui_load_config() {
 	_tui_prefs_set_defaults
 	_tui_prefs_parse_file "$(tui_config_path)" || \
 		_tui_prefs_parse_file "$(tui_config_example_path)" || true
+	return 0
 }
 
 # tui_save_config — Persist TUI preferences.

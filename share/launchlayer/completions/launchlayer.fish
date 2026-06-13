@@ -47,6 +47,7 @@ function __launchlayer_register
     complete -c $cmd -n __launchlayer_no_subcommand -a '--completions' -d 'Manage shell tab completions'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--list-games' -d 'List installed Steam games'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--init-appid' -d 'Scaffold games/<AppID>.env'
+    complete -c $cmd -n __launchlayer_no_subcommand -a '--bulk-set-include' -d 'Set INCLUDE preset on many games'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--init-unconfigured' -d 'Scaffold configs for unconfigured games'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--prune-uninstalled' -d 'Remove configs for uninstalled games'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--export-config' -d 'Pack launch.d configs into a tarball'
@@ -57,6 +58,14 @@ function __launchlayer_register
     complete -c $cmd -n __launchlayer_no_subcommand -a '--backup-timer' -d 'Install/manage backup timer'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--backup-prefs' -d 'Manage backup preferences'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--tui-prefs' -d 'Manage TUI preferences'
+    complete -c $cmd -n __launchlayer_no_subcommand -a '--hub-fingerprint' -d 'Machine fingerprint for hub matching'
+    complete -c $cmd -n __launchlayer_no_subcommand -a '--hub-publish' -d 'Publish per-game config to community hub'
+    complete -c $cmd -n __launchlayer_no_subcommand -a '--hub-update' -d 'Update shared hub configs for this machine'
+    complete -c $cmd -n __launchlayer_no_subcommand -a '--hub-delete' -d 'Delete a shared hub config by id'
+    complete -c $cmd -n __launchlayer_no_subcommand -a '--hub-recommend' -d 'Recommend configs from similar machines'
+    complete -c $cmd -n __launchlayer_no_subcommand -a '--hub-search' -d 'List machines similar to this one'
+    complete -c $cmd -n __launchlayer_no_subcommand -a '--hub-apply' -d 'Apply a shared hub config by id'
+    complete -c $cmd -n __launchlayer_no_subcommand -a '--hub-prefs' -d 'Manage hub preferences'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--paths' -d 'Shader cache, compatdata, install paths'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--show-config' -d 'Show resolved config for an AppID'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--edit-appid' -d 'Open per-game config in EDITOR'
@@ -214,6 +223,107 @@ function __launchlayer_register
         -a 'show reset set'
     complete -c $cmd \
         -n '__fish_seen_subcommand_from --tui-prefs' \
+        -a '--json' -d 'JSON output'
+
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-prefs' \
+        -a 'show reset set'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-prefs' \
+        -a '--json' -d 'JSON output'
+
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --bulk-set-include; and not __fish_seen_subcommand_from standard competitive lightweight native' \
+        -a '(__launchlayer_presets)'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --bulk-set-include' \
+        -a '--all-configured' -d 'Only games with per-game .env'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --bulk-set-include' \
+        -a '--all-installed' -d 'Every installed Steam game'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --bulk-set-include' \
+        -a '--grep' -d 'Filter by game name'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --bulk-set-include' \
+        -a '--dry-run' -d 'Print targets without writing'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --bulk-set-include' \
+        -a '--json' -d 'JSON output'
+
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-fingerprint' \
+        -a '--json' -d 'JSON output'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-fingerprint' \
+        -a '--fingerprint-level' -d 'Privacy level'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-fingerprint --fingerprint-level' \
+        -a 'minimal standard detailed'
+
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-publish; and test (count (commandline -opc)) -eq 2' \
+        -a '(__launchlayer_appids) --all-configured'
+
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-publish' \
+        -a '--note' -d 'Optional publish note'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-publish' \
+        -a '--config-id' -d 'Update specific hub config id'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-publish' \
+        -a '--all-configured' -d 'Publish all configured games'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-publish' \
+        -a '--json' -d 'JSON output'
+
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-update; and test (count (commandline -opc)) -eq 2' \
+        -a '(__launchlayer_appids) --all-configured'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-update' \
+        -a '--note' -d 'Optional update note'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-update' \
+        -a '--all-configured' -d 'Update all shared configs on this machine'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-update' \
+        -a '--include-new' -d 'Also publish games without existing hub config'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-update' \
+        -a '--json' -d 'JSON output'
+
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-recommend; and test (count (commandline -opc)) -eq 2' \
+        -a '(__launchlayer_appids)'
+
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-recommend' \
+        -a '--limit' -d 'Maximum recommendations'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-recommend' \
+        -a '--json' -d 'JSON output'
+
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-search' \
+        -a '--limit' -d 'Maximum machines'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-search' \
+        -a '--json' -d 'JSON output'
+
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-apply' \
+        -a '--dry-run' -d 'Preview without writing files'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-apply' \
+        -a '--json' -d 'JSON output'
+
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-delete' \
+        -a '--yes' -d 'Skip confirmation prompt'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-delete' \
         -a '--json' -d 'JSON output'
 
     complete -c $cmd \

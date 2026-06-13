@@ -194,7 +194,7 @@ tui_system_menu() {
 				tui_vram_menu
 				;;
 			"Cache report")
-				tui_run_paged tui_cache_report || true
+				tui_cache_report_menu
 				;;
 			"Setup / onboarding")
 				tui_setup_menu
@@ -340,7 +340,44 @@ tui_settings_menu() {
 
 # tui_cache_report — Cache audit using TUI min-GB preference.
 tui_cache_report() {
-	local min_gb=${TUI_CACHE_MIN_GB:-5}
+	local min_gb=${1:-${TUI_CACHE_MIN_GB:-5}} mode=${2:-both} grep_pattern=${3:-}
 	[[ "$min_gb" =~ ^[0-9]+$ ]] || min_gb=5
-	cache_report "$min_gb" both "" 0
+	cache_report "$min_gb" "$mode" "$grep_pattern" 0
+}
+
+# tui_cache_report_menu — Cache audit with CLI-parity filters.
+tui_cache_report_menu() {
+	local action val min_gb mode grep_pattern
+	min_gb=${TUI_CACHE_MIN_GB:-5}
+	while true; do
+		action="$(tui_menu "Cache report (min ${min_gb} GB)" \
+			"Full report (shader + compatdata)" \
+			"Shader cache only" \
+			"Compatdata only" \
+			"Filter by game name (--grep)" \
+			"Change min GB threshold" \
+			"Back")" || return 0
+
+		case "$action" in
+			"Full report (shader + compatdata)")
+				tui_run_paged tui_cache_report "$min_gb" both "" || true
+				;;
+			"Shader cache only")
+				tui_run_paged tui_cache_report "$min_gb" shader "" || true
+				;;
+			"Compatdata only")
+				tui_run_paged tui_cache_report "$min_gb" compat "" || true
+				;;
+			"Filter by game name (--grep)")
+				read -r -p "Name substring: " grep_pattern </dev/tty || continue
+				[[ -n "$grep_pattern" ]] || continue
+				tui_run_paged tui_cache_report "$min_gb" both "$grep_pattern" || true
+				;;
+			"Change min GB threshold")
+				read -r -p "Min GB [${min_gb}]: " val </dev/tty || continue
+				[[ -n "$val" && "$val" =~ ^[0-9]+$ ]] && min_gb=$val
+				;;
+			*) return 0 ;;
+		esac
+	done
 }

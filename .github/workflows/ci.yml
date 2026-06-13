@@ -20,3 +20,27 @@ jobs:
 
       - name: Bats
         run: make test
+
+  hub:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable Corepack (pnpm)
+        run: corepack enable
+
+      - name: Install hub dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit hub dependencies
+        run: pnpm audit --audit-level=high
+
+      - name: Typecheck hub Convex functions
+        run: pnpm exec tsc -p convex/tsconfig.json

@@ -1,0 +1,29 @@
+# LaunchLayer Hub preferences
+# Copy to ~/.config/launchlayer/hub.conf and adjust.
+# Reset: launchlayer --hub-prefs reset  |  TUI → Community hub → Hub settings
+# CLI:   launchlayer --hub-prefs set KEY VALUE
+#
+# Keys (aliases in parentheses):
+#   hub_url (url)              Convex HTTP actions base URL
+#   publish_token (token)      Bearer token when hub enforces publish auth
+#   machine_label (label)      Friendly name shown on shared configs
+#   fingerprint_level          minimal | standard | detailed (privacy vs match quality)
+
+# Base URL of your LaunchLayer Hub deployment (Convex HTTP actions URL).
+# Example after `npx convex dev`: https://your-deployment.convex.site
+# hub_url=
+
+# Optional bearer token if your hub requires authenticated publishes.
+# Must match HUB_PUBLISH_TOKEN on the Convex deployment (see hub/.env.example).
+# publish_token=
+
+# Optional friendly label shown next to your published configs.
+# machine_label=7900X3D + 3080 Ti workstation
+
+# Fingerprint depth for hub publish/recommend (privacy vs matching quality):
+#   minimal  — GPU vendor, OS, session, profiles, display/refresh tiers, desktop (default)
+#   standard — minimal + audio, VRAM tier, monitor layout, exact display, X3D mask
+#   detailed — standard + full GPU list, all monitors, output names, OS id
+# fingerprint_level=minimal
+
+# One-shot override: LAUNCHLAYER_HUB_FINGERPRINT_LEVEL=detailed launchlayer --hub-fingerprint

@@ -225,25 +225,103 @@ detect_gnome_display_mode() {
 	printf '%s %s %s\n' "$w" "$h" "${rate:-}"
 }
 
-# detect_kwin_display_mode — Width, height, refresh via kscreen-doctor or wlr-randr.
-detect_kwin_display_mode() {
-	local name w h rate
-	name="$(detect_kwin_active_output)"
-	if [[ -n "$name" ]]; then
-		read -r w h rate < <(parse_wlr_randr_output "$name" 2>/dev/null || true) || true
-		[[ -n "$w" && -n "$h" ]] && { printf '%s %s %s %s\n' "$w" "$h" "${rate:-}" "$name"; return 0; }
-	fi
-	if command -v kscreen-doctor >/dev/null 2>&1; then
-		kscreen-doctor -o 2>/dev/null | awk -v want="${name:-}" '
-			/^Output:/ {out=$2; geom=""}
-			want != "" && out != want {next}
-			/Geometry:/ {
-				if (match($0, /([0-9]+),([0-9]+)(@([0-9]+))?/, m)) {
-					printf "%s %s %s %s\n", m[1], m[2], (m[4] ? m[4] : ""), out
-					exit
+# detect_kwin_primary_output — KDE primary output (kscreen priority 1, else lowest priority).
+detect_kwin_primary_output() {
+	local name=""
+	name="$(parse_kscreen_doctor_outputs 2>/dev/null | awk '$2 == 1 { print $1; exit }')" || true
+	[[ -n "$name" ]] && { echo "$name"; return 0; }
+	name="$(parse_kscreen_doctor_outputs 2>/dev/null | awk '
+		NF >= 2 {
+			pri = $2 + 0
+			if (best_pri == "" || pri < best_pri) {
+				best_pri = pri
+				best_name = $1
+			}
+		}
+		END { if (best_name != "") print best_name }
+	')" || true
+	[[ -n "$name" ]] && echo "$name"
+}
+
+# kscreen_doctor_plain — kscreen-doctor output with ANSI color stripped.
+kscreen_doctor_plain() {
+	command -v kscreen-doctor >/dev/null 2>&1 || return 1
+	kscreen-doctor -o 2>/dev/null | sed -r 's/\x1B\[[0-9;]*[a-zA-Z]//g'
+}
+
+# parse_kscreen_doctor_outputs — One line per output: "name priority width height refresh".
+parse_kscreen_doctor_outputs() {
+	kscreen_doctor_plain | awk '
+		function flush() {
+			if (name != "" && w != "" && h != "") {
+				printf "%s %s %s %s %s\n", name, priority, w, h, (hz == "" ? 0 : hz)
+			}
+		}
+		/^Output:/ {
+			flush()
+			name = $3
+			priority = 999
+			w = h = hz = ""
+			next
+		}
+		/priority/ {
+			if (match($0, /priority[[:space:]]+[0-9]+/)) {
+				s = substr($0, RSTART, RLENGTH)
+				sub(/^priority[[:space:]]+/, "", s)
+				priority = s + 0
+			}
+			next
+		}
+		/Geometry:/ {
+			if (match($0, /[0-9]+x[0-9]+[[:space:]]*$/)) {
+				s = substr($0, RSTART, RLENGTH)
+				split(s, parts, "x")
+				w = parts[1]
+				sub(/[[:space:]]+$/, "", parts[2])
+				h = parts[2]
+			}
+			next
+		}
+		/Modes:/ && /\*/ {
+			line = $0
+			while (match(line, /[0-9]+x[0-9]+@[0-9.]+/)) {
+				s = substr(line, RSTART, RLENGTH)
+				rest = substr(line, RSTART + RLENGTH, 1)
+				if (rest == "*") {
+					n = split(s, parts, /[@x]/)
+					if (n >= 3) {
+						hz = int(parts[3] + 0.5)
+					}
+					break
 				}
-			}'
+				line = substr(line, RSTART + RLENGTH)
+			}
+			next
+		}
+		END { flush() }
+	'
+}
+
+# detect_kwin_display_mode — Width, height, refresh via kscreen-doctor (primary unless output given).
+detect_kwin_display_mode() {
+	local want=${1:-} name w h rate
+	[[ -n "$want" ]] || want="$(detect_kwin_primary_output 2>/dev/null || true)"
+	[[ -n "$want" ]] || want="$(detect_kwin_active_output 2>/dev/null || true)"
+	if [[ -n "$want" ]]; then
+		read -r w h rate name < <(parse_kscreen_doctor_outputs 2>/dev/null | awk -v want="$want" '
+			$1 == want && NF >= 5 { printf "%s %s %s %s\n", $3, $4, $5, $1; exit }
+		') || true
+		if [[ -n "$w" && -n "$h" ]]; then
+			printf '%s %s %s %s\n' "$w" "$h" "${rate:-}" "${name:-$want}"
+			return 0
+		fi
+		read -r w h rate < <(parse_wlr_randr_output "$want" 2>/dev/null || true) || true
+		if [[ -n "$w" && -n "$h" ]]; then
+			printf '%s %s %s %s\n' "$w" "$h" "${rate:-}" "$want"
+			return 0
+		fi
 	fi
+	return 1
 }
 
 # detect_compositor_display_mode — Session-aware width height refresh output_name.

@@ -22,6 +22,7 @@ _launchlayer() {
 		'--completions:manage shell tab completions'
 		'--list-games:list installed Steam games'
 		'--init-appid:scaffold games/<AppID>.env'
+		'--bulk-set-include:set INCLUDE preset on many games'
 		'--init-unconfigured:scaffold configs for unconfigured games'
 		'--prune-uninstalled:remove configs for uninstalled games'
 		'--export-config:pack launch.d configs into a tarball'
@@ -32,6 +33,14 @@ _launchlayer() {
 		'--backup-timer:install/manage backup timer'
 		'--backup-prefs:manage backup preferences'
 		'--tui-prefs:manage TUI preferences'
+		'--hub-fingerprint:machine fingerprint for hub matching'
+		'--hub-publish:publish per-game config to community hub'
+		'--hub-update:update shared hub configs for this machine'
+		'--hub-delete:delete a shared hub config by id'
+		'--hub-recommend:recommend configs from similar machines'
+		'--hub-search:list machines similar to this one'
+		'--hub-apply:apply a shared hub config by id'
+		'--hub-prefs:manage hub preferences'
 		'--paths:shader cache, compatdata, and install paths'
 		'--show-config:show resolved config for an AppID'
 		'--edit-appid:open per-game config in $EDITOR'
@@ -74,6 +83,20 @@ _launchlayer() {
 					_arguments \
 						'1:appid:($appids)' \
 						'2:preset:($presets)'
+					;;
+				--bulk-set-include)
+					appids=("${(@f)$(
+						"$script" --list-games --json 2>/dev/null \
+							| sed -n 's/.*"appid":"\([0-9]*\)".*/\1/p'
+					)}")
+					_arguments \
+						'1:preset:($presets)' \
+						'(--all-configured)*--all-configured[only configured games]' \
+						'(--all-installed)*--all-installed[all installed games]' \
+						'(--grep)*--grep[name filter]:pattern:' \
+						'(--dry-run)*--dry-run[preview without writing]' \
+						'(--json)*--json[JSON output]' \
+						'*:appid:($appids)'
 					;;
 				--validate-config)
 					appids=("${(@f)$(
@@ -146,6 +169,67 @@ _launchlayer() {
 				--tui-prefs)
 					_arguments \
 						'1:action:(show reset set)' \
+						'(--json)*--json[JSON output]'
+					;;
+				--hub-prefs)
+					_arguments \
+						'1:action:(show reset set)' \
+						'(--json)*--json[JSON output]'
+					;;
+				--hub-fingerprint)
+					_arguments \
+						'(--json)*--json[JSON output]' \
+						'(--fingerprint-level)*--fingerprint-level[privacy level]:(minimal standard detailed)'
+					;;
+				--hub-publish)
+					appids=("${(@f)$(
+						"$script" --list-games --json 2>/dev/null \
+							| sed -n 's/.*"appid":"\([0-9]*\)".*/\1/p'
+					)}")
+					_arguments \
+						'1:appid:($appids --all-configured)' \
+						'(--note)*--note[optional publish note]:text:' \
+						'(--config-id)*--config-id[update specific hub config id]:id:' \
+						'(--all-configured)*--all-configured[publish all configured games]' \
+						'(--json)*--json[JSON output]'
+					;;
+				--hub-update)
+					appids=("${(@f)$(
+						"$script" --list-games --json 2>/dev/null \
+							| sed -n 's/.*"appid":"\([0-9]*\)".*/\1/p'
+					)}")
+					_arguments \
+						'1:target:($appids --all-configured)' \
+						'(--note)*--note[optional update note]:text:' \
+						'(--all-configured)*--all-configured[update all shared configs]' \
+						'(--include-new)*--include-new[also publish games without hub config]' \
+						'(--json)*--json[JSON output]'
+					;;
+				--hub-recommend)
+					appids=("${(@f)$(
+						"$script" --list-games --json 2>/dev/null \
+							| sed -n 's/.*"appid":"\([0-9]*\)".*/\1/p'
+					)}")
+					_arguments \
+						'1:appid:($appids)' \
+						'(--limit)*--limit[maximum recommendations]:count:' \
+						'(--json)*--json[JSON output]'
+					;;
+				--hub-search)
+					_arguments \
+						'(--limit)*--limit[maximum machines]:count:' \
+						'(--json)*--json[JSON output]'
+					;;
+				--hub-apply)
+					_arguments \
+						'1:config_id:' \
+						'(--dry-run)*--dry-run[preview without writing files]' \
+						'(--json)*--json[JSON output]'
+					;;
+				--hub-delete)
+					_arguments \
+						'1:config_id:' \
+						'(--yes)*--yes[skip confirmation prompt]' \
 						'(--json)*--json[JSON output]'
 					;;
 				--list-games)

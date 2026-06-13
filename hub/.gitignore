@@ -1,0 +1,28 @@
+
+# Dependencies (pnpm)
+node_modules/
+
+# npm/yarn lockfiles (hub uses pnpm)
+package-lock.json
+yarn.lock
+npm-shrinkwrap.json
+.pnpm-debug.log*
+
+# Convex local deployment state and secrets
+.convex/
+.env*
+!.env.example
+
+# Convex AI plugin local state (not standard codegen)
+convex/_generated/ai/
+
+# Agent skill installs (convex dev tooling)
+.agents/
+.claude/
+skills-lock.json
+AGENTS.md
+CLAUDE.md
+
+# Build / logs
+dist/
+*.log

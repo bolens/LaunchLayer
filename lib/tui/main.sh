@@ -1,18 +1,12 @@
 # shellcheck shell=bash
 # lib/tui/main.sh — Main menu loop and TUI entry point.
-# tui_cache_report — Cache audit using TUI min-GB preference.
-tui_cache_report() {
-	local min_gb=${TUI_CACHE_MIN_GB:-5}
-	[[ "$min_gb" =~ ^[0-9]+$ ]] || min_gb=5
-	cache_report "$min_gb" both "" 0
-}
 
 # tui_main_menu — Top-level menu loop.
 run_tui() {
-	local choice issues -a main_items=() prefix_items=() suffix_items=(
+	local choice issues i hub
+	local -a main_items=() prefix_items=() suffix_items=(
 		"Quit"
 	)
-	local i hub
 
 	tui_require_tty || return 1
 	tui_load_config
@@ -36,6 +30,7 @@ run_tui() {
 		"Games"
 		"Config library"
 		"Backup & restore"
+		"Community hub"
 		"System & tools"
 		"TUI settings"
 	)
@@ -73,6 +68,9 @@ run_tui() {
 				;;
 			"Backup & restore"|"Backup & restore  ← last visit")
 				tui_backup_menu
+				;;
+			"Community hub"|"Community hub  ← last visit")
+				tui_hub_menu
 				;;
 			"System & tools"|"System & tools  ← last visit")
 				tui_system_menu

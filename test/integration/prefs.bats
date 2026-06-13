@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# Integration tests for backup pruning and preference templates.
+load '../helpers.bash'
+
+setup() {
+	bats_integration_setup
+}
+
+@test "prune-backups dry-run keeps newest archives" {
+	local tmp backup_dir i
+	tmp="$(mktemp -d)"
+	backup_dir="$tmp/backups"
+	mkdir -p "$backup_dir"
+	for i in 1 2 3; do
+		echo "backup$i" > "$backup_dir/launchlayer-backup-2026010${i}-12000${i}.tar.gz"
+		sleep 0.01
+	done
+	run env LAUNCHLAYER_CONFIG_DIR="$tmp" "$SCRIPT" --prune-backups --dir "$backup_dir" --keep 1 --dry-run
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"would remove"* ]]
+	[[ $(find "$backup_dir" -maxdepth 1 -name 'launchlayer-backup-*.tar.gz' | wc -l) -eq 3 ]]
+	rm -rf "$tmp"
+}
+
+@test "prune-backups removes oldest archives" {
+	local tmp backup_dir i
+	tmp="$(mktemp -d)"
+	backup_dir="$tmp/backups"
+	mkdir -p "$backup_dir"
+	for i in 1 2 3; do
+		echo "backup$i" > "$backup_dir/launchlayer-backup-2026010${i}-12000${i}.tar.gz"
+		sleep 0.01
+	done
+	run env LAUNCHLAYER_CONFIG_DIR="$tmp" "$SCRIPT" --prune-backups --dir "$backup_dir" --keep 1
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"removed=2"* ]]
+	[[ $(find "$backup_dir" -maxdepth 1 -name 'launchlayer-backup-*.tar.gz' | wc -l) -eq 1 ]]
+	rm -rf "$tmp"
+}
+
+@test "prune-backups keep=0 retains all archives" {
+	local tmp backup_dir i
+	tmp="$(mktemp -d)"
+	backup_dir="$tmp/backups"
+	mkdir -p "$backup_dir"
+	for i in 1 2 3; do
+		echo "backup$i" > "$backup_dir/launchlayer-backup-2026010${i}-12000${i}.tar.gz"
+	done
+	run env LAUNCHLAYER_CONFIG_DIR="$tmp" "$SCRIPT" --prune-backups --dir "$backup_dir" --keep 0
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"unlimited retention"* ]]
+	[[ $(find "$backup_dir" -maxdepth 1 -name 'launchlayer-backup-*.tar.gz' | wc -l) -eq 3 ]]
+	rm -rf "$tmp"
+}
+
+@test "tui-prefs reset restores repo defaults" {
+	local tmp example
+	tmp="$(mktemp -d)"
+	example="$tmp/share/launchlayer/templates/tui.conf.example"
+	mkdir -p "$(dirname "$example")"
+	cat > "$example" <<'EOF'
+game_filter=configured
+cache_min_gb=10
+default_preset=competitive
+fzf_height=50%
+fzf_preview=down:40%:wrap
+EOF
+	mkdir -p "$tmp/launchlayer"
+	cat > "$tmp/launchlayer/tui.conf" <<'EOF'
+game_filter=all
+cache_min_gb=1
+default_preset=lightweight
+fzf_height=20%
+fzf_preview=left:30%:wrap
+EOF
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --tui-prefs reset
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"Reset TUI preferences"* ]]
+	grep -q 'game_filter=configured' "$tmp/launchlayer/tui.conf"
+	grep -q 'default_preset=competitive' "$tmp/launchlayer/tui.conf"
+	rm -rf "$tmp"
+}
+
+@test "backup.conf.example contains all backup preference keys" {
+	local example="$REPO_ROOT/share/launchlayer/templates/backup.conf.example"
+	[[ -f "$example" ]]
+	local key
+	for key in backup_dir keep timer_type on_calendar on_boot_sec on_unit_active_sec \
+		randomized_delay_sec include_local include_profiles include_tui auto_prune; do
+		grep -q "^${key}=" "$example"
+	done
+}
+
+@test "tui.conf.example contains all TUI preference keys" {
+	local example="$REPO_ROOT/share/launchlayer/templates/tui.conf.example"
+	[[ -f "$example" ]]
+	local key
+	for key in game_filter cache_min_gb default_preset last_menu json_output \
+		resume_last_menu press_enter_lines fzf_height fzf_preview; do
+		grep -q "^${key}=" "$example"
+	done
+}
+
+@test "hub.conf.example contains hub preference keys" {
+	local example="$REPO_ROOT/share/launchlayer/templates/hub.conf.example"
+	[[ -f "$example" ]]
+	local key
+	for key in hub_url publish_token machine_label fingerprint_level; do
+		grep -q "^# ${key}=" "$example" || grep -q "^${key}=" "$example"
+	done
+}

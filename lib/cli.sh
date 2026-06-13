@@ -24,6 +24,7 @@ LAUNCHLAYER_SUBCOMMANDS=(
 	--show-cpu-topology
 	--list-games
 	--init-appid
+	--bulk-set-include
 	--init-unconfigured
 	--prune-uninstalled
 	--export-config
@@ -41,6 +42,14 @@ LAUNCHLAYER_SUBCOMMANDS=(
 	--validate-config
 	--scan-anticheat
 	--scan-detections
+	--hub-fingerprint
+	--hub-publish
+	--hub-update
+	--hub-delete
+	--hub-recommend
+	--hub-apply
+	--hub-search
+	--hub-prefs
 	--cache-report
 	--launch-stats
 	--dry-run
@@ -157,7 +166,9 @@ Usage:
   ${bn} --list-games              Installed games with detection hints
   ${bn} --show-config APPID       Resolved layers and launch chain
 
-  ${bn} --tui                       Interactive game/config browser (requires fzf)
+  ${bn} --tui                       Interactive game/config browser (fzf optional)
+
+With no arguments in a TTY, opens the TUI automatically when fzf is installed.
 
 Run '${bn} --help' for the full command reference.
 EOF
@@ -195,6 +206,8 @@ $(cli_bold "Onboarding & health")
 $(cli_bold "Games & config")
   --list-games [--configured] [--json] [--grep NAME]
   --init-appid APPID|NAME [preset] [--force]  Create games/<AppID>.env
+  --bulk-set-include PRESET [--all-configured|--all-installed] [--grep NAME] [APPID|NAME...] [--dry-run] [--json]
+                                    Set INCLUDE=presets/PRESET.env on many games
   --paths APPID|NAME [--json]         Shader cache, compatdata, install paths
   --init-unconfigured [--preset P] [--eac-only] [--dry-run]
   --prune-uninstalled [--dry-run] [--yes] [--json]
@@ -216,6 +229,24 @@ $(cli_bold "Games & config")
   --scan-anticheat [--update-list]  Find EAC/BattlEye vs anticheat-appids.txt
   --scan-detections                 Audit heuristic vs list mismatches
 
+$(cli_bold "Community hub") $(cli_dim "(requires hub.conf — see share/launchlayer/templates/hub.conf.example)")
+  --hub-fingerprint [--json] [--fingerprint-level minimal|standard|detailed]
+                                    Machine fingerprint for similarity matching
+  --hub-publish APPID|NAME [--note TEXT] [--config-id ID] [--all-configured] [--json]
+                                    Upload or update per-game config(s) on LaunchLayer Hub
+  --hub-update APPID|NAME|CONFIG_ID [--all-configured] [--note TEXT] [--include-new] [--json]
+                                    Update existing shared config(s) for this machine
+  --hub-delete CONFIG_ID [--yes] [--json]
+                                    Delete a shared config (requires publish token)
+  --hub-recommend APPID|NAME [--limit N] [--json]
+                                    Configs from machines similar to yours
+  --hub-search [--limit N] [--json] List machines most similar to this one
+  --hub-apply CONFIG_ID [--dry-run] [--json]
+                                    Download and apply a shared hub config
+  --hub-prefs [show|reset|set] [args...] [--json]
+                                    Manage hub preferences (template: share/launchlayer/templates/hub.conf.example)
+                                    User file: ~/.config/launchlayer/hub.conf
+
 $(cli_bold "Runtime & diagnostics")
   --status [AppID|NAME] [--json]    Runtime state, shader/compatdata sizes
   --show-cpu-topology               V-Cache CCD hints for X3D_CPUS
@@ -235,10 +266,10 @@ $(cli_bold "General")
   --version, -V                     Show version and paths
 
 $(cli_bold "Config layers") $(cli_dim "(later overrides earlier)")
-  launch.d/local.env                Optional machine-local file (--write-local-config)
   launch.d/profiles/<profile>.env   LAUNCHLAYER_PROFILES or auto-detected
   launch.d/default.env              Global infrastructure defaults
-  launch.d/presets/*.env            Via INCLUDE= or auto-selected preset
+  launch.d/local.env                Machine-local overrides (--write-local-config; gitignored; force-overwrites)
+  launch.d/presets/*.env            Via INCLUDE= or auto standard/native (skipped when per-game file exists)
   games/<AppID>.env                 Per-game overrides (LAUNCHLAYER_GAMES_DIR)
 
 $(cli_bold "Environment")

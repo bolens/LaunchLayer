@@ -27,6 +27,14 @@ Desktop.ini
 .env.*
 !.env.example
 
+# Dependencies / package managers (anywhere in repo)
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+
+# Convex local deployment state (any subdirectory)
+.convex/
+
 # Runtime / launch state (live data: ~/.local/state/launchlayer/)
 *.log
 .state/
@@ -43,7 +51,21 @@ launchlayer-state/
 launch.d/local.env
 launch.d/[0-9]*.env
 
-# GAMES_DIR — per-game configs (default: ~/.local/share/launchlayer/games)
+# Hub backend (Convex + pnpm) — see also hub/.gitignore
+hub/.env
+hub/.env.*
+!hub/.env.example
+hub/.agents/
+hub/.claude/
+hub/skills-lock.json
+hub/AGENTS.md
+hub/CLAUDE.md
+hub/convex/_generated/ai/
+hub/package-lock.json
+hub/yarn.lock
+hub/dist/
+*.tsbuildinfo
+
 # Ignore when LAUNCHLAYER_GAMES_DIR points inside the repo.
 /games/
 

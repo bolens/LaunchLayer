@@ -55,6 +55,7 @@ def "nu-complete launchlayer" [spans: list<string>] {
         { value: "--completions", description: "Manage shell tab completions" }
         { value: "--list-games", description: "List installed Steam games" }
         { value: "--init-appid", description: "Scaffold games/<AppID>.env" }
+        { value: "--bulk-set-include", description: "Set INCLUDE preset on many games" }
         { value: "--init-unconfigured", description: "Scaffold configs for unconfigured games" }
         { value: "--prune-uninstalled", description: "Remove configs for uninstalled games" }
         { value: "--export-config", description: "Pack launch.d configs into a tarball" }
@@ -65,6 +66,14 @@ def "nu-complete launchlayer" [spans: list<string>] {
         { value: "--backup-timer", description: "Install/manage backup timer" }
         { value: "--backup-prefs", description: "Manage backup preferences" }
         { value: "--tui-prefs", description: "Manage TUI preferences" }
+        { value: "--hub-fingerprint", description: "Machine fingerprint for hub matching" }
+        { value: "--hub-publish", description: "Publish per-game config to community hub" }
+        { value: "--hub-update", description: "Update shared hub configs for this machine" }
+        { value: "--hub-delete", description: "Delete a shared hub config by id" }
+        { value: "--hub-recommend", description: "Recommend configs from similar machines" }
+        { value: "--hub-search", description: "List machines similar to this one" }
+        { value: "--hub-apply", description: "Apply a shared hub config by id" }
+        { value: "--hub-prefs", description: "Manage hub preferences" }
         { value: "--paths", description: "Shader cache, compatdata, install paths" }
         { value: "--show-config", description: "Show resolved config for an AppID" }
         { value: "--edit-appid", description: "Open per-game config in $EDITOR" }
@@ -94,6 +103,14 @@ def "nu-complete launchlayer" [spans: list<string>] {
                 launchlayer-appids $script | each {|id| { value: $id } }
             } else {
                 ($presets ++ ["--force"]) | each {|v| { value: $v } }
+            }
+        }
+        "--bulk-set-include" => {
+            if ($spans | length) == 2 {
+                $presets | each {|v| { value: $v } }
+            } else {
+                (["--all-configured" "--all-installed" "--grep" "--dry-run" "--json"] ++ $presets ++ (launchlayer-appids $script))
+                | each {|v| { value: $v } }
             }
         }
         "--validate-config" => {
@@ -131,6 +148,42 @@ def "nu-complete launchlayer" [spans: list<string>] {
         }
         "--tui-prefs" => {
             launchlayer-suggestions ["show" "reset" "set" "--json"]
+        }
+        "--hub-fingerprint" => {
+            launchlayer-suggestions ["--json" "--fingerprint-level" "minimal" "standard" "detailed"]
+        }
+        "--hub-publish" => {
+            if ($spans | length) == 2 {
+                (launchlayer-appids $script ++ ["--all-configured"]) | each {|v| { value: $v } }
+            } else {
+                launchlayer-suggestions ["--note" "--config-id" "--all-configured" "--json"]
+            }
+        }
+        "--hub-update" => {
+            if ($spans | length) == 2 {
+                (launchlayer-appids $script ++ ["--all-configured"]) | each {|v| { value: $v } }
+            } else {
+                launchlayer-suggestions ["--note" "--all-configured" "--include-new" "--json"]
+            }
+        }
+        "--hub-recommend" => {
+            if ($spans | length) == 2 {
+                launchlayer-appids $script | each {|id| { value: $id } }
+            } else {
+                launchlayer-suggestions ["--limit" "--json"]
+            }
+        }
+        "--hub-search" => {
+            launchlayer-suggestions ["--limit" "--json"]
+        }
+        "--hub-apply" => {
+            launchlayer-suggestions ["--dry-run" "--json"]
+        }
+        "--hub-delete" => {
+            launchlayer-suggestions ["--yes" "--json"]
+        }
+        "--hub-prefs" => {
+            launchlayer-suggestions ["show" "reset" "set" "--json" "hub_url" "publish_token" "machine_label" "fingerprint_level" "minimal" "standard" "detailed"]
         }
         "--list-games" => {
             launchlayer-suggestions ["--configured" "--json" "--grep"]

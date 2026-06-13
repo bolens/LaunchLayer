@@ -185,6 +185,7 @@ tui_game_actions() {
 			"[Edit] Set preset (re-init)" \
 			"[Manage] Validate config" \
 			"[Manage] Delete per-game config" \
+			"[Hub] Community configs" \
 			"Back to games menu")" || {
 			tui_crumb_leave
 			return 0
@@ -223,6 +224,9 @@ tui_game_actions() {
 				;;
 			"[Manage] Delete per-game config")
 				tui_delete_game_config "$appid"
+				;;
+			"[Hub] Community configs")
+				tui_hub_game_actions "$appid"
 				;;
 			"Back to games menu"|*)
 				tui_crumb_leave

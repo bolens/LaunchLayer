@@ -30,6 +30,12 @@
 #   --completions [status|enable|disable|print] [--shell bash|zsh|fish|all]
 #   --doctor [--json]                 full environment + config health check
 #   --setup [--completions] [--systemd] [--symlink] [--print-launch-option]
+#   --init-appid APPID|NAME [preset] [--force]
+#   --bulk-set-include PRESET [--all-configured|--all-installed] [--grep NAME] [APPID|NAME...]
+#   --export-config / --backup-config / --import-config / --prune-backups
+#   --backup-timer / --backup-prefs / --tui-prefs / --hub-prefs
+#   --hub-fingerprint / --hub-publish / --hub-update / --hub-delete
+#   --hub-recommend / --hub-search / --hub-apply
 #   --tui                             interactive game/config browser
 #   --install-systemd                 install user maintenance timer (resolved paths)
 #   --sysctl [status|install]         vm.max_map_count helper (install needs root)
@@ -67,15 +73,15 @@
 #   vram.sh         — VRAM hog pause/resume
 #   inspect/        — show, maintenance, reports, validation, backup
 #   cli.sh          — help, version, JSON helpers
-#   prefs/          — paths, backup, tui preference helpers
+#   prefs/          — paths, backup, tui preference helpers (hub prefs in lib/hub/)
 #   completions/    — core, shells, helpers, cli
 #   setup/          — sysctl, systemd, doctor, onboard
-#   commands/       — status, environment, games, dispatch
+#   commands/       — status, environment, games, hub, dispatch
 #   tui/            — config, primitives, menus, main loop
 #   launch.sh       — main launch orchestration
 #
 # Other repo paths:
-#   share/launchlayer/templates/  user pref templates (backup.conf, tui.conf)
+#   share/launchlayer/templates/  user pref templates (backup.conf, tui.conf, hub.conf)
 #   share/launchlayer/sysctl/     vm.max_map_count drop-in (elasticsearch.conf)
 #   share/launchlayer/systemd/    user systemd unit templates
 #   share/launchlayer/completions/ shell completion scripts

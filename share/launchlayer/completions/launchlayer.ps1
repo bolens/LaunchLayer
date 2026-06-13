@@ -27,10 +27,11 @@ function Get-LaunchlayerCompletions {
         '--pause-vram-hogs', '--resume-vram-hogs', '--cleanup-stale-launch',
         '--status', '--show-cpu-topology', '--detect-environment', '--detect-defaults',
         '--write-local-config', '--doctor', '--setup', '--install-systemd', '--sysctl',
-        '--completions', '--list-games', '--init-appid', '--init-unconfigured',
+        '--completions', '--list-games', '--init-appid', '--bulk-set-include', '--init-unconfigured',
         '--prune-uninstalled', '--export-config', '--backup-config', '--import-config',
         '--prune-backups', '--run-scheduled-backup', '--backup-timer', '--backup-prefs',
-        '--tui-prefs', '--show-config', '--edit-appid', '--paths', '--validate-config',
+        '--tui-prefs', '--hub-fingerprint', '--hub-publish', '--hub-update', '--hub-delete', '--hub-recommend', '--hub-search',
+        '--hub-apply', '--hub-prefs', '--show-config', '--edit-appid', '--paths', '--validate-config',
         '--scan-anticheat', '--scan-detections', '--cache-report', '--launch-stats',
         '--dry-run', '--help', '-h', '--version', '-V', '--tui'
     )
@@ -52,6 +53,13 @@ function Get-LaunchlayerCompletions {
                 return $script:LaunchlayerPresets + @('--force')
             }
             return $script:LaunchlayerPresets + @('--force')
+        }
+        '--bulk-set-include' {
+            if ($Tokens.Count -eq 2) {
+                return $script:LaunchlayerPresets
+            }
+            return @('--all-configured', '--all-installed', '--grep', '--dry-run', '--json') +
+                $script:LaunchlayerPresets + @(Get-LaunchlayerAppIds -ScriptPath $ScriptPath)
         }
         '--validate-config' {
             return @('all', 'default', 'presets') + @(Get-LaunchlayerAppIds -ScriptPath $ScriptPath)
@@ -85,6 +93,39 @@ function Get-LaunchlayerCompletions {
         }
         '--tui-prefs' {
             return @('show', 'reset', 'set', '--json')
+        }
+        '--hub-fingerprint' {
+            return @('--json', '--fingerprint-level', 'minimal', 'standard', 'detailed')
+        }
+        '--hub-publish' {
+            if ($Tokens.Count -eq 2) {
+                return @(Get-LaunchlayerAppIds -ScriptPath $ScriptPath) + @('--all-configured')
+            }
+            return @('--note', '--config-id', '--all-configured', '--json')
+        }
+        '--hub-update' {
+            if ($Tokens.Count -eq 2) {
+                return @(Get-LaunchlayerAppIds -ScriptPath $ScriptPath) + @('--all-configured')
+            }
+            return @('--note', '--all-configured', '--include-new', '--json')
+        }
+        '--hub-recommend' {
+            if ($Tokens.Count -eq 2) {
+                return @(Get-LaunchlayerAppIds -ScriptPath $ScriptPath)
+            }
+            return @('--limit', '--json')
+        }
+        '--hub-search' {
+            return @('--limit', '--json')
+        }
+        '--hub-apply' {
+            return @('--dry-run', '--json')
+        }
+        '--hub-delete' {
+            return @('--yes', '--json')
+        }
+        '--hub-prefs' {
+            return @('show', 'reset', 'set', '--json', 'hub_url', 'publish_token', 'machine_label', 'fingerprint_level', 'minimal', 'standard', 'detailed')
         }
         '--list-games' {
             return @('--configured', '--json', '--grep')

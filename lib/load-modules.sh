@@ -81,14 +81,29 @@ launchlayer_source_setup() {
 	source "$LIB_DIR/setup/onboard.sh"
 }
 
+# launchlayer_source_hub — Community config hub client (fingerprint, similarity, API).
+launchlayer_source_hub() {
+	# shellcheck source=hub/prefs.sh
+	source "$LIB_DIR/hub/prefs.sh"
+	# shellcheck source=hub/fingerprint.sh
+	source "$LIB_DIR/hub/fingerprint.sh"
+	# shellcheck source=hub/similarity.sh
+	source "$LIB_DIR/hub/similarity.sh"
+	# shellcheck source=hub/client.sh
+	source "$LIB_DIR/hub/client.sh"
+}
+
 # launchlayer_source_commands — CLI subcommands and dispatch.
 launchlayer_source_commands() {
+	launchlayer_source_hub
 	# shellcheck source=commands/status.sh
 	source "$LIB_DIR/commands/status.sh"
 	# shellcheck source=commands/environment.sh
 	source "$LIB_DIR/commands/environment.sh"
 	# shellcheck source=commands/games.sh
 	source "$LIB_DIR/commands/games.sh"
+	# shellcheck source=commands/hub.sh
+	source "$LIB_DIR/commands/hub.sh"
 	# shellcheck source=commands/dispatch.sh
 	source "$LIB_DIR/commands/dispatch.sh"
 }
@@ -103,6 +118,8 @@ launchlayer_source_tui() {
 	source "$LIB_DIR/tui/menus-game.sh"
 	# shellcheck source=tui/menus-config.sh
 	source "$LIB_DIR/tui/menus-config.sh"
+	# shellcheck source=tui/menus-hub.sh
+	source "$LIB_DIR/tui/menus-hub.sh"
 	# shellcheck source=tui/menus-system.sh
 	source "$LIB_DIR/tui/menus-system.sh"
 	# shellcheck source=tui/main.sh

@@ -33,6 +33,16 @@ tui_config_example_path() {
 	printf '%s/tui.conf.example' "$(launchlayer_repo_config_dir)"
 }
 
+# hub_prefs_path — User LaunchLayer Hub settings file.
+hub_prefs_path() {
+	printf '%s/hub.conf' "$(launchlayer_user_config_dir)"
+}
+
+# hub_prefs_example_path — Repo default hub.conf template.
+hub_prefs_example_path() {
+	printf '%s/hub.conf.example' "$(launchlayer_repo_config_dir)"
+}
+
 # default_systemd_backup_dir — Default backup directory when no prefs exist.
 default_systemd_backup_dir() {
 	printf '%s/launchlayer-backups' "${HOME}"

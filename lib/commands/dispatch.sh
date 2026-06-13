@@ -308,6 +308,37 @@ handle_subcommand() {
 		--sysctl)
 			handle_sysctl_subcommand "${1:-status}"
 			;;
+		--hub-fingerprint)
+			load_profile_config
+			load_config_file "$LAUNCHD_DIR/default.env" 0
+			[[ -f "$LAUNCHD_DIR/local.env" ]] && load_config_file "$LAUNCHD_DIR/local.env" 0
+			apply_defaults
+			hub_show_fingerprint "$@"
+			;;
+		--hub-publish)
+			hub_publish_config "$@"
+			;;
+		--hub-update)
+			hub_update_config "$@"
+			;;
+		--hub-delete)
+			hub_delete_config "$@"
+			;;
+		--hub-recommend)
+			hub_recommend_configs "$@"
+			;;
+		--hub-apply)
+			hub_apply_config "$@"
+			;;
+		--hub-search)
+			hub_search_machines "$@"
+			;;
+		--hub-prefs)
+			handle_hub_prefs_subcommand "$@"
+			;;
+		--bulk-set-include)
+			bulk_set_include_preset "$@"
+			;;
 		--help|-h)
 			print_help
 			;;
