@@ -239,7 +239,7 @@ check_compatdata() {
 
 # check_vram_available — Warn when GPU reports free VRAM below threshold.
 check_vram_available() {
-	local min_mb=${1:-${VRAM_PREFLIGHT_MIN_MB:-0}}
+	local min_mb="${VRAM_PREFLIGHT_MIN_MB:-0}"
 	local free_mb=""
 	[[ "$min_mb" =~ ^[0-9]+$ && "$min_mb" -gt 0 ]] || return 0
 	free_mb="$(gpu_vram_free_mb 2>/dev/null || true)"

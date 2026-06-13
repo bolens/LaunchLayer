@@ -148,7 +148,7 @@ detect_audio_server() {
 
 # flatpak_script_access — Report ok, likely_ok, or needs_override for Flatpak Steam.
 flatpak_script_access() {
-	local script=${1:-${LAUNCHLAYER_MAIN_SCRIPT:-}}
+	local script="${LAUNCHLAYER_MAIN_SCRIPT:-}"
 	is_flatpak_steam || { echo ok; return 0; }
 	[[ -n "$script" ]] || { echo unknown; return 0; }
 	if [[ "$script" == "${HOME}"/* ]]; then
