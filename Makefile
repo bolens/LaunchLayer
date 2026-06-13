@@ -1,4 +1,4 @@
-.PHONY: test lint check shellcheck check-hub-git
+.PHONY: test lint check shellcheck check-hub-git tui-screenshots
 
 SHELL := /bin/bash
 BATS ?= bats
@@ -18,3 +18,6 @@ check-hub-git:
 	bash scripts/check-staged-hub-secrets.sh
 
 check: shellcheck check-hub-git test
+
+tui-screenshots:
+	bash scripts/tui-screenshots/regenerate.sh

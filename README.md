@@ -2,20 +2,72 @@
 
 <img src="docs/assets/launchlayer.svg" alt="LaunchLayer" width="420">
 
-**Layered launch orchestration for Steam games**
+# LaunchLayer
+
+**Layered launch orchestration for Steam games on Linux**
+
+*One Steam launch string. Per-game configs. GameMode, Gamescope, MangoHUD, and more — assembled automatically.*
 
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](LICENSE)
+[![CI](https://github.com/bolens/LaunchLayer/actions/workflows/ci.yml/badge.svg)](https://github.com/bolens/LaunchLayer/actions/workflows/ci.yml)
 [![Shell](https://img.shields.io/badge/shell-bash-4EAA25?logo=gnu-bash&logoColor=white)](launchlayer)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20BSD%20%7C%20macOS%20%7C%20WSL2-1793D2?logo=linux&logoColor=white)](launch.d/profiles/)
-[![CI](https://github.com/bolens/LaunchLayer/actions/workflows/ci.yml/badge.svg)](https://github.com/bolens/LaunchLayer/actions/workflows/ci.yml)
 
 </div>
 
-LaunchLayer sits in Steam’s **Launch Options** ahead of `%command%`. It loads machine and per-game settings, runs preflight checks, and assembles a wrapper chain—GameMode, CPU affinity, MangoHUD, Gamescope, and more—before your game starts.
+**For Linux gamers** who tune every launch — GameMode, CPU affinity, MangoHUD, Gamescope, VRAM hogs, network latency — but do not want a different Steam launch string per title.
 
-Built for a tuned Linux gaming workstation (7900X3D, RTX 3080 Ti, Wayland / Plasma 6), but auto-detection and profiles make it work across distros, Steam Deck, Flatpak Steam, BSD, and WSL2.
+LaunchLayer sits in Steam’s **Launch Options** ahead of `%command%`. It loads layered config, runs preflight checks, and builds the wrapper chain before your game starts.
 
-**Requirements:** bash 4.2+, Steam (or a `%command%` game launch argv). Optional tools (`fzf`, `gamescope`, …) enhance the experience but are not required for basic launches.
+| Without LaunchLayer | With LaunchLayer |
+|---------------------|------------------|
+| `gamemoderun mangohud gamescope -W 3440 … %command%` pasted per game | `"/path/to/launchlayer" %command%` once per game |
+| Settings scattered across Steam, shell aliases, and one-off scripts | Plain `KEY=VALUE` files: profiles → presets → per-game |
+| No preflight for `vm.max_map_count`, shader bloat, or VRAM pressure | Doctor, cache trim, compositor-aware display detection |
+
+Built for a tuned workstation (7900X3D, RTX 3080 Ti, Wayland / Plasma 6), with auto-detection and profiles for Steam Deck, Flatpak Steam, BSD, and WSL2.
+
+**Requirements:** bash 4.2+, Steam (or any launcher that passes `%command%`). Optional tools (`fzf`, `gamescope`, …) enhance the stack but are not required for basic launches.
+
+### See it work
+
+Preview the resolved layers and launch chain without starting a game:
+
+```bash
+./launchlayer --show-config 2357570
+```
+
+```
+=== Config for AppID 2357570 (Overwatch®) ===
+Layers:
+  → profiles/arch-linux.env
+  → profiles/nvidia-desktop.env
+  → default.env
+  → presets/competitive.env
+  → games/2357570.env
+
+Launch chain:
+  gamemoderun → taskset → game-performance → dlss-swapper → gamescope → %command%
+```
+
+<p align="center">
+  <img src="docs/assets/tui-game-picker.png" alt="LaunchLayer TUI game picker" width="640">
+  <br>
+  <em><a href="docs/tui.md#screenshots">Interactive TUI</a> — browse games, preview configs, flip toggles</em>
+</p>
+
+### Quick paths
+
+| I want to… | Go to |
+|------------|-------|
+| Get running in five minutes | [Quick start](#quick-start) |
+| Paste into Steam’s Launch Options | [Steam integration](#integrating-with-steam-launch-options) |
+| Browse and edit games interactively | [Interactive TUI](#interactive-tui) · [screenshots](docs/tui.md#screenshots) |
+| Share configs with similar machines | [Community hub](#community-hub) |
+| Understand the launch pipeline | [How a launch works](#how-a-launch-works) |
+| Full CLI command tables | [docs/cli.md](docs/cli.md) |
+| TUI menus and shortcuts | [docs/tui.md](docs/tui.md) |
+| Module-level internals | [docs/architecture.md](docs/architecture.md) |
 
 ---
 
@@ -28,79 +80,59 @@ Built for a tuned Linux gaming workstation (7900X3D, RTX 3080 Ti, Wayland / Plas
 | · | [What it does](#what-it-does) |
 | ⚙ | [How a launch works](#how-a-launch-works) |
 | ≡ | [Configuration](#configuration) |
-| ⌨ | [CLI reference](#cli-reference) |
-| ▤ | [Interactive TUI](#interactive-tui) |
+| ⌨ | [CLI reference](#cli-reference) · [docs/cli.md](docs/cli.md) |
+| ▤ | [Interactive TUI](#interactive-tui) · [docs/tui.md](docs/tui.md) |
 | ◉ | [Community hub](#community-hub) |
 | ⊞ | [System tuning](#system-tuning) |
 | / | [Project layout](#project-layout) |
 | + | [Optional dependencies](#optional-dependencies) |
 | ✓ | [Testing](#testing) |
+| ? | [FAQ](#faq) |
+| ↗ | [Contributing](#contributing) |
 | § | [License](#license) |
 
 ---
 
 ## Quick start
 
-<table>
-<tr>
-<td width="28" align="center">①</td>
-<td><strong>Clone to a stable path</strong></td>
-</tr>
-</table>
+1. **Clone to a stable path** (Steam needs a fixed absolute path in Launch Options):
 
 ```bash
-git clone https://github.com/bolens/LaunchLayer.git /mnt/games/config
-cd /mnt/games/config
+git clone https://github.com/bolens/LaunchLayer.git ~/launchlayer
+cd ~/launchlayer
 ```
 
-<table>
-<tr>
-<td width="28" align="center">②</td>
-<td><strong>Run onboarding</strong></td>
-</tr>
-</table>
+2. **Run onboarding** — completions, symlink, launch string, and machine defaults:
 
 ```bash
 ./launchlayer --setup --completions --symlink --print-launch-option --write-local-config
 ```
 
-This installs shell completions, adds a `~/.local/bin/launchlayer` shortcut, prints your Steam launch string, and writes `launch.d/local.env` with detected machine defaults. Add `--systemd` for the maintenance timer or `--backup-timer` for scheduled config backups.
+This installs shell completions, adds `~/.local/bin/launchlayer`, prints your Steam launch string, and writes `launch.d/local.env`. Add `--systemd` for the maintenance timer or `--backup-timer` for scheduled config backups.
 
-<table>
-<tr>
-<td width="28" align="center">③</td>
-<td><strong>Set Steam launch options</strong></td>
-</tr>
-</table>
+3. **Paste into Steam** — copy the printed string into each game’s **Launch Options** (same string for every title):
 
-Paste the launch string from step ② into each game’s **Launch Options** field. See [Integrating with Steam launch options](#integrating-with-steam-launch-options) for UI paths, Flatpak notes, and verification steps.
+```
+"/home/you/launchlayer/launchlayer" %command%
+```
 
-<table>
-<tr>
-<td width="28" align="center">④</td>
-<td><strong>Scaffold a per-game config</strong></td>
-</tr>
-</table>
+See [Integrating with Steam launch options](#integrating-with-steam-launch-options) for UI paths, Flatpak notes, and verification.
+
+4. **Scaffold a per-game config**:
 
 ```bash
 ./launchlayer --init-appid 2357570 competitive    # by AppID
 ./launchlayer --init-appid "Overwatch" competitive  # by name
+./launchlayer --tui                                 # or browse interactively
 ```
 
-Or browse interactively: `./launchlayer --tui`
-
-<table>
-<tr>
-<td width="28" align="center">⑤</td>
-<td><strong>Sanity check</strong></td>
-</tr>
-</table>
+5. **Sanity check**:
 
 ```bash
 ./launchlayer --doctor
 ```
 
-If Proton titles misbehave, fix `vm.max_map_count` once—see [System tuning](#system-tuning).
+If Proton titles misbehave, fix `vm.max_map_count` once — see [System tuning](#system-tuning).
 
 ---
 
@@ -422,92 +454,20 @@ Inspect detection: `./launchlayer --detect-environment`
 
 ## CLI reference
 
-Run from a terminal—no `%command%` needed. Most game commands accept **AppID or name fragment** (case-insensitive).
+Run from a terminal — no `%command%` needed. **`./launchlayer --help`** is the live source of truth.
 
-Global flags (place before subcommands):
+**Full command tables:** [docs/cli.md](docs/cli.md)
 
-| Flag / variable | Effect |
-|-----------------|--------|
-| `--quiet`, `-q` | Suppress non-fatal warnings |
-| `--verbose`, `-v` | Extra debug output (`DEBUG=1`) |
-| `--json` | Machine-readable output (where supported) |
-| `LAUNCHLAYER_QUIET=1` | Same as `--quiet` (including during game launch) |
-| `LAUNCHLAYER_CONFIG_DIR` | Override config root (parent of `launch.d/`) |
-| `LAUNCHLAYER_GAMES_DIR` | Per-game `.env` directory (default: `~/.local/share/launchlayer/games`) |
-| `LAUNCHLAYER_PROFILES` | Comma-separated machine profiles (or auto-detect) |
-| `NO_COLOR=1` | Disable ANSI colors |
+| Command | What it does |
+|---------|--------------|
+| `--doctor` | Environment + config health check |
+| `--show-config APPID` | Resolved layers and launch chain |
+| `--init-appid APPID preset` | Scaffold a per-game config |
+| `--list-games` | Installed games with native/EAC hints |
+| `--tui` | Interactive game/config browser |
+| `--export-config` / `--import-config` | Backup and restore config bundles |
 
-### Setup and health
-
-| Command | Description |
-|---------|-------------|
-| `--help`, `-h` | Grouped command reference |
-| `--version`, `-V` | Version and install paths |
-| `--doctor [--json]` | Environment + config health check (includes `--validate-config all`); exits non-zero when issues remain |
-| `--setup [--completions] [--systemd] [--backup-timer] [--symlink] [--print-launch-option] [--write-local-config]` | Non-destructive onboarding |
-| `--detect-environment [--json]` | Auto-detected platform, GPU, display, tools |
-| `--detect-defaults [--json]` | Recommended machine-local settings |
-| `--write-local-config [--force] [--dry-run]` | Persist defaults to `launch.d/local.env` |
-| `--completions [status\|enable\|disable\|print] [--shell S]` | Shell tab completions |
-| `--install-systemd` | Install user **maintenance** timer (`launchlayer-maintenance.timer`) |
-| `--backup-timer [install\|enable\|disable\|status\|reinstall] [--dir PATH] [--keep N] [--schedule ON_CALENDAR] [--no-enable]` | Install/manage **backup** timer (`launchlayer-backup.timer`) |
-| `--backup-prefs [show\|reset\|set\|set-schedule] [--json] [--reinstall-timer]` | Edit `backup.conf` retention, schedule, and includes |
-| `--sysctl [status\|install]` | `vm.max_map_count` helper (install needs root) |
-
-### Games and config
-
-| Command | Description |
-|---------|-------------|
-| `--list-games [--configured] [--json] [--grep NAME]` | Installed games with native/EAC hints |
-| `--init-appid APPID\|NAME [preset] [--force]` | Create per-game config |
-| `--bulk-set-include PRESET [--all-configured\|--all-installed] [--grep NAME] [APPID\|NAME...] [--dry-run] [--json]` | Set `INCLUDE=presets/PRESET.env` on many games (TUI: **Games → Bulk change INCLUDE preset**) |
-| `--init-unconfigured [--preset P] [--eac-only] [--dry-run]` | Bulk-scaffold missing configs |
-| `--prune-uninstalled [--dry-run] [--yes]` | Remove configs for uninstalled games |
-| `--show-config APPID\|NAME [--json]` | Resolved layers, settings, launch chain |
-| `--edit-appid APPID\|NAME` | Open/create per-game config in `$EDITOR` |
-| `--paths APPID\|NAME [--json]` | Shader cache, compatdata, install paths |
-| `--validate-config [APPID\|NAME\|all] [--json]` | Lint `.env` files |
-| `--scan-anticheat [--update-list]` | Find EAC/BattlEye vs known list |
-| `--scan-detections` | Audit heuristic vs list mismatches |
-
-### Runtime and diagnostics
-
-| Command | Description |
-|---------|-------------|
-| `--status [AppID\|NAME] [--json]` | Runtime state, cache sizes |
-| `--show-cpu-topology` | CPU summary + X3D V-Cache CCD range |
-| `--cache-report [--min-gb N] [--grep NAME] [--json] [--shader-only\|--compat-only]` | Large cache directories |
-| `--launch-stats [AppID\|NAME] [--json]` | Summarize `launch.log` |
-| `--dry-run %command%` | Print env + chain without running |
-| `--pause-vram-hogs` / `--resume-vram-hogs` | Manual VRAM service control |
-| `--cleanup-stale-launch [pid]` | Recover after crash or force-quit |
-
-### Backup and restore
-
-| Command | Description |
-|---------|-------------|
-| `--export-config [--output PATH] [--include-local] [--no-profiles] [--include-tui] [--json]` | Export config bundle (timestamped `.tar.gz` by default) |
-| `--backup-config [--output DIR\|PATH] [--exclude-local] [--no-profiles] [--include-tui] [--json]` | Backup alias with backup-dir defaults |
-| `--import-config ARCHIVE [--yes] [--merge\|--replace] [--exclude-local] [--no-profiles] [--include-tui] [--json]` | Restore bundle (dry-run by default; pass `--yes` to apply) |
-| `--prune-backups [--dir PATH] [--keep N] [--dry-run] [--json]` | Remove old backup archives |
-| `--run-scheduled-backup [--dir PATH] [--keep N] [--json]` | Run backup + prune (used by `launchlayer-backup.timer`) |
-| `--tui-prefs [show\|reset\|set] [--json]` | Edit `tui.conf` (fzf height, JSON mode, default preset, …) |
-| `--hub-prefs [show\|reset\|set] [--json]` | Edit `hub.conf` (url, publish token, machine label, fingerprint level) |
-
-### Shell completion
-
-Supported shells: **bash**, **zsh**, **fish**, **nushell** (`nu`), **PowerShell** (`pwsh`), and **Oil** (`osh`, reuses bash completions).
-
-```bash
-./launchlayer --completions enable              # login shell
-./launchlayer --completions enable --shell all
-./launchlayer --completions print --shell bash  # for Nix/packaging
-./launchlayer --completions enable --shell osh    # Oil shell
-./launchlayer --completions enable --shell nu     # ~/.config/nushell/completions/
-./launchlayer --completions enable --shell pwsh   # $PROFILE drop-in
-```
-
-Disable with `--completions disable`. Unknown flags suggest close matches (“Did you mean …?”).
+Global flags: `--quiet`, `--verbose`, `--json`, plus `LAUNCHLAYER_CONFIG_DIR`, `LAUNCHLAYER_GAMES_DIR`, `LAUNCHLAYER_PROFILES`. Most game commands accept **AppID or name fragment** (case-insensitive).
 
 ---
 
@@ -518,99 +478,29 @@ Disable with `--completions disable`. Unknown flags suggest close matches (“Di
 launchlayer                  # same when symlinked; also opens TUI with no args when fzf + TTY
 ```
 
-Requires an interactive terminal. With [fzf](https://github.com/junegunn/fzf) menus are fuzzy lists with a header, border, and reverse layout; without fzf, the same items appear as numbered prompts (`1) …`, `Choice:`).
+Requires [fzf](https://github.com/junegunn/fzf) for fuzzy menus with live previews; without it, numbered prompts are used instead.
 
-**On launch** — status banner (two lines, then the main menu):
+<p align="center">
+  <img src="docs/assets/tui-main-menu.png" alt="LaunchLayer main menu" width="720">
+  <br>
+  <em>Main menu with status banner</em>
+</p>
 
-```
-── filter: all │ doctor: 0 issue(s) │ vm.max_map_count: ok
-── backup: off │ maintenance: off │ keep newest 7 after backup │ hub: not configured · fp:minimal
-```
+<p align="center">
+  <img src="docs/assets/tui-game-picker.png" alt="LaunchLayer game picker with live preview" width="720">
+  <br>
+  <em>Game picker — fuzzy search, live config preview, Ctrl-E/Ctrl-D shortcuts</em>
+</p>
 
-**Main menu** — header `LaunchLayer 0.9.0` (version from `LAUNCHLAYER_VERSION`). Optional prefix rows appear first when applicable:
+<p align="center">
+  <img src="docs/assets/tui-quick-toggles.png" alt="LaunchLayer per-game quick toggles" width="720">
+  <br>
+  <em>Quick toggles — inherited vs per-game overrides (green/red)</em>
+</p>
 
-```
-LaunchLayer 0.9.0                          ← fzf --header
-────────────────────────────────────────
-Doctor: 2 issue(s)                         ← only when doctor finds issues
-▶ Resume: Games                            ← when a previous hub was saved
-Games  ← last visit                        ← suffix on the last main hub visited
-Config library
-Backup & restore
-Community hub
-System & tools
-TUI settings
-Quit
-```
+**Full menu tree, shortcuts, and preferences:** [docs/tui.md](docs/tui.md) (includes [screenshots](docs/tui.md#screenshots))
 
-With **auto-resume** enabled (`TUI settings → Auto-resume last hub`), the saved hub opens immediately instead of showing this menu.
-
-<details>
-<summary>Submenus (exact labels from the TUI)</summary>
-
-**Games ›** `(filter: all)`
-
-- Browse & configure game
-- Recent games
-- Change game filter (`all` / `configured` / `unconfigured`)
-- Bulk change INCLUDE preset
-- Init unconfigured games
-- Prune uninstalled configs
-
-**Games › *Game* › Actions** `(config ok | validation issues | inherits layers)`
-
-- `[View]` Resolved config · Dry-run launch chain · Paths · Launch stats
-- `[Edit]` Quick toggles · Advanced config · Clear override · Open in `$EDITOR` · Set preset (re-init)
-- `[Manage]` Validate config · Delete per-game config
-- `[Hub]` Community configs
-
-**Game picker** (fzf): header `Select a game ([recent] at top, Ctrl-E: editor, Ctrl-D: dry-run, filter=…)`; `[recent]` rows sort to the top; live preview via `--tui-game-preview`.
-
-**Config library › Layers & validation**
-
-- Edit `launch.d/default.env` / `local.env` · Show detected defaults · Write local.env from detection
-- Anticheat & detections · Edit machine profile · Edit gameplay preset
-- Validate default + presets · Validate all game configs
-
-**Backup & restore ›** `(prune policy │ maint: …)`
-
-- Settings & preferences · Backup actions · Export & import · Prune archives · Backup timer
-
-**Community hub ›** `(url · fp:minimal | not configured · fp:minimal)`
-
-- Hub settings · Fingerprint level: *minimal* · Machine fingerprint · Similar machines
-- Recommend configs (pick game) · Publish config · Update shared configs · Delete config by ID · Apply config by ID
-- Publish/update flows support optional **config ID** and **include-new** (same as `--config-id` / `--include-new` on the CLI)
-
-**System & tools › Diagnostics & setup**
-
-- Doctor · Detect environment · Runtime status · CPU topology · vm.max_map_count
-- VRAM hogs & launch cleanup · Cache report (full / shader-only / compat-only / grep / min GB) · Setup / onboarding
-
-**TUI settings ›** `saved to tui.conf`
-
-- Game picker filter · JSON view output · Auto-resume last hub · Press-enter line threshold
-- Cache report min GB · Default init preset · fzf height · fzf preview layout · Reset to defaults
-
-</details>
-
-**Highlights:**
-
-- Breadcrumb headers use ` › ` (e.g. `Games › Overwatch 2 › Quick toggles`)
-- Quick toggles show inherited vs per-game override coloring when the terminal supports it
-- **Ctrl-E** / **Ctrl-D** in the game picker map to `--edit-appid` and `--dry-run`
-- JSON view mode (`TUI settings`) makes view commands emit `--json` output, pretty-printed when `jq`/`python3` is available
-- Long output only pauses at “Press Enter to continue…” when it spans `press_enter_lines` (default 8)
-
-**Preferences** in `~/.config/launchlayer/`:
-
-| File | Template |
-|------|----------|
-| `tui.conf` | `share/launchlayer/templates/tui.conf.example` |
-| `backup.conf` | `share/launchlayer/templates/backup.conf.example` |
-| `hub.conf` | `share/launchlayer/templates/hub.conf.example` |
-
-Reset via `--tui-prefs reset`, `--backup-prefs reset`, `--hub-prefs reset`, or **TUI settings** / **Backup & restore → Settings & preferences** / **Community hub → Hub settings**.
+Regenerate screenshots after UI changes: `make tui-screenshots` (requires [VHS](https://github.com/charmbracelet/vhs) and `fzf`).
 
 ---
 
@@ -714,11 +604,20 @@ lib/                     # ⚙ core modules (config, launch, hardware, tui, …)
 hub/                     # ◉ optional Convex backend (pnpm)
 share/launchlayer/       # ▣ templates, sysctl, systemd units, completions
 examples/games/          # ◆ tracked example per-game configs
-scripts/                 # ⊞ workstation setup; check-staged-hub-secrets.sh
+scripts/
+  tui-screenshots/       # VHS frame scripts + fixtures (make tui-screenshots)
+  check-staged-hub-secrets.sh
+  setup-workstation-tuning.sh
 test/                    # ✓ bats integration + unit tests
 docs/
   architecture.md        # module load order, paths, hub API
-  assets/launchlayer.svg # logo (this README)
+  cli.md                 # full CLI command reference
+  tui.md                 # interactive TUI menus, shortcuts, screenshots
+  assets/
+    launchlayer.svg
+    tui-main-menu.png
+    tui-game-picker.png
+    tui-quick-toggles.png
 ```
 
 ### Runtime state
@@ -780,6 +679,56 @@ Or directly:
 bats test/
 shellcheck -x -P lib --severity=warning launchlayer lib/*.sh lib/**/*.sh scripts/*.sh test/helpers.bash
 ```
+
+---
+
+## FAQ
+
+**Do I need a different launch string per game?**
+No. Use the same `"/path/to/launchlayer" %command%` on every title. Per-game tuning lives in `GAMES_DIR/<AppID>.env`.
+
+**Can I keep `gamemoderun` or `mangohud` in Steam’s launch options?**
+Remove external wrappers from Steam and enable `GAMEMODE=1`, `MANGOHUD=1`, `GAMESCOPE=1`, etc. in config instead — otherwise you get double-wrapped launches.
+
+**Does this work with Flatpak Steam?**
+Yes. Installs under `$HOME` usually work as-is; paths outside `$HOME` need a Flatpak filesystem override. Run `./launchlayer --detect-environment` and see [Flatpak Steam](#3-flatpak-steam).
+
+**Do I need the community hub?**
+No. Local launches, the TUI, backup/restore, and doctor all work without it. The hub is optional for sharing configs with similar machines.
+
+**Where do per-game configs live?**
+In `~/.local/share/launchlayer/games/<AppID>.env` by default — not in the git repo. See [Configuration](#configuration).
+
+**Commercial use?**
+This project is [CC BY-NC-SA 4.0](LICENSE). Commercial use requires separate permission from bolens.
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome at [github.com/bolens/LaunchLayer](https://github.com/bolens/LaunchLayer).
+
+```bash
+make check    # shellcheck + hub secret guard + bats
+make test     # bats only
+```
+
+- Deep module reference: [docs/architecture.md](docs/architecture.md)
+- CLI and TUI reference: [docs/cli.md](docs/cli.md) · [docs/tui.md](docs/tui.md) (with [TUI screenshots](docs/tui.md#screenshots))
+- Example per-game config: [examples/games/2357570.env](examples/games/2357570.env)
+- Do not commit `hub/.env.local`, `hub/.convex/`, or publish tokens — `make check-hub-git` catches accidental staging
+
+---
+
+## Star history
+
+<a href="https://star-history.com/#bolens/LaunchLayer&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=bolens/LaunchLayer&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=bolens/LaunchLayer&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=bolens/LaunchLayer&type=Date" />
+  </picture>
+</a>
 
 ---
 

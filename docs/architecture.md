@@ -27,6 +27,12 @@ share/launchlayer/
   completions/              # bash, zsh, fish, nu, pwsh scripts
 launch.d/                   # shipped layers only (presets, profiles, lists)
 examples/games/             # tracked example per-game configs
+docs/
+  architecture.md           # this file
+  cli.md                    # CLI command reference
+  tui.md                    # TUI menus + screenshots (assets/tui-*.png)
+  assets/                   # logo + TUI screenshots (regenerate: make tui-screenshots)
+scripts/tui-screenshots/    # VHS capture scripts
 ```
 
 ## Config layers (later overrides earlier)
@@ -51,8 +57,8 @@ Per-game `INCLUDE=` loads the preset **under** that file’s keys (preset first,
 
 Utility subcommands are implemented once in `lib/commands/` and `lib/inspect/`, then wired through:
 
-- **CLI** — `handle_subcommand` in `lib/commands/dispatch.sh` (`launchlayer --help` is the full reference)
-- **TUI** — menus under `lib/tui/` call the same functions (e.g. `show_doctor`, `hub_publish_config`, `bulk_set_include_preset`)
+- **CLI** — `handle_subcommand` in `lib/commands/dispatch.sh` (`launchlayer --help` is the full reference; see [docs/cli.md](cli.md))
+- **TUI** — menus under `lib/tui/` call the same functions (e.g. `show_doctor`, `hub_publish_config`, `bulk_set_include_preset`); see [docs/tui.md](tui.md)
 
 User preferences follow the same pattern for all three config files:
 

@@ -1,0 +1,30 @@
+=== Overwatch® (2357570) ===
+INCLUDE=auto
+native=0  anticheat=1  engine=unknown
+
+Toggles (* = per-game override):
+  GAMEMODE=1
+  MANGOHUD=1
+  GAMESCOPE=1
+  GAMESCOPE_ADAPTIVE_SYNC=1
+  VRAM_HOGS=1
+  NETWORK_TUNE=1
+  PIPEWIRE_LOW_LATENCY=0
+  SHADER_CACHE_TRIM=0 *
+  GPU_POWER_CHECK=1
+  LAUNCH_WATCHDOG=1
+  GAME_PERFORMANCE=1
+  BENCHMARK=0
+  DEBUG=0
+  FORCE_NATIVE=0
+  FORCE_PROTON=0
+  DISABLE_CPU_AFFINITY=0
+
+Effective settings:
+  GAMEMODE=1  (presets/standard.env)
+  MANGOHUD=1  (presets/competitive.env)
+  GAMESCOPE=1  (presets/competitive.env)
+  LAUNCH_WRAPPERS=dlss-swapper  (games/2357570.env)
+  GAMESCOPE_W=3440  (games/2357570.env)
+  GAMESCOPE_H=1440  (games/2357570.env)
+  GAMESCOPE_R=120  (games/2357570.env)
