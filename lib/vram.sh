@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # shellcheck source=common.sh
-# shellcheck source=runtime.sh
+# shellcheck source=runtime/logging.sh
 # lib/vram.sh — VRAM-heavy service pause/resume and launch session cleanup.
 #
 # VRAM hogs (Sunshine, HyprWhspr, etc.) are stopped while a game runs so the

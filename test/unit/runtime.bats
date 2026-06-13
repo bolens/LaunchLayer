@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unit tests for lib/runtime.sh helpers.
+# Unit tests for lib/runtime/ helpers.
 load '../helpers.bash'
 
 setup() {
@@ -27,8 +27,10 @@ setup() {
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib runtime
 		run_pre_launch_cmd
+		echo done
 	'
 	[[ $status -eq 0 ]]
+	[[ "$output" == done ]]
 }
 
 @test "run_pre_launch_cmd executes hook" {
@@ -55,4 +57,250 @@ setup() {
 	[[ "$output" == *'"/cache/shader"'* ]]
 	[[ "$output" == *'"bytes":1073741824'* ]]
 	python3 -c 'import json,sys; json.loads(sys.argv[1])' "$output"
+}
+
+@test "apply_unset_vars removes listed env vars" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export UNSET_VARS="FOO BAR"
+		export FOO=1 BAR=2
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime
+		apply_unset_vars
+		echo "foo:${FOO:-unset} bar:${BAR:-unset}"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "foo:unset bar:unset" ]]
+}
+
+@test "apply_anticheat_guardrails warns on DEBUG with EAC title" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export DEBUG=1
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime
+		is_anticheat=1
+		apply_anticheat_guardrails 2>&1
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"DEBUG=1 with EAC title"* ]]
+}
+
+@test "apply_proton_env skips exports for native games" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime
+		is_native=1
+		FORCE_PROTON=0
+		unset PROTON_ENABLE_WAYLAND PROTON_USE_NTSYNC DXVK_ASYNC 2>/dev/null || true
+		apply_proton_env
+		echo "wayland:${PROTON_ENABLE_WAYLAND:-unset} ntsync:${PROTON_USE_NTSYNC:-unset} dxvk:${DXVK_ASYNC:-unset}"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "wayland:unset ntsync:unset dxvk:unset" ]]
+}
+
+@test "apply_proton_env benchmark profile strips overlays" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export is_native=0 BENCHMARK=1 MANGOHUD=1
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime
+		apply_proton_env
+		echo "mangohud:${MANGOHUD:-unset} dxvk:${DXVK_ASYNC:-unset}"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "mangohud:unset dxvk:1" ]]
+}
+
+@test "apply_proton_env sets Proton defaults for non-native games" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export is_native=0
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime
+		apply_proton_env
+		echo "wayland:${PROTON_ENABLE_WAYLAND} dxvk:${DXVK_ASYNC}"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "wayland:1 dxvk:1" ]]
+}
+
+@test "rotate_launch_log trims oversized launch.log" {
+	local tmp log
+	tmp="$(temp_state_dir)"
+	log="$tmp/state/launchlayer/launch.log"
+	mkdir -p "$(dirname "$log")"
+	printf '%s\n' {1..10} > "$log"
+	run env \
+		CONFIG_DIR="$CONFIG_DIR" \
+		XDG_STATE_HOME="$tmp/state" \
+		LAUNCH_LOG_MAX_LINES=3 \
+		bash -c '
+			source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+			source_lib platform runtime
+			rotate_launch_log
+			wc -l < "$LAUNCH_LOG_FILE"
+		'
+	[[ $status -eq 0 ]]
+	[[ "$output" -eq 3 ]]
+	rm -rf "$tmp"
+}
+
+@test "log_launch_event appends structured launch line" {
+	local tmp
+	tmp="$(temp_state_dir)"
+	run env \
+		CONFIG_DIR="$CONFIG_DIR" \
+		XDG_STATE_HOME="$tmp/state" \
+		bash -c '
+			source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+			source_lib platform runtime
+			steam_app_id=42424242
+			steam_game_name="Test Game"
+			is_native=1
+			is_anticheat=0
+			log_launch_event 0 120
+			cat "$LAUNCH_LOG_FILE"
+		'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"appid=42424242"* ]]
+	[[ "$output" == *"duration=120s exit=0"* ]]
+	rm -rf "$tmp"
+}
+
+@test "parse_game_extra_args splits GAME_EXTRA_ARGS" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export GAME_EXTRA_ARGS="--foo bar"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime
+		parse_game_extra_args
+		printf "%s\n" "${game_extra_argv[@]}"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'--foo\nbar' ]]
+}
+
+@test "build_launch_chain includes enabled installed wrappers" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export is_native=0 GAMEMODE=1 MANGOHUD=1 BENCHMARK=0
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform runtime
+		optional_tool_installed() {
+			case "$1" in gamemoderun|mangohud|taskset) return 0 ;; *) return 1 ;; esac
+		}
+		command_available() { return 1; }
+		default_online_cpus() { echo 0-3; }
+		launch=()
+		build_launch_chain
+		printf "%s\n" "${launch[@]}"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *gamemoderun* ]]
+	[[ "$output" == *mangohud* ]]
+}
+
+@test "apply_pipewire_low_latency exports pulse latency on pipewire" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export PIPEWIRE_LOW_LATENCY=1
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform runtime
+		detect_audio_server() { echo pipewire; }
+		optional_tool_installed() { return 1; }
+		apply_pipewire_low_latency
+		echo "latency:${PULSE_LATENCY_MSEC:-unset}"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "latency:30" ]]
+}
+
+@test "run_post_launch_cmd executes hook" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export POST_LAUNCH_CMD="echo postlaunch-marker"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime
+		run_post_launch_cmd
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"postlaunch-marker"* ]]
+}
+
+@test "print_dry_run shows launch chain and config layers" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform runtime keys config
+		steam_app_id=42424242
+		steam_game_name="Dry Run Game"
+		is_native=0
+		is_anticheat=1
+		config_layers=("'$CONFIG_DIR'/launch.d/default.env")
+		launch=(gamemoderun)
+		game_extra_argv=(--foo)
+		print_dry_run /bin/true
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"launchlayer dry run"* ]]
+	[[ "$output" == *"Config layers"* ]]
+	[[ "$output" == *"Launch chain"* ]]
+	[[ "$output" == *"gamemoderun"* ]]
+}
+
+@test "append_launch_wrappers adds installed LAUNCH_WRAPPERS_BEFORE" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export LAUNCH_WRAPPERS_BEFORE="wrapper-a wrapper-b"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform runtime
+		command_available() {
+			case "$1" in wrapper-a|wrapper-b) return 0 ;; *) return 1 ;; esac
+		}
+		launch=()
+		append_launch_wrappers
+		printf "%s\n" "${launch[@]}"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'wrapper-a\nwrapper-b' ]]
+}
+
+@test "build_launch_chain adds gamescope flags when enabled" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export is_native=0 GAMESCOPE=1 GAMESCOPE_W=1920 GAMESCOPE_H=1080 GAMESCOPE_R=120
+		export GAMESCOPE_ADAPTIVE_SYNC=1 GAMESCOPE_FSR=1 BENCHMARK=0 MANGOHUD=0
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform runtime
+		optional_tool_installed() { [[ "$1" == gamescope ]]; }
+		command_available() { return 1; }
+		launch=()
+		build_launch_chain
+		printf "%s\n" "${launch[@]}"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *gamescope* ]]
+	[[ "$output" == *"-W"* ]]
+	[[ "$output" == *"1920"* ]]
+	[[ "$output" == *"--adaptive-sync"* ]]
+	[[ "$output" == *"--fsr-sharpness"* ]]
+}
+
+@test "apply_cpu_performance uses powerprofilesctl fallback" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export GAME_PERFORMANCE=1
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform runtime
+		command_available() { [[ "$1" == powerprofilesctl ]]; }
+		optional_tool_installed() { [[ "$1" == powerprofilesctl ]]; }
+		debug() { printf "%s\n" "$*"; }
+		powerprofilesctl() { echo switched; return 0; }
+		apply_cpu_performance 2>&1
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"powerprofilesctl performance (fallback)"* ]]
 }

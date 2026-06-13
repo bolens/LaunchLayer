@@ -6,6 +6,10 @@ setup() {
 	bats_integration_setup
 }
 
+teardown() {
+	bats_integration_teardown
+}
+
 @test "list-games json output" {
 	local fake_steam
 	fake_steam="$(fake_steam_root 1794680 "Vampire Survivors")"
@@ -23,6 +27,42 @@ setup() {
 	[[ "$output" == *"1794680"* ]]
 	[[ "$output" == *"yes"* ]]
 	rm -rf "$fake_steam"
+}
+
+@test "list-games tabular rows are not prefixed by scan progress text" {
+	local fake_steam
+	fake_steam="$(fake_steam_root 1794680 "Vampire Survivors")"
+	run env STEAM_ROOT="$fake_steam" TERM=xterm-256color "$SCRIPT" --list-games --grep "Vampire Survivors"
+	[[ $status -eq 0 ]]
+	[[ "$output" != *"games scanned)"*"1794680"* ]]
+	[[ "$output" =~ ^APPID[[:space:]] ]]
+	rm -rf "$fake_steam"
+}
+
+@test "list-games updates persisted games cache on full scan" {
+	local fake_steam cache_dir lines_file
+	fake_steam="$(fake_steam_root 1794680 "Vampire Survivors")"
+	cache_dir="$(mktemp -d)"
+	lines_file="$cache_dir/launchlayer/tui-games/lines"
+	run env STEAM_ROOT="$fake_steam" XDG_CACHE_HOME="$cache_dir" "$SCRIPT" --list-games --grep "Vampire Survivors"
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"1794680"* ]]
+	[[ -f "$lines_file" ]]
+	[[ "$(<"$cache_dir/launchlayer/tui-games/status")" == "ready" ]]
+	grep -q '1794680' "$lines_file"
+	rm -rf "$fake_steam" "$cache_dir"
+}
+
+@test "list-games json mode still updates persisted games cache" {
+	local fake_steam cache_dir
+	fake_steam="$(fake_steam_root 1794680 "Vampire Survivors")"
+	cache_dir="$(mktemp -d)"
+	run env STEAM_ROOT="$fake_steam" XDG_CACHE_HOME="$cache_dir" "$SCRIPT" --list-games --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *'"1794680"'* ]]
+	[[ -f "$cache_dir/launchlayer/tui-games/lines" ]]
+	grep -q '1794680' "$cache_dir/launchlayer/tui-games/lines"
+	rm -rf "$fake_steam" "$cache_dir"
 }
 
 @test "list-games configured only" {
@@ -49,7 +89,9 @@ setup() {
 	fake_steam="$(fake_steam_root 2357570 "Overwatch")"
 	run env STEAM_ROOT="$fake_steam" "$SCRIPT" --paths 2357570 --json
 	[[ $status -eq 0 ]]
-	python3 -c 'import json,sys; json.loads(sys.argv[1])' "$output"
+	[[ "$output" == *'"appid":"2357570"'* || "$output" == *'"appid": "2357570"'* ]]
+	[[ "$output" == *'"shader_cache"'* ]]
+	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["appid"]=="2357570"' "$output"
 	rm -rf "$fake_steam"
 }
 
@@ -62,6 +104,7 @@ setup() {
 @test "cache-report json runs" {
 	run "$SCRIPT" --cache-report --min-gb 999 --json
 	[[ $status -eq 0 ]]
+	[[ "$output" == *'"entries"'* || "$output" == *'"games"'* || "$output" == *'"shader"'* ]]
 	python3 -c 'import json,sys; json.loads(sys.argv[1])' "$output"
 }
 

@@ -6,6 +6,10 @@ setup() {
 	bats_integration_setup
 }
 
+teardown() {
+	bats_integration_teardown
+}
+
 @test "help exits zero" {
 	run "$SCRIPT" --help
 	[[ $status -eq 0 ]]
@@ -38,10 +42,8 @@ setup() {
 	tmp_home="$(mktemp -d)"
 	bindir="$tmp_home/.local/bin"
 	mkdir -p "$bindir"
-	# shellcheck disable=SC2030
-	export HOME="$tmp_home"
-	"$SCRIPT" --setup --symlink >/dev/null
-	run "$bindir/launchlayer" --version
+	env HOME="$tmp_home" "$SCRIPT" --setup --symlink >/dev/null
+	run env HOME="$tmp_home" "$bindir/launchlayer" --version
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"LaunchLayer"* ]]
 	[[ "$output" == *"script="* ]]

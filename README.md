@@ -80,7 +80,7 @@ Launch chain:
 | · | [What it does](#what-it-does) |
 | ⚙ | [How a launch works](#how-a-launch-works) |
 | ≡ | [Configuration](#configuration) |
-| ⌨ | [CLI reference](#cli-reference) · [docs/cli.md](docs/cli.md) |
+| ⌨ | [CLI reference](docs/cli.md) |
 | ▤ | [Interactive TUI](#interactive-tui) · [docs/tui.md](docs/tui.md) |
 | ◉ | [Community hub](#community-hub) |
 | ⊞ | [System tuning](#system-tuning) |
@@ -307,14 +307,14 @@ flowchart LR
 1. **Recover stale state** — Resume VRAM-heavy services left paused after a crash (`lib/vram.sh`)
 2. **Resolve AppID** — From `SteamAppId`, `STEAM_APPID`, or launch argv (`lib/config.sh`)
 3. **Load layered config** — Profiles → `default.env` → `local.env` → preset or per-game file; then `apply_defaults` and `apply_detected_defaults`
-4. **Detect game flags** — Native vs Proton, EAC/BattlEye, engine hints (`lib/steam.sh`)
+4. **Detect game flags** — Native vs Proton, EAC/BattlEye, engine hints (`lib/steam/detect.sh`)
 5. **Auto hardware defaults** — X3D CPU mask, display resolution/refresh for Gamescope (`lib/hardware/`)
 6. **Parse extra args** — Split `GAME_EXTRA_ARGS` into argv appended after `%command%`
 7. **Preflight checks** — Skipped when `BENCHMARK=1` (`lib/preflight.sh`): sysctl, shader/compat caches, VRAM, GPU power/processes, disk, concurrent launch guard
 8. **Tool warnings & anticheat guardrails** — Missing optional tools; warn on risky settings for EAC/BattlEye titles
 9. **VRAM hogs** — Optionally pause configured systemd user units with refcount + exit trap (before runtime tuning)
 10. **Runtime tuning** — Network (`ethtool`), PipeWire latency, CPU perf profile, NVIDIA power mode, Proton/DXVK/VKD3D env
-11. **Build launch chain** — Assemble wrappers per `build_launch_chain` in `lib/runtime.sh`
+11. **Build launch chain** — Assemble wrappers per `build_launch_chain` in `lib/runtime/chain.sh`
 12. **Exec** — `PRE_LAUNCH_CMD` → run chain + `%command%` + extras → `POST_LAUNCH_CMD`; log to `~/.local/state/launchlayer/launch.log`
 
 </details>
@@ -448,26 +448,7 @@ PROTON_*  DXVK_*  VKD3D_*  __GL_*  __VK_*
 
 Cross-compositor probing covers KDE/Plasma, GNOME/COSMIC, Hyprland, Sway, wlroots compositors, and X11 stacks (via xrandr). Compositor IPC probes are gated so inactive tools (e.g. `hyprctl` on KDE) do not false-match. Wayland sessions auto-set `GAMESCOPE_EXPOSE_WAYLAND=0`.
 
-Inspect detection: `./launchlayer --detect-environment`
-
----
-
-## CLI reference
-
-Run from a terminal — no `%command%` needed. **`./launchlayer --help`** is the live source of truth.
-
-**Full command tables:** [docs/cli.md](docs/cli.md)
-
-| Command | What it does |
-|---------|--------------|
-| `--doctor` | Environment + config health check |
-| `--show-config APPID` | Resolved layers and launch chain |
-| `--init-appid APPID preset` | Scaffold a per-game config |
-| `--list-games` | Installed games with native/EAC hints |
-| `--tui` | Interactive game/config browser |
-| `--export-config` / `--import-config` | Backup and restore config bundles |
-
-Global flags: `--quiet`, `--verbose`, `--json`, plus `LAUNCHLAYER_CONFIG_DIR`, `LAUNCHLAYER_GAMES_DIR`, `LAUNCHLAYER_PROFILES`. Most game commands accept **AppID or name fragment** (case-insensitive).
+Inspect detection: `./launchlayer --detect-environment` (see [docs/cli.md](docs/cli.md))
 
 ---
 
@@ -517,18 +498,9 @@ cp share/launchlayer/templates/hub.conf.example ~/.config/launchlayer/hub.conf
 # Optional: publish_token, machine_label, fingerprint_level (minimal | standard | detailed)
 ```
 
-| Command | Description |
-|---------|-------------|
-| `--hub-fingerprint [--json] [--fingerprint-level minimal\|standard\|detailed]` | Machine descriptor for matching (`minimal` default; override via `hub.conf` or env) |
-| `--hub-publish APPID\|NAME [--note TEXT] [--config-id ID] [--all-configured] [--json]` | Upload per-game config(s) (requires `curl`) |
-| `--hub-update APPID\|NAME\|CONFIG_ID [--all-configured] [--note TEXT] [--include-new] [--json]` | Update existing shared config(s) for this machine |
-| `--hub-delete CONFIG_ID [--yes] [--json]` | Delete a shared config (requires `curl` + publish token when enforced) |
-| `--hub-recommend APPID\|NAME [--limit N] [--json]` | Configs from similar machines |
-| `--hub-search [--limit N] [--json]` | Machines most like yours |
-| `--hub-apply CONFIG_ID [--dry-run] [--json]` | Download and write a shared config (requires `curl` + `jq` or `python3`) |
-| `--hub-prefs [show\|reset\|set] [--json]` | Edit `hub.conf` without the TUI |
+**Hub CLI commands:** [docs/cli.md § Community hub](docs/cli.md#community-hub)
 
-The TUI exposes the same flows under **Community hub** (main menu) and **[Hub] Community configs** (per-game actions). Bulk `INCLUDE` preset changes use **`--bulk-set-include`** on the CLI or **Games → Bulk change INCLUDE preset** in the TUI.
+The TUI exposes the same flows under **Community hub** (main menu) and **[Hub] Community configs** (per-game actions).
 
 Deploy or develop the backend from `hub/` (requires [Corepack](https://nodejs.org/api/corepack.html) + pnpm):
 
@@ -661,7 +633,7 @@ The script degrades gracefully when tools are missing. Run `--doctor` or `--dete
 
 - **`launch.d/anticheat-appids.txt`** — Known EAC/BattlEye AppIDs; guardrails warn on risky settings (`DEBUG=1`, `DXVK_ASYNC`)
 - **`launch.d/native-appids.txt`** — Known native Linux builds; skips Proton env unless `FORCE_PROTON=1`
-- Heuristics in `lib/steam.sh` also inspect install manifests; `--scan-anticheat` and `--scan-detections` help keep lists accurate
+- Heuristics in `lib/steam/detect.sh` also inspect install manifests; `--scan-anticheat` and `--scan-detections` help keep lists accurate
 
 ---
 

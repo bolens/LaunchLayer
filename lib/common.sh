@@ -68,12 +68,12 @@ X3D_CPUS_META_FILE="$STATE_DIR/x3d-cpus.meta"
 # Per-launch mutable state (reset each game launch)
 # ---------------------------------------------------------------------------
 
-declare -A config_loaded=()
-declare -A config_key_sources=()
-declare -a config_layers=()
-declare -a paused_vram_units=()
-declare -a launch=()
-declare -a game_extra_argv=()
+declare -g -A config_loaded=()
+declare -g -A config_key_sources=()
+declare -g -a config_layers=()
+declare -g -a paused_vram_units=()
+declare -g -a launch=()
+declare -g -a game_extra_argv=()
 
 DRY_RUN=0
 LAUNCH_QUIET=0

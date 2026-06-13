@@ -115,98 +115,49 @@ optional_tool_installed() {
 	esac
 }
 
+# tool_packages_data_file — Shipped TSV mapping logical tools to distro packages.
+tool_packages_data_file() {
+	printf '%s/tool-packages.tsv' "$(launchlayer_share_dir)"
+}
+
+# _tool_package_from_tsv — Lookup package for tool+PM; prints package or returns 1.
+_tool_package_from_tsv() {
+	local tool=$1 pm=$2 file=$3
+	local row_tool row_pm row_pkg
+	[[ -f "$file" ]] || return 1
+
+	while IFS=$'\t' read -r row_tool row_pm row_pkg || [[ -n "$row_tool" ]]; do
+		[[ "$row_tool" =~ ^# ]] && continue
+		[[ -z "$row_tool" ]] && continue
+		[[ "$row_tool" == "$tool" && "$row_pm" == "$pm" ]] || continue
+		[[ "$row_pkg" == "-" ]] && return 0
+		printf '%s' "$row_pkg"
+		return 0
+	done < "$file"
+
+	while IFS=$'\t' read -r row_tool row_pm row_pkg || [[ -n "$row_tool" ]]; do
+		[[ "$row_tool" =~ ^# ]] && continue
+		[[ -z "$row_tool" ]] && continue
+		[[ "$row_tool" == "$tool" && "$row_pm" == "*" ]] || continue
+		[[ "$row_pkg" == "-" ]] && return 0
+		printf '%s' "$row_pkg"
+		return 0
+	done < "$file"
+	return 1
+}
+
 # tool_package_name — Package or bundle name(s) for a logical tool on this OS.
 tool_package_name() {
 	local tool=$1
 	local pm=${2:-$(detect_package_manager)}
+	local pkg=""
 
-	case "$tool" in
-		gamemoderun) echo gamemode ;;
-		game-performance)
-			case "$pm" in
-				pacman) echo game-performance ;;
-				apt) echo linux-cpupower ;;
-				dnf) echo kernel-tools ;;
-				zypper) echo cpupower ;;
-				apk) echo cpupower ;;
-				emerge) echo sys-power/cpupower ;;
-				xbps) echo cpupower ;;
-				eopkg) echo cpupower ;;
-				rpm-ostree) echo kernel-tools ;;
-				nix) echo cpupower ;;
-				brew) echo cpupower ;;
-				pkg) echo cpupower ;;
-				*) echo cpupower ;;
-			esac
-			;;
-		gamescope) echo gamescope ;;
-		mangohud) echo mangohud ;;
-		fzf) echo fzf ;;
-		taskset)
-			case "$pm" in
-				emerge) echo sys-apps/util-linux ;;
-				*) echo util-linux ;;
-			esac
-			;;
-		cpupower)
-			case "$pm" in
-				pacman) echo cpupower ;;
-				apt) echo linux-cpupower ;;
-				dnf|rpm-ostree) echo kernel-tools ;;
-				zypper) echo cpupower ;;
-				apk) echo cpupower ;;
-				emerge) echo sys-power/cpupower ;;
-				xbps) echo cpupower ;;
-				eopkg) echo cpupower ;;
-				nix) echo cpupower ;;
-				brew) echo cpupower ;;
-				pkg) echo cpupower ;;
-				*) echo cpupower ;;
-			esac
-			;;
-		powerprofilesctl)
-			case "$pm" in
-				pacman) echo power-profiles-daemon ;;
-				*) echo power-profiles-daemon ;;
-			esac
-			;;
-		ethtool) echo ethtool ;;
-		pw-metadata)
-			case "$pm" in
-				apt) echo pipewire-bin ;;
-				emerge) echo media-video/pipewire ;;
-				*) echo pipewire ;;
-			esac
-			;;
-		nvidia-smi)
-			case "$pm" in
-				pacman) echo nvidia-utils ;;
-				apt) echo nvidia-utils ;;
-				dnf|rpm-ostree) echo nvidia-driver ;;
-				zypper) echo nvidia-computeG06 ;;
-				emerge) echo x11-drivers/nvidia-drivers ;;
-				nix) echo linuxPackages.nvidia-utils ;;
-				brew) echo "" ;;
-				*) echo nvidia-driver ;;
-			esac
-			;;
-		nvidia-settings) echo nvidia-settings ;;
-		jq) echo jq ;;
-		lscpu)
-			case "$pm" in
-				emerge) echo sys-apps/util-linux ;;
-				*) echo util-linux ;;
-			esac
-			;;
-		tar) echo tar ;;
-		ip)
-			case "$pm" in
-				dnf|rpm-ostree) echo iproute ;;
-				*) echo iproute2 ;;
-			esac
-			;;
-		*) echo "$tool" ;;
-	esac
+	pkg="$(_tool_package_from_tsv "$tool" "$pm" "$(tool_packages_data_file)")"
+	if (( $? == 0 )); then
+		printf '%s' "$pkg"
+		return 0
+	fi
+	printf '%s' "$tool"
 }
 
 # format_install_command — Human-readable install command for a package name.

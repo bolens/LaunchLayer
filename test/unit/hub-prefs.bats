@@ -36,11 +36,10 @@ EOF
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib prefs hub
 		load_hub_prefs
-		[[ "$HUB_PREFS_URL" == "https://example.convex.site" ]]
-		[[ "$HUB_PREFS_MACHINE_LABEL" == "test-box" ]]
-		[[ "$HUB_PREFS_FINGERPRINT_LEVEL" == "standard" ]]
+		echo "url:$HUB_PREFS_URL label:$HUB_PREFS_MACHINE_LABEL level:$HUB_PREFS_FINGERPRINT_LEVEL"
 	'
 	[[ $status -eq 0 ]]
+	[[ "$output" == "url:https://example.convex.site label:test-box level:standard" ]]
 	rm -rf "$tmp"
 }
 
@@ -51,9 +50,10 @@ EOF
 		export CONFIG_DIR="'"$CONFIG_DIR"'"
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib prefs hub
-		hub_url_configured
+		hub_url_configured && echo configured || echo missing
 	'
-	[[ $status -eq 1 ]]
+	[[ $status -eq 0 ]]
+	[[ "$output" == missing ]]
 	rm -rf "$tmp"
 }
 
@@ -105,10 +105,11 @@ EOF
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib prefs hub
 		save_hub_prefs
-		grep -q "hub_url=https://example.convex.site" "$(hub_prefs_path)"
-		grep -q "fingerprint_level=standard" "$(hub_prefs_path)"
+		cat "$(hub_prefs_path)"
 	'
 	[[ $status -eq 0 ]]
+	[[ "$output" == *"hub_url=https://example.convex.site"* ]]
+	[[ "$output" == *"fingerprint_level=standard"* ]]
 	rm -rf "$tmp"
 }
 
@@ -138,10 +139,12 @@ EOF
 			source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 			source_lib prefs hub
 			reset_hub_prefs
+			cat "$(hub_prefs_path)"
 		'
 	[[ $status -eq 0 ]]
-	grep -q 'machine_label=workstation' "$tmp/launchlayer/hub.conf"
-	grep -q 'fingerprint_level=standard' "$tmp/launchlayer/hub.conf"
+	[[ "$output" == *"machine_label=workstation"* ]]
+	[[ "$output" == *"fingerprint_level=standard"* ]]
+	[[ "$output" != *"wrong.example"* ]]
 	rm -rf "$tmp"
 }
 
@@ -154,9 +157,10 @@ EOF
 		source_lib prefs hub cli
 		handle_hub_prefs_subcommand set fingerprint_level detailed
 		load_hub_prefs
-		[[ "$HUB_PREFS_FINGERPRINT_LEVEL" == "detailed" ]]
+		echo "level:$HUB_PREFS_FINGERPRINT_LEVEL"
 	'
 	[[ $status -eq 0 ]]
+	[[ "$output" == *"level:detailed"* ]]
 	rm -rf "$tmp"
 }
 

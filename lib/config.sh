@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # shellcheck source=common.sh
 # shellcheck source=keys.sh
-# shellcheck source=steam.sh
+# shellcheck source=steam/library.sh
 # lib/config.sh — Layered .env config loading and default values.
 #
 # Config resolution order:

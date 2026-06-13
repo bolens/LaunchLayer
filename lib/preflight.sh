@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # shellcheck source=common.sh
-# shellcheck source=steam.sh
+# shellcheck source=steam/detect.sh
 # lib/preflight.sh — Pre-launch health checks (sysctl, caches, VRAM).
 
 [[ -n "${LAUNCHLAYER_PREFLIGHT_LOADED:-}" ]] && return 0

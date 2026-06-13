@@ -6,6 +6,10 @@ setup() {
 	bats_integration_setup
 }
 
+teardown() {
+	bats_integration_teardown
+}
+
 @test "warn_enabled_missing_tools reports gamescope" {
 	run bash -c '
 		export CONFIG_DIR="'"$REPO_ROOT/"'"
@@ -26,17 +30,16 @@ setup() {
 	run bash -c '
 		export CONFIG_DIR="'"$REPO_ROOT/"'"
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
-		source_lib platform
-		source "'"$REPO_ROOT/lib/tools.sh"'"
-		source "'"$REPO_ROOT/lib/runtime.sh"'"
+		source_lib platform runtime
 		optional_tool_installed() { return 1; }
 		command_available() { return 1; }
 		GAMEMODE=1 GAMESCOPE=1 MANGOHUD=1
 		launch=()
 		build_launch_chain
-		(( ${#launch[@]} == 0 ))
+		echo "count:${#launch[@]}"
 	'
 	[[ $status -eq 0 ]]
+	[[ "$output" == count:0 ]]
 }
 
 @test "tool install hint for gamemoderun" {

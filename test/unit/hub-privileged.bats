@@ -42,11 +42,15 @@ teardown() {
 	write_hub_conf "$XDG_CONFIG_HOME" "$HUB_MOCK_URL" test-secret minimal
 	run hub_require_privileged_auth
 	[[ $status -eq 0 ]]
+	[[ -z "$output" ]]
+	[[ ! "$output" == *"requires publish_token"* ]]
 }
 
 @test "hub_delete_payload emits config_id JSON" {
 	run hub_delete_payload "cfg-abc-123"
 	[[ $status -eq 0 ]]
+	[[ "$output" == *'"config_id"'* ]]
+	[[ "$output" == *"cfg-abc-123"* ]]
 	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["config_id"]=="cfg-abc-123"' "$output"
 }
 
@@ -95,6 +99,8 @@ teardown() {
 	write_hub_conf "$XDG_CONFIG_HOME" "$HUB_MOCK_URL" test-secret minimal
 	run hub_delete_config cfg-cli --yes --json
 	[[ $status -eq 0 ]]
+	[[ "$output" == *'"deleted_config_id"'* ]]
+	[[ "$output" == *"cfg-cli"* ]]
 	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["deleted_config_id"]=="cfg-cli"' "$output"
 }
 

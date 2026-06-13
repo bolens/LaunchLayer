@@ -6,6 +6,10 @@ setup() {
 	bats_integration_setup
 }
 
+teardown() {
+	bats_integration_teardown
+}
+
 @test "prune-backups dry-run keeps newest archives" {
 	local tmp backup_dir i
 	tmp="$(mktemp -d)"
@@ -88,28 +92,46 @@ EOF
 @test "backup.conf.example contains all backup preference keys" {
 	local example="$REPO_ROOT/share/launchlayer/templates/backup.conf.example"
 	[[ -f "$example" ]]
-	local key
-	for key in backup_dir keep timer_type on_calendar on_boot_sec on_unit_active_sec \
-		randomized_delay_sec include_local include_profiles include_tui auto_prune; do
-		grep -q "^${key}=" "$example"
-	done
+	run bash -c '
+		example="'"$example"'"
+		for key in backup_dir keep timer_type on_calendar on_boot_sec on_unit_active_sec \
+			randomized_delay_sec include_local include_profiles include_tui auto_prune; do
+			grep -q "^${key}=" "$example" || { echo "missing:$key"; exit 1; }
+			echo "present:$key"
+		done
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"present:backup_dir"* ]]
+	[[ "$output" == *"present:auto_prune"* ]]
 }
 
 @test "tui.conf.example contains all TUI preference keys" {
 	local example="$REPO_ROOT/share/launchlayer/templates/tui.conf.example"
 	[[ -f "$example" ]]
-	local key
-	for key in game_filter cache_min_gb default_preset last_menu json_output \
-		resume_last_menu press_enter_lines fzf_height fzf_preview; do
-		grep -q "^${key}=" "$example"
-	done
+	run bash -c '
+		example="'"$example"'"
+		for key in game_filter cache_min_gb default_preset last_menu json_output \
+			resume_last_menu press_enter_lines fzf_height fzf_preview; do
+			grep -q "^${key}=" "$example" || { echo "missing:$key"; exit 1; }
+			echo "present:$key"
+		done
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"present:game_filter"* ]]
+	[[ "$output" == *"present:fzf_preview"* ]]
 }
 
 @test "hub.conf.example contains hub preference keys" {
 	local example="$REPO_ROOT/share/launchlayer/templates/hub.conf.example"
 	[[ -f "$example" ]]
-	local key
-	for key in hub_url publish_token machine_label fingerprint_level; do
-		grep -q "^# ${key}=" "$example" || grep -q "^${key}=" "$example"
-	done
+	run bash -c '
+		example="'"$example"'"
+		for key in hub_url publish_token machine_label fingerprint_level; do
+			grep -q "^# ${key}=" "$example" || grep -q "^${key}=" "$example" || { echo "missing:$key"; exit 1; }
+			echo "present:$key"
+		done
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"present:hub_url"* ]]
+	[[ "$output" == *"present:fingerprint_level"* ]]
 }

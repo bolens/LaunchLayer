@@ -6,6 +6,10 @@ setup() {
 	bats_integration_setup
 }
 
+teardown() {
+	bats_integration_teardown
+}
+
 @test "doctor runs" {
 	run "$SCRIPT" --doctor
 	[[ $status -eq 0 ]]
@@ -49,7 +53,8 @@ setup() {
 @test "launch-stats json with no filter" {
 	run "$SCRIPT" --launch-stats --json
 	[[ $status -eq 0 ]]
-	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert "entries" in d' "$output"
+	[[ "$output" == *'"entries"'* ]]
+	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert "entries" in d and isinstance(d["entries"], list)' "$output"
 }
 
 @test "scan-anticheat runs with fake steam library" {
@@ -77,6 +82,7 @@ setup() {
 	unit_dir="$tmp/.config/systemd/user"
 	run env HOME="$tmp" XDG_CONFIG_HOME="$tmp/.config" "$SCRIPT" --install-systemd
 	[[ $status -eq 0 ]]
+	[[ "$output" == *"systemd"* || "$output" == *"launchlayer-maintenance"* || "$output" == *"timer"* ]]
 	[[ -f "$unit_dir/launchlayer-maintenance.service" ]]
 	[[ -f "$unit_dir/launchlayer-maintenance.timer" ]]
 	grep -q launchlayer "$unit_dir/launchlayer-maintenance.service"

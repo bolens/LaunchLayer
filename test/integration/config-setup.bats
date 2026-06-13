@@ -6,9 +6,14 @@ setup() {
 	bats_integration_setup
 }
 
+teardown() {
+	bats_integration_teardown
+}
+
 @test "status json runs" {
 	run "$SCRIPT" --status --json
 	[[ $status -eq 0 ]]
+	[[ "$output" == *'"config_dir"'* || "$output" == *'"version"'* || "$output" == *'"steam_root"'* ]]
 	python3 -c 'import json,sys; json.loads(sys.argv[1])' "$output"
 }
 
@@ -23,11 +28,11 @@ setup() {
 	tmp_home="$(mktemp -d)"
 	bindir="$tmp_home/.local/bin"
 	mkdir -p "$bindir"
-	# shellcheck disable=SC2030
-	export HOME="$tmp_home"
-	run "$SCRIPT" --setup --symlink
+	run env HOME="$tmp_home" "$SCRIPT" --setup --symlink
 	[[ $status -eq 0 ]]
+	[[ "$output" == *"launchlayer"* || "$output" == *"symlink"* || "$output" == *".local/bin"* ]]
 	[[ -L "$bindir/launchlayer" ]]
+	[[ "$(readlink "$bindir/launchlayer")" == *"launchlayer"* ]]
 	rm -rf "$tmp_home"
 }
 

@@ -1,6 +1,6 @@
 # LaunchLayer TUI preferences
 # Installed copy: ~/.config/launchlayer/tui.conf
-# Reset: launchlayer --tui-prefs reset  |  TUI → TUI settings → Reset to defaults
+# Reset: launchlayer --tui-prefs reset  |  TUI → Settings → Interface → Reset defaults
 # CLI:   launchlayer --tui-prefs set KEY VALUE
 #
 # Keys:
@@ -12,7 +12,7 @@
 #   resume_last_menu    1 = auto-open last_menu hub when TUI starts
 #   press_enter_lines   Minimum output lines before "Press Enter" pause
 #   fzf_height          fzf height (e.g. 40%)
-#   fzf_preview         fzf preview window layout (e.g. right:50%:wrap)
+#   fzf_preview         fzf preview window layout (e.g. right:35%:wrap)
 
 game_filter=all
 cache_min_gb=5
@@ -22,4 +22,4 @@ json_output=0
 resume_last_menu=0
 press_enter_lines=8
 fzf_height=40%
-fzf_preview=right:50%:wrap
+fzf_preview=right:35%:wrap

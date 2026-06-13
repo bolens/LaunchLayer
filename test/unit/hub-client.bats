@@ -66,6 +66,9 @@ setup() {
 	local fp='{"gpu_vendor":"nvidia","os_family":"arch","session_type":"wayland","profiles":[],"display_tier":"1440p","vrr":false,"wsl2":false,"flatpak_steam":false,"steam_deck":false,"immutable":false,"container":false}'
 	run hub_my_config_payload "$fp" 42424242
 	[[ $status -eq 0 ]]
+	[[ "$output" == *'"appid"'* ]]
+	[[ "$output" == *"42424242"* ]]
+	[[ "$output" == *'"fingerprint_hash"'* ]]
 	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["appid"]=="42424242" and d["fingerprint_hash"]' "$output"
 }
 

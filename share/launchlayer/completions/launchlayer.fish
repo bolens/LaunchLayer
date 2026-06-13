@@ -53,6 +53,7 @@ function __launchlayer_register
     complete -c $cmd -n __launchlayer_no_subcommand -a '--export-config' -d 'Pack launch.d configs into a tarball'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--backup-config' -d 'Timestamped config backup'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--import-config' -d 'Restore configs from tarball'
+    complete -c $cmd -n __launchlayer_no_subcommand -a '--restore-backup' -d 'Restore from latest or chosen backup archive'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--prune-backups' -d 'Remove oldest backup archives'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--run-scheduled-backup' -d 'Backup then prune old archives'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--backup-timer' -d 'Install/manage backup timer'
@@ -177,6 +178,43 @@ function __launchlayer_register
         -a '--include-tui' -d 'Import TUI preferences'
     complete -c $cmd \
         -n '__fish_seen_subcommand_from --import-config' \
+        -a '--json' -d 'JSON output'
+
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --restore-backup' \
+        -a '--dir' -d 'Backup directory'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --restore-backup' \
+        -a '--list' -d 'List backup archives'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --restore-backup --appid' \
+        -a '(__launchlayer_appids)'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --restore-backup' \
+        -a '--appid' -d 'Restore one game only'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --restore-backup' \
+        -a '--dry-run' -d 'Preview restore without writing files'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --restore-backup' \
+        -a '--yes' -d 'Apply restore'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --restore-backup' \
+        -a '--merge' -d 'Skip existing files'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --restore-backup' \
+        -a '--replace' -d 'Overwrite existing files'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --restore-backup' \
+        -a '--exclude-local' -d 'Skip launch.d/local.env'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --restore-backup' \
+        -a '--no-profiles' -d 'Skip launch.d/profiles'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --restore-backup' \
+        -a '--include-tui' -d 'Import TUI preferences'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --restore-backup' \
         -a '--json' -d 'JSON output'
 
     complete -c $cmd \

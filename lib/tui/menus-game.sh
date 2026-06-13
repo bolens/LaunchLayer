@@ -4,6 +4,21 @@
 # Configuration menus
 # ---------------------------------------------------------------------------
 
+# tui_games_hub_menu_select_fallback — Numbered games hub when fzf is unavailable.
+tui_games_hub_menu_select_fallback() {
+	local -a items=() choice
+	mapfile -t items < <(tui_games_menu_print_items)
+	choice="$(tui_select_pick "$(tui_crumb_label "(filter: ${TUI_GAME_FILTER:-all})")" "${items[@]}")" || return 1
+	[[ -n "$choice" ]] || return 1
+	if tui_games_menu_item_loading_p "$choice"; then
+		tui_games_cache_wait || return 1
+		choice="$(tui_games_menu_normalize_selection "$choice")"
+	else
+		choice="$(tui_games_menu_normalize_selection "$choice")"
+	fi
+	printf '%s\n' "$choice"
+}
+
 # tui_format_toggle_option — Menu line using already-loaded effective settings.
 tui_format_toggle_option() {
 	local appid=$1 key=$2 effective override file label
@@ -13,31 +28,48 @@ tui_format_toggle_option() {
 	[[ -f "$file" ]] && override="$(tui_env_file_get "$file" "$key")"
 	if [[ -n "$override" ]]; then
 		if cli_uses_color; then
-			if tui_bool_on "$effective"; then
-				label="$(printf '\033[1;32m%s=on\033[0m' "$key")"
-			else
-				label="$(printf '\033[1;31m%s=off\033[0m' "$key")"
-			fi
+			label="$(printf '%s %s' "$key" "$(tui_glyph_bool_onoff "$effective")")"
 			printf '%s  %s' "$label" "$(cli_dim override)"
 		else
-			printf '%s=%s  (override)' "$key" "${effective:-0}"
+			printf '%s=%s  (override)' "$key" "$(tui_glyph_bool_onoff "$effective")"
 		fi
 	else
 		if cli_uses_color; then
-			if tui_bool_on "$effective"; then
-				printf '%s  %s' "$(cli_dim "${key}=on")" "$(cli_dim inherited)"
-			else
-				printf '%s  %s' "$(cli_dim "${key}=off")" "$(cli_dim inherited)"
-			fi
+			printf '%s  %s  %s' "$key" "$(tui_glyph_bool_onoff "$effective" 1)" "$(cli_dim inherited)"
 		else
-			printf '%s=%s  (inherited)' "$key" "${effective:-0}"
+			printf '%s=%s  (inherited)' "$key" "$(tui_glyph_bool_onoff "$effective")"
 		fi
 	fi
 }
 
+# tui_quick_toggles_reload — Print quick-toggle rows for fzf reload (stdout).
+tui_quick_toggles_reload() {
+	local appid=$1 key
+	tui_ensure_appid_env "$appid"
+	prepare_launch_context "$appid"
+	for key in "${TUI_TOGGLE_KEYS[@]}"; do
+		printf '%s\n' "$(tui_format_toggle_option "$appid" "$key")"
+	done
+	printf '%s\n' \
+		"Clear override (inherit from layers)" \
+		"Clear ALL overrides" \
+		"Back"
+}
+
+# tui_quick_toggles_flip — Flip one toggle key from a menu row (fzf execute-silent).
+tui_quick_toggles_flip() {
+	local appid=$1 selection=$2 key
+	selection="$(printf '%s' "$selection" | tui_strip_ansi)"
+	key="$(tui_toggle_key_from_option "$selection")"
+	[[ -n "$key" ]] || return 0
+	tui_ensure_appid_env "$appid"
+	tui_toggle_game_key "$appid" "$key"
+	tui_validate_game_config_brief "$appid"
+}
+
 # tui_quick_toggles — Toggle boolean launch settings in per-game .env.
 tui_quick_toggles() {
-	local appid=$1 action key -a options=()
+	local appid=$1 action key last_anchor="" -a options=()
 	tui_ensure_appid_env "$appid"
 	tui_crumb_enter "Quick toggles"
 
@@ -51,10 +83,18 @@ tui_quick_toggles() {
 		options+=("Clear ALL overrides")
 		options+=("Back")
 
-		action="$(tui_menu "Flip per-game override" "${options[@]}")" || {
-			tui_crumb_leave
-			return 0
-		}
+		tui_menu_set_start_pos "$last_anchor" "${options[@]}"
+		if tui_has_fzf; then
+			action="$(tui_fzf_toggle_pick "$appid" "Flip per-game override")" || {
+				tui_crumb_leave
+				return 0
+			}
+		else
+			action="$(TUI_MENU_CONTEXT=toggles tui_menu "Flip per-game override" "${options[@]}")" || {
+				tui_crumb_leave
+				return 0
+			}
+		fi
 		[[ "$action" == Back ]] && break
 		if [[ "$action" == "Clear override (inherit from layers)" ]]; then
 			tui_clear_override_menu "$appid"
@@ -66,6 +106,7 @@ tui_quick_toggles() {
 		fi
 		key="$(tui_toggle_key_from_option "$action")"
 		[[ -n "$key" ]] || continue
+		last_anchor=$key
 		tui_toggle_game_key "$appid" "$key"
 		tui_validate_game_config_brief "$appid"
 	done
@@ -141,7 +182,7 @@ tui_init_game_config() {
 		force=1
 	fi
 	preset="$(tui_pick_preset)" || return 0
-	init_appid_config "$appid" "$preset" "$force"
+	tui_run_paged init_appid_config "$appid" "$preset" "$force" || true
 }
 
 # tui_delete_game_config — Remove per-game .env after confirmation.
@@ -149,12 +190,12 @@ tui_delete_game_config() {
 	local appid=$1 path
 	path="$(resolve_appid_env_path "$appid")"
 	[[ -f "$path" ]] || {
-		echo "No per-game config at $path"
+		tui_show_text "No per-game config at $path" "Delete config"
 		return 0
 	}
 	if tui_confirm "Delete $(basename "$path")? (preset auto-selection will apply)"; then
 		rm -f "$path"
-		echo "Deleted $path"
+		tui_show_text "Deleted $path" "Delete config"
 	fi
 }
 
@@ -173,23 +214,33 @@ tui_game_actions() {
 
 	while true; do
 		status_label="$(tui_game_validation_label "$appid")"
+		TUI_MENU_CONTEXT=actions
+		TUI_ACTION_APPID=$appid
 		action="$(tui_menu "Actions (${status_label})" \
 			"[View] Resolved config" \
 			"[View] Dry-run launch chain" \
 			"[View] Paths (cache / install)" \
 			"[View] Launch stats" \
+			"" \
 			"[Edit] Quick toggles" \
 			"[Edit] Advanced config" \
 			"[Edit] Clear override" \
 			"[Edit] Open in \$EDITOR" \
 			"[Edit] Set preset (re-init)" \
+			"" \
 			"[Manage] Validate config" \
 			"[Manage] Delete per-game config" \
+			"" \
 			"[Hub] Community configs" \
+			"" \
 			"Back to games menu")" || {
+			unset TUI_ACTION_APPID
 			tui_crumb_leave
 			return 0
 		}
+		unset TUI_ACTION_APPID
+
+		[[ -n "$action" ]] || continue
 
 		case "$action" in
 			"[View] Resolved config")
@@ -214,7 +265,7 @@ tui_game_actions() {
 				tui_clear_override_menu "$appid"
 				;;
 			"[Edit] Open in \$EDITOR")
-				edit_appid_config "$appid"
+				tui_edit_appid_config "$appid"
 				;;
 			"[Edit] Set preset (re-init)")
 				tui_init_game_config "$appid"
@@ -241,19 +292,21 @@ tui_games_menu() {
 	local action appid
 	tui_crumb_enter "Games"
 	tui_remember_main_menu "Games"
+	tui_games_cache_start
 
 	while true; do
-		action="$(tui_menu "(filter: ${TUI_GAME_FILTER:-all})" \
-			"Browse & configure game" \
-			"Recent games" \
-			"Change game filter" \
-			"Bulk change INCLUDE preset" \
-			"Init unconfigured games" \
-			"Prune uninstalled configs" \
-			"Back")" || {
-			tui_crumb_leave
-			return 0
-		}
+		TUI_MENU_CONTEXT=games
+		if tui_has_fzf; then
+			action="$(tui_fzf_games_hub_pick "$(tui_crumb_label "(filter: ${TUI_GAME_FILTER:-all})")")" || {
+				tui_crumb_leave
+				return 0
+			}
+		else
+			action="$(tui_games_hub_menu_select_fallback)" || {
+				tui_crumb_leave
+				return 0
+			}
+		fi
 
 		case "$action" in
 			"Browse & configure game")
@@ -262,9 +315,6 @@ tui_games_menu() {
 				;;
 			"Recent games")
 				tui_recent_games_menu
-				;;
-			"Change game filter")
-				tui_change_game_filter
 				;;
 			"Bulk change INCLUDE preset")
 				tui_bulk_preset_menu

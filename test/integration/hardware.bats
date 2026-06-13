@@ -6,6 +6,10 @@ setup() {
 	bats_integration_setup
 }
 
+teardown() {
+	bats_integration_teardown
+}
+
 @test "detect_desktop_session recognizes additional compositors" {
 	local root="$REPO_ROOT"
 	run env CONFIG_DIR="$root" bash -c '
@@ -93,7 +97,6 @@ EOF
 	run env CONFIG_DIR="$root" bash -c '
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib platform
-		source "$LIB_DIR/cli.sh"
 		_gpu_role_guess amd "Advanced Micro Devices, Inc. [AMD/ATI] Raphael"
 	'
 	[[ $status -eq 0 ]]
@@ -101,8 +104,7 @@ EOF
 
 	run env CONFIG_DIR="$root" bash -c '
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
-		source_lib platform
-		source "$LIB_DIR/cli.sh"
+		source_lib platform cli
 		detect_gpus_json
 	'
 	[[ $status -eq 0 ]]

@@ -6,6 +6,10 @@ setup() {
 	bats_integration_setup
 }
 
+teardown() {
+	bats_integration_teardown
+}
+
 @test "init-unconfigured dry-run does not create files" {
 	local tmp before after
 	tmp="$(mktemp -d)"
@@ -55,6 +59,8 @@ EOF
 	echo 'INCLUDE=presets/standard.env' > "$tmp/games/99999999.env"
 	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --prune-uninstalled --json
 	[[ $status -eq 0 ]]
+	[[ "$output" == *'"appid":"99999999"'* || "$output" == *'"appid": "99999999"'* ]]
+	[[ "$output" == *'"orphans"'* ]]
 	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["orphans"][0]["appid"]=="99999999"' "$output"
 	rm -rf "$tmp"
 }

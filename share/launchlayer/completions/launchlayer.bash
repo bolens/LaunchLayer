@@ -22,7 +22,7 @@ _launchlayer_settings() {
 		--status --show-cpu-topology --detect-environment --detect-defaults --write-local-config
 		--doctor --setup --install-systemd --sysctl --completions --list-games --init-appid
 		--init-unconfigured --prune-uninstalled --export-config --backup-config --import-config
-		--prune-backups --run-scheduled-backup --backup-timer --backup-prefs --tui-prefs
+		--restore-backup --prune-backups --run-scheduled-backup --backup-timer --backup-prefs --tui-prefs
 		--hub-fingerprint --hub-publish --hub-update --hub-delete --hub-recommend --hub-search --hub-apply --hub-prefs
 		--bulk-set-include
 		--show-config --edit-appid --paths --validate-config
@@ -86,6 +86,11 @@ _launchlayer_settings() {
 			;;
 		--import-config)
 			COMPREPLY=( $(compgen -f -W "--dry-run --yes --merge --replace --exclude-local --no-profiles --include-tui --json" -- "$cur") )
+			;;
+		--restore-backup)
+			local appids
+			appids="$(_launchlayer_appids "$script")"
+			COMPREPLY=( $(compgen -f -W "--dir --list --appid --dry-run --yes --merge --replace --exclude-local --no-profiles --include-tui --json $appids" -- "$cur") )
 			;;
 		--prune-backups)
 			COMPREPLY=( $(compgen -W "--dir --keep --dry-run --json" -- "$cur") )

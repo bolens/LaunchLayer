@@ -6,6 +6,10 @@ setup() {
 	bats_integration_setup
 }
 
+teardown() {
+	bats_integration_teardown
+}
+
 @test "validate-config all passes" {
 	run "$SCRIPT" --validate-config all
 	[[ $status -eq 0 ]]
@@ -67,6 +71,7 @@ setup() {
 	[[ -f "$REPO_ROOT/examples/games/2357570.env" ]] || skip "2357570.env missing"
 	run env LAUNCHLAYER_GAMES_DIR="$REPO_ROOT/examples/games" "$SCRIPT" --validate-config overwatch
 	[[ $status -eq 0 ]]
+	[[ "$output" == *"Validation passed"* || "$output" == *"0 issues"* ]]
 }
 
 @test "validate-config flags bad preset in temp dir" {

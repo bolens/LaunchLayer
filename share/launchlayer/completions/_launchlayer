@@ -28,6 +28,7 @@ _launchlayer() {
 		'--export-config:pack launch.d configs into a tarball'
 		'--backup-config:timestamped config backup'
 		'--import-config:restore configs from tarball'
+		'--restore-backup:restore from latest or chosen backup archive'
 		'--prune-backups:remove oldest backup archives'
 		'--run-scheduled-backup:backup then prune (timer hook)'
 		'--backup-timer:install/manage backup timer'
@@ -144,6 +145,21 @@ _launchlayer() {
 						'(--no-profiles)*--no-profiles[skip launch.d/profiles]' \
 						'(--include-tui)*--include-tui[import TUI preferences]' \
 						'(--json)*--json[JSON output]'
+					;;
+				--restore-backup)
+					_arguments \
+						'(--dir)*--dir[backup directory]:path:_directories' \
+						'(--list)*--list[list backup archives]' \
+						'(--appid)*--appid[restore one game only]:appid:' \
+						'(--dry-run)*--dry-run[preview restore without writing files]' \
+						'(--yes)*--yes[apply restore]' \
+						'(--merge)*--merge[skip existing files]' \
+						'(--replace)*--replace[overwrite existing files]' \
+						'(--exclude-local)*--exclude-local[skip launch.d/local.env]' \
+						'(--no-profiles)*--no-profiles[skip launch.d/profiles]' \
+						'(--include-tui)*--include-tui[import TUI preferences]' \
+						'(--json)*--json[JSON output]' \
+						'1:archive or directory:_files -g "*.(tar.gz|tgz|tar)"'
 					;;
 				--prune-backups)
 					_arguments \

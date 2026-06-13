@@ -83,10 +83,29 @@ Place before subcommands:
 | `--export-config [--output PATH] [--include-local] [--no-profiles] [--include-tui] [--json]` | Export config bundle (timestamped `.tar.gz` by default) |
 | `--backup-config [--output DIR\|PATH] [--exclude-local] [--no-profiles] [--include-tui] [--json]` | Backup alias with backup-dir defaults |
 | `--import-config ARCHIVE [--yes] [--merge\|--replace] [--exclude-local] [--no-profiles] [--include-tui] [--json]` | Restore bundle (dry-run by default; pass `--yes` to apply) |
+| `--restore-backup [ARCHIVE\|DIR] [--dir PATH] [--list] [--appid APPID\|NAME] [--yes] [--merge\|--replace] …` | Restore from latest or chosen backup archive (replace by default) |
 | `--prune-backups [--dir PATH] [--keep N] [--dry-run] [--json]` | Remove old backup archives |
 | `--run-scheduled-backup [--dir PATH] [--keep N] [--json]` | Run backup + prune (used by `launchlayer-backup.timer`) |
 | `--tui-prefs [show\|reset\|set] [--json]` | Edit `tui.conf` (fzf height, JSON mode, default preset, …) |
-| `--hub-prefs [show\|reset\|set] [--json]` | Edit `hub.conf` (url, publish token, machine label, fingerprint level) |
+
+---
+
+## Community hub
+
+Optional — local launches do not need the hub. Requires `curl` for publish/delete/apply; `jq` or `python3` for apply.
+
+| Command | Description |
+|---------|-------------|
+| `--hub-fingerprint [--json] [--fingerprint-level minimal\|standard\|detailed]` | Machine descriptor for matching (`minimal` default; override via `hub.conf` or env) |
+| `--hub-publish APPID\|NAME [--note TEXT] [--config-id ID] [--all-configured] [--json]` | Upload per-game config(s) |
+| `--hub-update APPID\|NAME\|CONFIG_ID [--all-configured] [--note TEXT] [--include-new] [--json]` | Update existing shared config(s) for this machine |
+| `--hub-delete CONFIG_ID [--yes] [--json]` | Delete a shared config (publish token when enforced) |
+| `--hub-recommend APPID\|NAME [--limit N] [--json]` | Configs from similar machines |
+| `--hub-search [--limit N] [--json]` | Machines most like yours |
+| `--hub-apply CONFIG_ID [--dry-run] [--json]` | Download and write a shared config |
+| `--hub-prefs [show\|reset\|set] [--json]` | Edit `hub.conf` without the TUI |
+
+TUI equivalents: **Community hub** (main menu) and **[Hub] Community configs** (per-game actions). Bulk preset changes: **`--bulk-set-include`** or **Games → Bulk change INCLUDE preset**.
 
 ---
 

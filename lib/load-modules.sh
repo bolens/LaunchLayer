@@ -23,14 +23,35 @@ launchlayer_source_platform() {
 	source "$LIB_DIR/platform/profiles.sh"
 }
 
+# launchlayer_source_compositors — JSON parsers and per-compositor display probes.
+launchlayer_source_compositors() {
+	# shellcheck source=hardware/compositors/json.sh
+	source "$LIB_DIR/hardware/compositors/json.sh"
+	# shellcheck source=hardware/compositors/wlr.sh
+	source "$LIB_DIR/hardware/compositors/wlr.sh"
+	# shellcheck source=hardware/compositors/desktop.sh
+	source "$LIB_DIR/hardware/compositors/desktop.sh"
+}
+
 # launchlayer_source_hardware — CPU topology and display auto-detection.
 launchlayer_source_hardware() {
 	# shellcheck source=hardware/cpu.sh
 	source "$LIB_DIR/hardware/cpu.sh"
-	# shellcheck source=hardware/compositors.sh
-	source "$LIB_DIR/hardware/compositors.sh"
+	launchlayer_source_compositors
 	# shellcheck source=hardware/display.sh
 	source "$LIB_DIR/hardware/display.sh"
+}
+
+# launchlayer_source_backup — Config bundle export, import, and archive pruning.
+launchlayer_source_backup() {
+	# shellcheck source=inspect/backup/common.sh
+	source "$LIB_DIR/inspect/backup/common.sh"
+	# shellcheck source=inspect/backup/export.sh
+	source "$LIB_DIR/inspect/backup/export.sh"
+	# shellcheck source=inspect/backup/import.sh
+	source "$LIB_DIR/inspect/backup/import.sh"
+	# shellcheck source=inspect/backup/restore.sh
+	source "$LIB_DIR/inspect/backup/restore.sh"
 }
 
 # launchlayer_source_inspect — Config inspection, validation, backup bundles.
@@ -43,8 +64,7 @@ launchlayer_source_inspect() {
 	source "$LIB_DIR/inspect/reports.sh"
 	# shellcheck source=inspect/validation.sh
 	source "$LIB_DIR/inspect/validation.sh"
-	# shellcheck source=inspect/backup.sh
-	source "$LIB_DIR/inspect/backup.sh"
+	launchlayer_source_backup
 }
 
 # launchlayer_source_prefs — User preference paths and .conf helpers.
@@ -93,35 +113,171 @@ launchlayer_source_hub() {
 	source "$LIB_DIR/hub/client.sh"
 }
 
+# launchlayer_source_steam — Steam library discovery and per-game metadata.
+launchlayer_source_steam() {
+	# shellcheck source=vdf.sh
+	source "$LIB_DIR/vdf.sh"
+	# shellcheck source=steam/library.sh
+	source "$LIB_DIR/steam/library.sh"
+	# shellcheck source=steam/detect.sh
+	source "$LIB_DIR/steam/detect.sh"
+}
+
+# launchlayer_source_cli — Help output, JSON helpers, and subcommand registry.
+launchlayer_source_cli() {
+	# shellcheck source=cli/colors.sh
+	source "$LIB_DIR/cli/colors.sh"
+	# shellcheck source=cli/json.sh
+	source "$LIB_DIR/cli/json.sh"
+	# shellcheck source=cli/help.sh
+	source "$LIB_DIR/cli/help.sh"
+	# shellcheck source=cli.sh
+	source "$LIB_DIR/cli.sh"
+}
+
+# launchlayer_source_dispatch — Domain-specific CLI verb handlers.
+launchlayer_source_dispatch() {
+	# shellcheck source=commands/dispatch-launch.sh
+	source "$LIB_DIR/commands/dispatch-launch.sh"
+	# shellcheck source=commands/dispatch-config.sh
+	source "$LIB_DIR/commands/dispatch-config.sh"
+	# shellcheck source=commands/dispatch-setup.sh
+	source "$LIB_DIR/commands/dispatch-setup.sh"
+	# shellcheck source=commands/dispatch-hub.sh
+	source "$LIB_DIR/commands/dispatch-hub.sh"
+	# shellcheck source=commands/dispatch-tui.sh
+	source "$LIB_DIR/commands/dispatch-tui.sh"
+	# shellcheck source=commands/dispatch.sh
+	source "$LIB_DIR/commands/dispatch.sh"
+}
+
+# launchlayer_source_commands_hub — Hub CLI verbs (publish, recommend, apply).
+launchlayer_source_commands_hub() {
+	# shellcheck source=commands/hub/context.sh
+	source "$LIB_DIR/commands/hub/context.sh"
+	# shellcheck source=commands/hub/fingerprint.sh
+	source "$LIB_DIR/commands/hub/fingerprint.sh"
+	# shellcheck source=commands/hub/publish.sh
+	source "$LIB_DIR/commands/hub/publish.sh"
+	# shellcheck source=commands/hub/delete.sh
+	source "$LIB_DIR/commands/hub/delete.sh"
+	# shellcheck source=commands/hub/recommend.sh
+	source "$LIB_DIR/commands/hub/recommend.sh"
+	# shellcheck source=commands/hub/apply.sh
+	source "$LIB_DIR/commands/hub/apply.sh"
+}
+
+# launchlayer_source_runtime — Launch hooks, env tuning, wrapper chain, logging.
+launchlayer_source_runtime() {
+	# shellcheck source=runtime/summary.sh
+	source "$LIB_DIR/runtime/summary.sh"
+	# shellcheck source=runtime/tuning.sh
+	source "$LIB_DIR/runtime/tuning.sh"
+	# shellcheck source=runtime/chain.sh
+	source "$LIB_DIR/runtime/chain.sh"
+	# shellcheck source=runtime/logging.sh
+	source "$LIB_DIR/runtime/logging.sh"
+}
+
+# launchlayer_source_games_list_cache — Shared list-games cache paths (CLI + TUI).
+launchlayer_source_games_list_cache() {
+	# shellcheck source=tui/games-cache/state.sh
+	source "$LIB_DIR/tui/games-cache/state.sh"
+}
+
+# launchlayer_source_tui_games_cache — Persistent game list cache for TUI menus.
+launchlayer_source_tui_games_cache() {
+	launchlayer_source_games_list_cache
+	# shellcheck source=tui/games-cache/menu.sh
+	source "$LIB_DIR/tui/games-cache/menu.sh"
+	# shellcheck source=tui/games-cache/loader.sh
+	source "$LIB_DIR/tui/games-cache/loader.sh"
+}
+
+# launchlayer_source_tui_menus_backup — Backup hub TUI menus.
+launchlayer_source_tui_menus_backup() {
+	# shellcheck source=tui/menus-backup/settings.sh
+	source "$LIB_DIR/tui/menus-backup/settings.sh"
+	# shellcheck source=tui/menus-backup/transfer.sh
+	source "$LIB_DIR/tui/menus-backup/transfer.sh"
+	# shellcheck source=tui/menus-backup/actions.sh
+	source "$LIB_DIR/tui/menus-backup/actions.sh"
+	# shellcheck source=tui/menus-backup/timer.sh
+	source "$LIB_DIR/tui/menus-backup/timer.sh"
+	# shellcheck source=tui/menus-backup/restore.sh
+	source "$LIB_DIR/tui/menus-backup/restore.sh"
+	# shellcheck source=tui/menus-backup/menu.sh
+	source "$LIB_DIR/tui/menus-backup/menu.sh"
+}
+
 # launchlayer_source_commands — CLI subcommands and dispatch.
 launchlayer_source_commands() {
 	launchlayer_source_hub
+	launchlayer_source_games_list_cache
 	# shellcheck source=commands/status.sh
 	source "$LIB_DIR/commands/status.sh"
 	# shellcheck source=commands/environment.sh
 	source "$LIB_DIR/commands/environment.sh"
 	# shellcheck source=commands/games.sh
 	source "$LIB_DIR/commands/games.sh"
-	# shellcheck source=commands/hub.sh
-	source "$LIB_DIR/commands/hub.sh"
-	# shellcheck source=commands/dispatch.sh
-	source "$LIB_DIR/commands/dispatch.sh"
+	launchlayer_source_commands_hub
+	launchlayer_source_dispatch
+}
+
+# launchlayer_source_tui_hub — Community hub TUI menus.
+launchlayer_source_tui_hub() {
+	# shellcheck source=tui/hub/core.sh
+	source "$LIB_DIR/tui/hub/core.sh"
+	# shellcheck source=tui/hub/settings.sh
+	source "$LIB_DIR/tui/hub/settings.sh"
+	# shellcheck source=tui/hub/browse.sh
+	source "$LIB_DIR/tui/hub/browse.sh"
+	# shellcheck source=tui/hub/publish.sh
+	source "$LIB_DIR/tui/hub/publish.sh"
+	# shellcheck source=tui/hub/menu.sh
+	source "$LIB_DIR/tui/hub/menu.sh"
+}
+
+# launchlayer_source_tui_system — System tools, setup, completions, and settings.
+launchlayer_source_tui_system() {
+	# shellcheck source=tui/menus-system-core.sh
+	source "$LIB_DIR/tui/menus-system-core.sh"
+	# shellcheck source=tui/menus-system-completions.sh
+	source "$LIB_DIR/tui/menus-system-completions.sh"
+	# shellcheck source=tui/menus-system-settings.sh
+	source "$LIB_DIR/tui/menus-system-settings.sh"
+	# shellcheck source=tui/settings-menu.sh
+	source "$LIB_DIR/tui/settings-menu.sh"
+	# shellcheck source=tui/menus-status.sh
+	source "$LIB_DIR/tui/menus-status.sh"
 }
 
 # launchlayer_source_tui — Interactive terminal UI.
 launchlayer_source_tui() {
 	# shellcheck source=tui/config.sh
 	source "$LIB_DIR/tui/config.sh"
+	# shellcheck source=tui/spinner.sh
+	source "$LIB_DIR/tui/spinner.sh"
+	# shellcheck source=tui/panel.sh
+	source "$LIB_DIR/tui/panel.sh"
 	# shellcheck source=tui/primitives.sh
 	source "$LIB_DIR/tui/primitives.sh"
+	# shellcheck source=tui/glyphs.sh
+	source "$LIB_DIR/tui/glyphs.sh"
+	# shellcheck source=tui/help.sh
+	source "$LIB_DIR/tui/help.sh"
+	# shellcheck source=tui/fzf.sh
+	source "$LIB_DIR/tui/fzf.sh"
+	launchlayer_source_tui_games_cache
+	# shellcheck source=tui/pickers.sh
+	source "$LIB_DIR/tui/pickers.sh"
 	# shellcheck source=tui/menus-game.sh
 	source "$LIB_DIR/tui/menus-game.sh"
 	# shellcheck source=tui/menus-config.sh
 	source "$LIB_DIR/tui/menus-config.sh"
-	# shellcheck source=tui/menus-hub.sh
-	source "$LIB_DIR/tui/menus-hub.sh"
-	# shellcheck source=tui/menus-system.sh
-	source "$LIB_DIR/tui/menus-system.sh"
+	launchlayer_source_tui_menus_backup
+	launchlayer_source_tui_hub
+	launchlayer_source_tui_system
 	# shellcheck source=tui/main.sh
 	source "$LIB_DIR/tui/main.sh"
 }
@@ -139,8 +295,7 @@ launchlayer_load_post_main() {
 	source "$LIB_DIR/vdf.sh"
 	# shellcheck source=config.sh
 	source "$LIB_DIR/config.sh"
-	# shellcheck source=steam.sh
-	source "$LIB_DIR/steam.sh"
+	launchlayer_source_steam
 	launchlayer_source_hardware
 	# shellcheck source=detected-defaults.sh
 	source "$LIB_DIR/detected-defaults.sh"
@@ -148,13 +303,11 @@ launchlayer_load_post_main() {
 	source "$LIB_DIR/gpu.sh"
 	# shellcheck source=preflight.sh
 	source "$LIB_DIR/preflight.sh"
-	# shellcheck source=runtime.sh
-	source "$LIB_DIR/runtime.sh"
+	launchlayer_source_runtime
 	# shellcheck source=vram.sh
 	source "$LIB_DIR/vram.sh"
 	launchlayer_source_inspect
-	# shellcheck source=cli.sh
-	source "$LIB_DIR/cli.sh"
+	launchlayer_source_cli
 	launchlayer_source_prefs
 	launchlayer_source_completions
 	launchlayer_source_setup

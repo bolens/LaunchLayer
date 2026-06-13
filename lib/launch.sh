@@ -1,10 +1,10 @@
 # shellcheck shell=bash
 # shellcheck source=common.sh
 # shellcheck source=config.sh
-# shellcheck source=steam.sh
+# shellcheck source=steam/detect.sh
 # shellcheck source=hardware/cpu.sh
 # shellcheck source=preflight.sh
-# shellcheck source=runtime.sh
+# shellcheck source=runtime/chain.sh
 # shellcheck source=vram.sh
 # lib/launch.sh — Main game-launch orchestration pipeline.
 

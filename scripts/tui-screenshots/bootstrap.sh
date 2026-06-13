@@ -27,14 +27,9 @@ TUI_PRESS_ENTER_LINES=${TUI_PRESS_ENTER_LINES:-8}
 fzf_menu() {
 	local header=$1
 	shift
-	local -a fzf_args=(
-		--header="$header"
-		--height="${LAUNCHLAYER_TUI_HEIGHT:-45%}"
-		--border
-		--layout=reverse
-		--info=inline
-		--pointer='▶'
-	)
-	cli_uses_color && fzf_args+=(--ansi)
+	local -a fzf_args=() context footer=""
+	context="${TUI_MENU_CONTEXT:-menu}"
+	footer="$(tui_fzf_context_footer "$context")"
+	tui_fzf_build_args fzf_args "$header" "$context" "$footer"
 	printf '%s\n' "$@" | fzf "${fzf_args[@]}"
 }

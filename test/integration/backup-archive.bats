@@ -6,6 +6,10 @@ setup() {
 	bats_integration_setup
 }
 
+teardown() {
+	bats_integration_teardown
+}
+
 @test "export-config and import-config round-trip" {
 	local tmp archive dest
 	tmp="$(mktemp -d)"
@@ -25,6 +29,7 @@ EOF
 	archive="$dest/roundtrip.tar.gz"
 	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --export-config --output "$archive" --json
 	[[ $status -eq 0 ]]
+	[[ "$output" == *'"file_count"'* ]]
 	[[ -f "$archive" ]]
 	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["file_count"]>=3' "$output"
 
@@ -33,6 +38,7 @@ EOF
 
 	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --import-config "$archive" --yes --json
 	[[ $status -eq 0 ]]
+	[[ "$output" == *'"applied"'* ]]
 	[[ -f "$tmp/games/42424242.env" ]]
 	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["applied"]>=1' "$output"
 
@@ -55,6 +61,7 @@ EOF
 	echo 'INCLUDE=presets/standard.env' > "$tmp/games/22222222.env"
 	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --import-config "$archive" --yes --merge --json
 	[[ $status -eq 0 ]]
+	[[ "$output" == *'"skipped"'* ]]
 	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["skipped"]>=1' "$output"
 	[[ -f "$tmp/games/22222222.env" ]]
 
@@ -84,6 +91,304 @@ EOF
 	echo 'INCLUDE=presets/standard.env' > "$tmp/games/99999998.env"
 	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --import-config "$archive" --dry-run --replace
 	[[ $status -eq 0 ]]
+	[[ "$output" == *"preview"* || "$output" == *"--yes"* ]]
 	[[ -f "$tmp/games/99999998.env" ]]
+	rm -rf "$tmp"
+}
+
+@test "restore-backup uses latest archive and replaces game config" {
+	local tmp outdir archive
+	tmp="$(mktemp -d)"
+	outdir="$tmp/backups"
+	mkdir -p "$tmp/launch.d/presets" "$tmp/games" "$outdir"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	cat > "$tmp/games/42424242.env" <<'EOF'
+# Restore Game (Steam AppID 42424242)
+INCLUDE=presets/standard.env
+GAME_EXTRA_ARGS="-from-backup"
+EOF
+	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --backup-config --output "$outdir"
+	[[ $status -eq 0 ]]
+
+	echo 'INCLUDE=presets/standard.env' > "$tmp/games/42424242.env"
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		LAUNCHLAYER_GAMES_DIR="$tmp/games" \
+		XDG_CONFIG_HOME="$tmp/config" \
+		HOME="$tmp" \
+		"$SCRIPT" --restore-backup --dir "$outdir" --appid 42424242 --yes --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *'"applied":1'* ]]
+	[[ "$output" == *"games/42424242.env"* ]]
+	grep -q 'from-backup' "$tmp/games/42424242.env"
+
+	rm -rf "$tmp"
+}
+
+@test "restore-backup --list reports archives" {
+	local tmp outdir
+	tmp="$(mktemp -d)"
+	outdir="$tmp/backups"
+	mkdir -p "$tmp/launch.d/presets" "$outdir"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	run env LAUNCHLAYER_CONFIG_DIR="$tmp" "$SCRIPT" --backup-config --output "$outdir"
+	[[ $status -eq 0 ]]
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp/config" \
+		HOME="$tmp" \
+		"$SCRIPT" --restore-backup --list --dir "$outdir" --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *'"count":1'* ]]
+	[[ "$output" == *"launchlayer-backup"* ]]
+	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["count"]==1' "$output"
+	rm -rf "$tmp"
+}
+
+@test "restore-backup dry-run does not modify configs" {
+	local tmp outdir
+	tmp="$(mktemp -d)"
+	outdir="$tmp/backups"
+	mkdir -p "$tmp/launch.d/presets" "$tmp/games" "$outdir"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	cat > "$tmp/games/42424242.env" <<'EOF'
+# Restore Game (Steam AppID 42424242)
+INCLUDE=presets/standard.env
+GAME_EXTRA_ARGS="-from-backup"
+EOF
+	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --backup-config --output "$outdir"
+	[[ $status -eq 0 ]]
+
+	echo 'INCLUDE=presets/standard.env' > "$tmp/games/42424242.env"
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		LAUNCHLAYER_GAMES_DIR="$tmp/games" \
+		XDG_CONFIG_HOME="$tmp/config" \
+		HOME="$tmp" \
+		"$SCRIPT" --restore-backup --dir "$outdir" --appid 42424242 --dry-run --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *'"dry_run":true'* ]]
+	[[ "$output" == *'"applied":0'* ]]
+	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["dry_run"] is True and d["applied"]==0' "$output"
+	! grep -q 'from-backup' "$tmp/games/42424242.env"
+
+	rm -rf "$tmp"
+}
+
+@test "restore-backup --merge skips existing game config" {
+	local tmp outdir
+	tmp="$(mktemp -d)"
+	outdir="$tmp/backups"
+	mkdir -p "$tmp/launch.d/presets" "$tmp/games" "$outdir"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	cat > "$tmp/games/42424242.env" <<'EOF'
+# Restore Game (Steam AppID 42424242)
+INCLUDE=presets/standard.env
+GAME_EXTRA_ARGS="-from-backup"
+EOF
+	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --backup-config --output "$outdir"
+	[[ $status -eq 0 ]]
+
+	echo 'INCLUDE=presets/standard.env' > "$tmp/games/42424242.env"
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		LAUNCHLAYER_GAMES_DIR="$tmp/games" \
+		XDG_CONFIG_HOME="$tmp/config" \
+		HOME="$tmp" \
+		"$SCRIPT" --restore-backup --dir "$outdir" --appid 42424242 --yes --merge --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *'"skipped":1'* ]]
+	[[ "$output" == *'"applied":0'* ]]
+	[[ "$output" == *'"action":"skip"'* ]]
+	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["skipped"]==1 and d["applied"]==0' "$output"
+	! grep -q 'from-backup' "$tmp/games/42424242.env"
+
+	rm -rf "$tmp"
+}
+
+@test "restore-backup picks newest archive when multiple exist" {
+	local tmp outdir old new
+	tmp="$(mktemp -d)"
+	outdir="$tmp/backups"
+	mkdir -p "$tmp/launch.d/presets" "$tmp/games" "$outdir"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	cat > "$tmp/games/42424242.env" <<'EOF'
+# Restore Game (Steam AppID 42424242)
+INCLUDE=presets/standard.env
+GAME_EXTRA_ARGS="-old-backup"
+EOF
+	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --backup-config --output "$outdir"
+	[[ $status -eq 0 ]]
+	old="$(find "$outdir" -maxdepth 1 -name 'launchlayer-backup-*.tar.gz' -print -quit)"
+	[[ -n "$old" ]]
+
+	cat > "$tmp/games/42424242.env" <<'EOF'
+# Restore Game (Steam AppID 42424242)
+INCLUDE=presets/standard.env
+GAME_EXTRA_ARGS="-new-backup"
+EOF
+	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --backup-config --output "$outdir"
+	[[ $status -eq 0 ]]
+	for new in "$outdir"/launchlayer-backup-*.tar.gz; do
+		[[ "$new" == "$old" ]] && continue
+		break
+	done
+	[[ -n "$new" && -f "$new" ]]
+	touch -d '2020-01-01 00:00:00' "$old"
+	touch -d '2024-06-01 00:00:00' "$new"
+
+	echo 'INCLUDE=presets/standard.env' > "$tmp/games/42424242.env"
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		LAUNCHLAYER_GAMES_DIR="$tmp/games" \
+		XDG_CONFIG_HOME="$tmp/config" \
+		HOME="$tmp" \
+		"$SCRIPT" --restore-backup --dir "$outdir" --appid 42424242 --yes --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *'"applied"'* ]]
+	grep -q 'new-backup' "$tmp/games/42424242.env"
+	! grep -q 'old-backup' "$tmp/games/42424242.env"
+
+	rm -rf "$tmp"
+}
+
+@test "restore-backup uses explicit archive path over latest" {
+	local tmp outdir archive
+	tmp="$(mktemp -d)"
+	outdir="$tmp/backups"
+	mkdir -p "$tmp/launch.d/presets" "$tmp/games" "$outdir"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	cat > "$tmp/games/42424242.env" <<'EOF'
+# Restore Game (Steam AppID 42424242)
+INCLUDE=presets/standard.env
+GAME_EXTRA_ARGS="-older"
+EOF
+	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --backup-config --output "$outdir"
+	[[ $status -eq 0 ]]
+	older="$(find "$outdir" -maxdepth 1 -name 'launchlayer-backup-*.tar.gz' -print -quit)"
+	mv "$older" "$outdir/launchlayer-backup-20200101-000000.tar.gz"
+	older="$outdir/launchlayer-backup-20200101-000000.tar.gz"
+
+	cat > "$tmp/games/42424242.env" <<'EOF'
+# Restore Game (Steam AppID 42424242)
+INCLUDE=presets/standard.env
+GAME_EXTRA_ARGS="-newer"
+EOF
+	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --backup-config --output "$outdir"
+	[[ $status -eq 0 ]]
+	newer="$(find "$outdir" -maxdepth 1 -name 'launchlayer-backup-*.tar.gz' ! -name 'launchlayer-backup-20200101-000000.tar.gz' -print -quit)"
+	touch -d '2020-01-01 00:00:00' "$older"
+	touch -d '2024-06-01 00:00:00' "$newer"
+
+	echo 'INCLUDE=presets/standard.env' > "$tmp/games/42424242.env"
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		LAUNCHLAYER_GAMES_DIR="$tmp/games" \
+		XDG_CONFIG_HOME="$tmp/config" \
+		HOME="$tmp" \
+		"$SCRIPT" --restore-backup "$older" --appid 42424242 --yes --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *'"applied":1'* ]]
+	[[ "$output" == *"20200101"* ]]
+	grep -q 'older' "$tmp/games/42424242.env"
+	! grep -q 'newer' "$tmp/games/42424242.env"
+
+	rm -rf "$tmp"
+}
+
+@test "restore-backup --appid fails when game missing from archive" {
+	local tmp outdir
+	tmp="$(mktemp -d)"
+	outdir="$tmp/backups"
+	mkdir -p "$tmp/launch.d/presets" "$tmp/games" "$outdir"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	cat > "$tmp/games/42424242.env" <<'EOF'
+# Restore Game (Steam AppID 42424242)
+INCLUDE=presets/standard.env
+EOF
+	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --backup-config --output "$outdir"
+	[[ $status -eq 0 ]]
+
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		LAUNCHLAYER_GAMES_DIR="$tmp/games" \
+		XDG_CONFIG_HOME="$tmp/config" \
+		HOME="$tmp" \
+		"$SCRIPT" --restore-backup --dir "$outdir" --appid 99999999 --yes
+	[[ $status -eq 1 ]]
+	[[ "$output" == *"Archive does not contain games/99999999.env"* ]]
+
+	rm -rf "$tmp"
+}
+
+@test "restore-backup full restore replaces launch.d and games configs" {
+	local tmp outdir
+	tmp="$(mktemp -d)"
+	outdir="$tmp/backups"
+	mkdir -p "$tmp/launch.d/presets" "$tmp/games" "$outdir"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	echo 'LOCAL=0' > "$tmp/launch.d/local.env"
+	cat > "$tmp/games/42424242.env" <<'EOF'
+# Restore Game (Steam AppID 42424242)
+INCLUDE=presets/standard.env
+GAME_EXTRA_ARGS="-from-backup"
+EOF
+	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --backup-config --output "$outdir"
+	[[ $status -eq 0 ]]
+
+	echo 'GAMEMODE=0' > "$tmp/launch.d/default.env"
+	echo 'LOCAL=1' > "$tmp/launch.d/local.env"
+	echo 'INCLUDE=presets/standard.env' > "$tmp/games/42424242.env"
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		LAUNCHLAYER_GAMES_DIR="$tmp/games" \
+		XDG_CONFIG_HOME="$tmp/config" \
+		HOME="$tmp" \
+		"$SCRIPT" --restore-backup --dir "$outdir" --yes --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *'"applied":'* ]]
+	[[ "$output" == *"launch.d/default.env"* ]]
+	[[ "$output" == *"games/42424242.env"* ]]
+	[[ "$output" == *"launch.d/local.env"* ]]
+	grep -q 'GAMEMODE=1' "$tmp/launch.d/default.env"
+	grep -q 'LOCAL=0' "$tmp/launch.d/local.env"
+	grep -q 'from-backup' "$tmp/games/42424242.env"
+	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["applied"]>=3' "$output"
+
+	rm -rf "$tmp"
+}
+
+@test "restore-backup --exclude-local skips local.env" {
+	local tmp outdir
+	tmp="$(mktemp -d)"
+	outdir="$tmp/backups"
+	mkdir -p "$tmp/launch.d/presets" "$tmp/games" "$outdir"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	echo 'LOCAL=from-backup' > "$tmp/launch.d/local.env"
+	run env LAUNCHLAYER_CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" "$SCRIPT" --backup-config --output "$outdir"
+	[[ $status -eq 0 ]]
+
+	echo 'LOCAL=current' > "$tmp/launch.d/local.env"
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		LAUNCHLAYER_GAMES_DIR="$tmp/games" \
+		XDG_CONFIG_HOME="$tmp/config" \
+		HOME="$tmp" \
+		"$SCRIPT" --restore-backup --dir "$outdir" --yes --exclude-local --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *'"applied":2'* ]]
+	[[ "$output" != *"launch.d/local.env"* ]]
+	grep -q 'LOCAL=current' "$tmp/launch.d/local.env"
+	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert all(a["path"]!="launch.d/local.env" for a in d["actions"])' "$output"
+
 	rm -rf "$tmp"
 }

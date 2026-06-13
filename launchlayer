@@ -32,7 +32,7 @@
 #   --setup [--completions] [--systemd] [--symlink] [--print-launch-option]
 #   --init-appid APPID|NAME [preset] [--force]
 #   --bulk-set-include PRESET [--all-configured|--all-installed] [--grep NAME] [APPID|NAME...]
-#   --export-config / --backup-config / --import-config / --prune-backups
+#   --export-config / --backup-config / --import-config / --restore-backup / --prune-backups
 #   --backup-timer / --backup-prefs / --tui-prefs / --hub-prefs
 #   --hub-fingerprint / --hub-publish / --hub-update / --hub-delete
 #   --hub-recommend / --hub-search / --hub-apply
@@ -64,15 +64,15 @@
 #   tools.sh        — optional dependency detection
 #   config.sh       — layered .env loading
 #   vdf.sh          — libraryfolders.vdf parsing
-#   steam.sh        — library discovery, native/EAC detection
-#   hardware/       — cpu, compositors, display detection
+#   steam/          — library discovery, native/EAC detection (library.sh, detect.sh)
+#   hardware/       — cpu, compositors/, display detection
 #   detected-defaults.sh — auto-detected machine defaults
 #   gpu.sh          — GPU-specific launch helpers
 #   preflight.sh    — pre-launch checks
-#   runtime.sh      — env tuning and launch-chain assembly
+#   runtime/        — summary, tuning, chain, logging
 #   vram.sh         — VRAM hog pause/resume
 #   inspect/        — show, maintenance, reports, validation, backup
-#   cli.sh          — help, version, JSON helpers
+#   cli/            — colors, json, help; cli.sh — version, subcommands, flags
 #   prefs/          — paths, backup, tui preference helpers (hub prefs in lib/hub/)
 #   completions/    — core, shells, helpers, cli
 #   setup/          — sysctl, systemd, doctor, onboard

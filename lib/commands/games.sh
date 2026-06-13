@@ -18,19 +18,15 @@ show_cpu_topology() {
 # list_games — Tabular or JSON list with launch-time detection (heuristics + lists).
 list_games() {
 	local configured_only=${1:-0} json=${2:-0} grep_pattern=${3:-}
-	local cfg native eac ac_type engine
+	local cfg native eac ac_type engine row
+	local -a _list_games_rows=() _list_games_cache_rows=()
 
 	CLI_JSON_OUTPUT=$json
-
-	if [[ "$json" != "1" ]]; then
-		printf '%-10s %-5s %-5s %-5s %-8s %-12s %s\n' APPID CFG NAT EAC AC-TYPE ENGINE NAME
-	fi
 
 	_list_games_one() {
 		local appid=$1 name=$2 _manifest=$3
 
 		cli_scan_progress_tick
-		game_name_matches_grep "$name" "$grep_pattern" || return 0
 
 		cfg=no; native=no; eac=no
 		appid_env_exists "$appid" && cfg=yes
@@ -39,6 +35,17 @@ list_games() {
 		ac_type="$(detect_anticheat_type "$appid")"
 		engine="$(detect_engine_hint "$appid")"
 		[[ -z "$ac_type" ]] && ac_type="-"
+		name="${name//$'\r'/ }"
+		name="${name//$'\n'/ }"
+		name="${name//$'\t'/ }"
+
+		row="$(
+			printf '%-10s %-5s %-5s %-8s %-12s %s' \
+				"$appid" "$cfg" "$native" "$ac_type" "$engine" "$name"
+		)"
+		_list_games_cache_rows+=("$row")
+
+		game_name_matches_grep "$name" "$grep_pattern" || return 0
 		[[ "$configured_only" == "1" && "$cfg" == no ]] && return 0
 
 		if [[ "$json" == "1" ]]; then
@@ -51,14 +58,23 @@ list_games() {
 				"$(json_string "$engine")" \
 				"$(json_string "$name")"
 		else
-			printf '%-10s %-5s %-5s %-5s %-8s %-12s %s\n' \
-				"$appid" "$cfg" "$native" "$eac" "$ac_type" "$engine" "$name"
+			_list_games_rows+=("$row")
 		fi
 	}
 
 	cli_scan_progress_begin "Listing installed games"
 	foreach_installed_game _list_games_one
 	cli_scan_progress_end
+	if [[ "${LAUNCH_QUIET:-0}" != "1" && "${LIST_GAMES_UPDATE_CACHE:-1}" != "0" && ${#_list_games_cache_rows[@]} -gt 0 ]]; then
+		tui_games_cache_persist_lines "${_list_games_cache_rows[@]}"
+	fi
+
+	if [[ "$json" != "1" ]]; then
+		printf '%-10s %-5s %-5s %-8s %-12s %s\n' APPID CFG NAT AC-TYPE ENGINE NAME
+		for row in "${_list_games_rows[@]}"; do
+			printf '%s\n' "$row"
+		done
+	fi
 }
 
 # resolve_appid_arg — Resolve CLI AppID or name fragment; prints AppID.

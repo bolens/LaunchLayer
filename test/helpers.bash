@@ -68,6 +68,9 @@ _source_lib_module() {
 		setup) launchlayer_source_setup ;;
 		commands) launchlayer_source_commands ;;
 		hub) launchlayer_source_hub ;;
+		runtime) launchlayer_source_runtime ;;
+		steam) launchlayer_source_steam ;;
+		cli) launchlayer_source_cli ;;
 		*)
 			# shellcheck source=/dev/null
 			source "$root/lib/${module}.sh"
@@ -141,10 +144,99 @@ bats_unit_setup() {
 bats_integration_setup() {
 	# shellcheck disable=SC1091
 	source "$BATS_TEST_DIRNAME/../helpers.bash"
+	BATS_SAVED_HOME="${HOME:-}"
+	BATS_SAVED_XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-}"
 	SCRIPT="$(launchlayer_script)"
 	REPO_ROOT="$(launchlayer_root)"
 	export SCRIPT REPO_ROOT
 	export STEAM_ROOT="${STEAM_ROOT:-$HOME/.local/share/Steam}"
+}
+
+# bats_integration_teardown — Restore env vars some integration tests override.
+bats_integration_teardown() {
+	[[ -n "${BATS_SAVED_HOME:-}" ]] && export HOME="$BATS_SAVED_HOME"
+	if [[ -n "${BATS_SAVED_XDG_CONFIG_HOME:-}" ]]; then
+		export XDG_CONFIG_HOME="$BATS_SAVED_XDG_CONFIG_HOME"
+	else
+		unset XDG_CONFIG_HOME
+	fi
+	unset LAUNCHLAYER_HUB_FINGERPRINT_LEVEL
+	stop_hub_mock_server
+}
+
+# engine_detect_reset — Clear tracked fake Steam roots between engine tests.
+engine_detect_reset() {
+	ENGINE_FAKE_STEAM_ROOTS=()
+	ENGINE_FIXTURE_DIR=""
+	ENGINE_FIXTURE_STEAM=""
+}
+
+# engine_detect_teardown — Remove fake Steam roots created during engine tests.
+engine_detect_teardown() {
+	local d
+	for d in "${ENGINE_FAKE_STEAM_ROOTS[@]:-}"; do
+		[[ -n "$d" ]] && rm -rf "$d"
+	done
+	engine_detect_reset
+}
+
+# engine_setup_fixture — Create a fake installed game; sets ENGINE_FIXTURE_DIR/STEAM.
+engine_setup_fixture() {
+	local appid=$1 name=$2 installdir=${3:-Game${appid}}
+	local fake
+	fake="$(fake_steam_root "$appid" "$name" "$installdir")"
+	ENGINE_FAKE_STEAM_ROOTS+=("$fake")
+	ENGINE_FIXTURE_STEAM="$fake"
+	ENGINE_FIXTURE_DIR="$fake/steamapps/common/$installdir"
+}
+
+# engine_run_detect — Run detect_engine_hint for an AppID (sets bats run status/output).
+engine_run_detect() {
+	local appid=$1 fake_steam=$2
+	local helpers_dir="${BATS_TEST_DIRNAME:-}"
+	[[ -n "$helpers_dir" ]] || helpers_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/unit"
+	run env STEAM_ROOT="$fake_steam" CONFIG_DIR="${CONFIG_DIR:-$(launchlayer_root)}" bash -c '
+		source "'"${helpers_dir}"'/../helpers.bash"
+		source_lib steam config
+		detect_engine_hint '"$appid"'
+	'
+}
+
+# engine_assert_hint — Assert the last detect_engine_hint result matches expected engine id.
+engine_assert_hint() {
+	local expected=$1
+	[[ $status -eq 0 ]] || {
+		echo "detect_engine_hint failed (status=$status): $output" >&2
+		return 1
+	}
+	[[ "$output" == "$expected" ]] || {
+		echo "expected engine=$expected got=$output" >&2
+		return 1
+	}
+}
+
+# engine_run_markers — Run _detect_engine_markers on a directory path directly.
+engine_run_markers() {
+	local game_dir=$1
+	local helpers_dir="${BATS_TEST_DIRNAME:-}"
+	[[ -n "$helpers_dir" ]] || helpers_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/unit"
+	run env CONFIG_DIR="${CONFIG_DIR:-$(launchlayer_root)}" bash -c '
+		source "'"${helpers_dir}"'/../helpers.bash"
+		source_lib steam config
+		_detect_engine_markers "'"$game_dir"'"
+	'
+}
+
+# engine_run_collect_roots — Run _engine_collect_scan_roots for assertions on scan coverage.
+engine_run_collect_roots() {
+	local game_dir=$1
+	local helpers_dir="${BATS_TEST_DIRNAME:-}"
+	[[ -n "$helpers_dir" ]] || helpers_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/unit"
+	run env CONFIG_DIR="${CONFIG_DIR:-$(launchlayer_root)}" bash -c '
+		source "'"${helpers_dir}"'/../helpers.bash"
+		source_lib steam config
+		_engine_collect_scan_roots "'"$game_dir"'" | sort
+	'
 }
 
 # source_lib — Source lib modules with CONFIG_DIR and LIB_DIR set.

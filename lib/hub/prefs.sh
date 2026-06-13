@@ -94,7 +94,11 @@ reset_hub_prefs() {
 	mkdir -p "$(dirname "$user_file")"
 	cp "$example" "$user_file"
 	load_hub_prefs
-	echo "Reset hub preferences to defaults ($user_file)"
+	if declare -f tui_panel_note >/dev/null 2>&1; then
+		tui_panel_note "Reset hub preferences to defaults ($user_file)" "Hub settings"
+	else
+		echo "Reset hub preferences to defaults ($user_file)"
+	fi
 }
 
 # hub_fingerprint_level_desc — One-line description for TUI/CLI display.

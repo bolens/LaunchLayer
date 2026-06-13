@@ -23,4 +23,5 @@ options+=(
 	Back
 )
 
+TUI_MENU_CONTEXT=toggles
 fzf_menu "$(tui_crumb_label "Flip per-game override")" "${options[@]}"

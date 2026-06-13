@@ -52,3 +52,36 @@ setup() {
 	[[ "$output" == "$tmp" ]]
 	rm -rf "$tmp"
 }
+
+@test "nproc_portable returns positive cpu count" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		nproc_portable
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" =~ ^[0-9]+$ ]]
+	(( output > 0 ))
+}
+
+@test "is_linux matches current kernel family" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		kernel=$(detect_uname_kernel)
+		if [[ "$kernel" == linux ]]; then
+			is_linux && echo linux-yes || echo linux-no
+		else
+			is_linux && echo linux-yes || echo linux-no
+		fi
+	'
+	[[ $status -eq 0 ]]
+	kernel="$(bash -c 'source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"; source_lib platform; detect_uname_kernel')"
+	if [[ "$kernel" == linux ]]; then
+		[[ "$output" == linux-yes ]]
+	else
+		[[ "$output" == linux-no ]]
+	fi
+}

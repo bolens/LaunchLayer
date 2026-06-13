@@ -6,11 +6,16 @@ setup() {
 	bats_integration_setup
 }
 
+teardown() {
+	bats_integration_teardown
+}
+
 @test "help mentions export and import" {
 	run "$SCRIPT" --help
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"--export-config"* ]]
 	[[ "$output" == *"--import-config"* ]]
+	[[ "$output" == *"--restore-backup"* ]]
 	[[ "$output" == *"--backup-config"* ]]
 	[[ "$output" == *"--backup-timer"* ]]
 	[[ "$output" == *"--backup-prefs"* ]]
@@ -53,8 +58,10 @@ setup() {
 		HOME="$tmp" \
 		"$SCRIPT" --backup-timer install --no-enable --schedule 'Mon..Fri *-*-* 04:00:00'
 	[[ $status -eq 0 ]]
-	grep -q 'OnCalendar=Mon..Fri \*-\*-\* 04:00:00' "$unit_dir/launchlayer-backup.timer"
-	grep -q 'on_calendar=Mon..Fri \*-\*-\* 04:00:00' "$tmp/launchlayer/backup.conf"
+	run grep OnCalendar= "$unit_dir/launchlayer-backup.timer"
+	[[ "$output" == *"Mon..Fri"* ]]
+	run grep on_calendar= "$tmp/launchlayer/backup.conf"
+	[[ "$output" == *"Mon..Fri"* ]]
 	rm -rf "$tmp"
 }
 
@@ -82,8 +89,10 @@ EOF
 		HOME="$tmp" \
 		"$SCRIPT" --backup-timer install --no-enable
 	[[ $status -eq 0 ]]
-	grep -q 'OnUnitActiveSec=6h' "$tmp/systemd/user/launchlayer-backup.timer"
-	grep -q 'OnBootSec=10min' "$tmp/systemd/user/launchlayer-backup.timer"
+	run grep OnUnitActiveSec= "$tmp/systemd/user/launchlayer-backup.timer"
+	[[ "$output" == *"OnUnitActiveSec=6h"* ]]
+	run grep OnBootSec= "$tmp/systemd/user/launchlayer-backup.timer"
+	[[ "$output" == *"OnBootSec=10min"* ]]
 	rm -rf "$tmp"
 }
 
@@ -93,6 +102,62 @@ EOF
 	run env XDG_CONFIG_HOME="$tmp" HOME="$tmp" "$SCRIPT" --backup-timer status
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"not installed"* ]]
+	rm -rf "$tmp"
+}
+
+@test "backup-timer uninstall removes user units" {
+	local tmp unit_dir
+	tmp="$(mktemp -d)"
+	unit_dir="$tmp/systemd/user"
+	mkdir -p "$tmp/launch.d/presets"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --backup-timer install --no-enable
+	[[ $status -eq 0 ]]
+	[[ -f "$unit_dir/launchlayer-backup.service" ]]
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --backup-timer uninstall
+	[[ $status -eq 0 ]]
+	[[ ! -f "$unit_dir/launchlayer-backup.service" ]]
+	[[ ! -f "$unit_dir/launchlayer-backup.timer" ]]
+	[[ "$output" == *"Removed launchlayer-backup"* ]]
+	rm -rf "$tmp"
+}
+
+@test "backup-timer enable-service toggles oneshot unit" {
+	local tmp unit_dir
+	tmp="$(mktemp -d)"
+	unit_dir="$tmp/systemd/user"
+	mkdir -p "$tmp/launch.d/presets"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --backup-timer install --no-enable
+	[[ $status -eq 0 ]]
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --backup-timer enable-service
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"Enabled launchlayer-backup.service"* ]]
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --backup-timer disable-service
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"Disabled launchlayer-backup.service"* ]]
 	rm -rf "$tmp"
 }
 

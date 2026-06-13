@@ -21,6 +21,16 @@ setup() {
 
 	run hub_json_get_bool "$fp" wsl2
 	[[ $status -eq 1 ]]
+
+	run bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib hub
+		fp='"'"'{"vrr":true,"wsl2":false}'"'"'
+		hub_json_get_bool "$fp" vrr && echo vrr-true || echo vrr-false
+		hub_json_get_bool "$fp" wsl2 && echo wsl2-true || echo wsl2-false
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'vrr-true\nwsl2-false' ]]
 }
 
 @test "hub_profile_overlap_score returns bounded integer" {

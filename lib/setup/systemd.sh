@@ -98,6 +98,115 @@ _backup_timer_schedule_from_unit() {
 	fi
 }
 
+# systemd_backup_units_installed_p — True when backup service and timer unit files exist.
+systemd_backup_units_installed_p() {
+	local unit_dir
+	unit_dir="$(systemd_user_dir)"
+	[[ -f "$unit_dir/launchlayer-backup.service" && -f "$unit_dir/launchlayer-backup.timer" ]]
+}
+
+# systemd_backup_timer_enabled_p — True when the user backup timer is enabled.
+systemd_backup_timer_enabled_p() {
+	command -v systemctl >/dev/null 2>&1 \
+		&& systemctl --user is-enabled launchlayer-backup.timer >/dev/null 2>&1
+}
+
+# systemd_backup_service_enabled_p — True when the oneshot service is enabled for manual start.
+systemd_backup_service_enabled_p() {
+	local state
+	command -v systemctl >/dev/null 2>&1 || return 1
+	state="$(systemctl --user is-enabled launchlayer-backup.service 2>/dev/null || true)"
+	[[ "$state" == enabled ]]
+}
+
+# systemd_backup_timer_brief_state — not_installed, installed, or enabled.
+systemd_backup_timer_brief_state() {
+	if ! systemd_backup_units_installed_p; then
+		printf 'not_installed\n'
+	elif systemd_backup_timer_enabled_p; then
+		printf 'enabled\n'
+	else
+		printf 'installed\n'
+	fi
+}
+
+# enable_systemd_backup_timer — Enable (and install) the backup timer.
+enable_systemd_backup_timer() {
+	if ! systemd_backup_units_installed_p; then
+		install_systemd_backup_units 0
+	fi
+	if ! command -v systemctl >/dev/null 2>&1; then
+		echo "systemctl not found" >&2
+		return 1
+	fi
+	systemctl --user daemon-reload
+	systemctl --user enable --now launchlayer-backup.timer \
+		&& echo "Enabled launchlayer-backup.timer" \
+		|| {
+			echo "Failed to enable launchlayer-backup.timer" >&2
+			return 1
+		}
+}
+
+# disable_systemd_backup_timer — Stop and disable the backup timer (units remain on disk).
+disable_systemd_backup_timer() {
+	if ! command -v systemctl >/dev/null 2>&1; then
+		echo "systemctl not found" >&2
+		return 1
+	fi
+	systemctl --user disable --now launchlayer-backup.timer 2>/dev/null \
+		&& echo "Disabled launchlayer-backup.timer" \
+		|| echo "launchlayer-backup.timer was not enabled"
+}
+
+# enable_systemd_backup_service — Enable the oneshot unit for manual systemctl start.
+enable_systemd_backup_service() {
+	if ! systemd_backup_units_installed_p; then
+		install_systemd_backup_units 0
+	fi
+	if ! command -v systemctl >/dev/null 2>&1; then
+		echo "systemctl not found" >&2
+		return 1
+	fi
+	systemctl --user daemon-reload
+	systemctl --user enable launchlayer-backup.service \
+		&& echo "Enabled launchlayer-backup.service (manual start)" \
+		|| {
+			echo "Failed to enable launchlayer-backup.service" >&2
+			return 1
+		}
+}
+
+# disable_systemd_backup_service — Disable manual start of the backup oneshot.
+disable_systemd_backup_service() {
+	if ! command -v systemctl >/dev/null 2>&1; then
+		echo "systemctl not found" >&2
+		return 1
+	fi
+	systemctl --user disable launchlayer-backup.service 2>/dev/null \
+		&& echo "Disabled launchlayer-backup.service (manual start)" \
+		|| echo "launchlayer-backup.service was not enabled"
+}
+
+# uninstall_systemd_backup_units — Remove backup timer/service units from the user systemd dir.
+uninstall_systemd_backup_units() {
+	local unit_dir service timer
+	unit_dir="$(systemd_user_dir)"
+	service="$unit_dir/launchlayer-backup.service"
+	timer="$unit_dir/launchlayer-backup.timer"
+	if command -v systemctl >/dev/null 2>&1; then
+		systemctl --user disable --now launchlayer-backup.timer 2>/dev/null || true
+		systemctl --user disable launchlayer-backup.service 2>/dev/null || true
+		systemctl --user stop launchlayer-backup.service 2>/dev/null || true
+		systemctl --user reset-failed launchlayer-backup.service 2>/dev/null || true
+	fi
+	rm -f "$service" "$timer"
+	if command -v systemctl >/dev/null 2>&1; then
+		systemctl --user daemon-reload
+	fi
+	echo "Removed launchlayer-backup.service and launchlayer-backup.timer"
+}
+
 # install_systemd_backup_units — Write backup timer/service with resolved script path.
 install_systemd_backup_units() {
 	local unit_dir script service timer backup_dir enable_now
@@ -203,31 +312,19 @@ handle_backup_timer_subcommand() {
 			install_systemd_backup_units "$install_enable"
 			;;
 		enable)
-			if [[ ! -f "$(systemd_user_dir)/launchlayer-backup.timer" ]]; then
-				install_systemd_backup_units 0
-			fi
-			if command -v systemctl >/dev/null 2>&1; then
-				systemctl --user daemon-reload
-				systemctl --user enable --now launchlayer-backup.timer \
-					&& echo "Enabled launchlayer-backup.timer" \
-					|| {
-						echo "Failed to enable launchlayer-backup.timer" >&2
-						return 1
-					}
-			else
-				echo "systemctl not found" >&2
-				return 1
-			fi
+			enable_systemd_backup_timer
 			;;
 		disable)
-			if command -v systemctl >/dev/null 2>&1; then
-				systemctl --user disable --now launchlayer-backup.timer 2>/dev/null \
-					&& echo "Disabled launchlayer-backup.timer" \
-					|| echo "launchlayer-backup.timer was not enabled"
-			else
-				echo "systemctl not found" >&2
-				return 1
-			fi
+			disable_systemd_backup_timer
+			;;
+		enable-service)
+			enable_systemd_backup_service
+			;;
+		disable-service)
+			disable_systemd_backup_service
+			;;
+		uninstall)
+			uninstall_systemd_backup_units
 			;;
 		reinstall)
 			install_systemd_backup_units 0
@@ -236,7 +333,7 @@ handle_backup_timer_subcommand() {
 			systemd_backup_status
 			;;
 		*)
-			echo "Usage: $0 --backup-timer [install|enable|disable|status|reinstall] [--dir PATH] [--keep N] [--schedule ON_CALENDAR] [--no-enable]" >&2
+			echo "Usage: $0 --backup-timer [install|enable|disable|enable-service|disable-service|uninstall|status|reinstall] [--dir PATH] [--keep N] [--schedule ON_CALENDAR] [--no-enable]" >&2
 			return 1
 			;;
 	esac

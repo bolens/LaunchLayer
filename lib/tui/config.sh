@@ -40,7 +40,8 @@ tui_appid_env_path() {
 # tui_ensure_appid_env — Create per-game config from suggested preset when missing.
 tui_ensure_appid_env() {
 	local appid=$1
-	appid_env_exists "$appid" || init_appid_config "$appid" "" 0
+	appid_env_exists "$appid" && return 0
+	tui_run_side_effect init_appid_config "$appid" "" 0
 }
 
 # tui_env_file_get — Read KEY=value from a .env file (last match wins).
@@ -86,7 +87,7 @@ tui_toggle_game_key() {
 		*) new_val=1 ;;
 	esac
 	tui_env_upsert "$file" "$key" "$new_val"
-	echo "Set $key=$new_val in $(basename "$file") (was: ${effective:-unset})"
+	tui_panel_note "Set $key=$new_val in $(basename "$file") (was: ${effective:-unset})" "Toggle"
 }
 
 # tui_validate_game_config_brief — One-line validation hint after per-game edits.
@@ -95,13 +96,13 @@ tui_validate_game_config_brief() {
 	file="$(tui_appid_env_path "$appid")"
 	[[ -f "$file" ]] || return 0
 	if ! validate_single_config_file "$file" >/dev/null 2>&1; then
-		echo "validation: issues in $(basename "$file") — use [Manage] Validate"
+		tui_panel_note "validation: issues in $(basename "$file") — use [Manage] Validate" "Validation"
 	fi
 }
 
 # tui_set_include_preset — Point per-game INCLUDE= at a named preset.
 tui_set_include_preset() {
-	set_include_preset "$1" "$2"
+	tui_run_side_effect set_include_preset "$1" "$2"
 }
 
 # tui_prompt_env_key — Prompt for a string key and write to per-game .env.
@@ -115,7 +116,7 @@ tui_prompt_env_key() {
 	read -r -p "${prompt} [${current:-empty}]: " new_val </dev/tty || return 1
 	[[ -z "$new_val" ]] && new_val="$current"
 	tui_env_upsert "$file" "$key" "$new_val"
-	echo "Set $key=$new_val"
+	tui_panel_note "Set $key=$new_val" "Config"
 }
 
 # tui_open_in_editor — Open a config file in \$EDITOR.
@@ -123,7 +124,7 @@ tui_open_in_editor() {
 	local path=$1 editor
 	editor="${EDITOR:-${VISUAL:-nano}}"
 	[[ -f "$path" ]] || {
-		echo "File not found: $path" >&2
+		tui_show_text "File not found: $path" "Editor"
 		return 1
 	}
 	"$editor" "$path"
@@ -135,7 +136,7 @@ tui_open_or_create_in_editor() {
 	if [[ ! -f "$path" ]]; then
 		mkdir -p "$(dirname "$path")"
 		touch "$path"
-		echo "Created $path"
+		tui_panel_note "Created $path" "Editor"
 	fi
 	tui_open_in_editor "$path"
 }
@@ -177,10 +178,10 @@ tui_clear_game_key_override() {
 	file="$(tui_appid_env_path "$appid")"
 	if tui_env_remove_key "$file" "$key"; then
 		effective="$(tui_effective_key "$appid" "$key")"
-		echo "Cleared $key override in $(basename "$file") (now inherits: ${effective:-unset})"
+		tui_panel_note "Cleared $key override in $(basename "$file") (now inherits: ${effective:-unset})" "Override"
 		return 0
 	fi
-	echo "No override for $key in $(basename "$file")"
+	tui_panel_note "No override for $key in $(basename "$file")" "Override"
 	return 1
 }
 
@@ -190,14 +191,14 @@ tui_clear_all_game_overrides() {
 	file="$(tui_appid_env_path "$appid")"
 	mapfile -t keys < <(tui_game_override_keys "$appid")
 	((${#keys[@]})) || {
-		echo "No per-game overrides in $(basename "$file")"
+		tui_panel_note "No per-game overrides in $(basename "$file")" "Override"
 		return 0
 	}
 	tui_confirm "Clear all ${#keys[@]} override(s) in $(basename "$file")?" || return 0
 	for key in "${keys[@]}"; do
 		tui_env_remove_key "$file" "$key"
 	done
-	echo "Cleared ${#keys[@]} override(s) — all keys now inherit from layers"
+	tui_panel_note "Cleared ${#keys[@]} override(s) — all keys now inherit from layers" "Override"
 	tui_validate_game_config_brief "$appid"
 }
 
@@ -210,50 +211,60 @@ tui_game_validation_label() {
 		return 0
 	}
 	if validate_single_config_file "$file" >/dev/null 2>&1; then
-		printf 'config ok'
+		printf '%s ok' "$(tui_glyph_ok)"
 	else
-		printf 'validation issues'
+		printf '%s issues' "$(tui_glyph_bad)"
 	fi
+}
+
+# tui_edit_appid_config — Open per-game .env in \$EDITOR; scaffold when missing.
+tui_edit_appid_config() {
+	local appid=$1 path
+	[[ -n "$appid" ]] || return 1
+	if ! appid_env_exists "$appid"; then
+		tui_run_paged init_appid_config "$appid" "" 0 || return 1
+	fi
+	path="$(resolve_appid_env_path "$appid")"
+	tui_open_in_editor "$path"
 }
 
 # tui_build_recent_picker_lines — Recent games only (from launch.log).
 tui_build_recent_picker_lines() {
 	local -a all_lines=() recent_ids=() line appid
-	mapfile -t all_lines < <(tui_list_games_lines)
+	local -a recent_lines=()
+	tui_games_cache_start
+	if tui_games_cache_ready; then
+		mapfile -t all_lines < <(tui_games_cache_lines)
+	else
+		mapfile -t all_lines < <(tui_games_cache_wait && tui_games_cache_lines)
+	fi
 	mapfile -t recent_ids < <(tui_recent_game_appids 12)
 	for appid in "${recent_ids[@]}"; do
 		for line in "${all_lines[@]}"; do
 			[[ "${line%% *}" == "$appid" ]] || continue
-			printf '[recent] %s\n' "$line"
+			recent_lines+=("$(tui_format_game_picker_row "$line" 1)")
 			break
 		done
 	done
+	((${#recent_lines[@]})) || return 1
+	tui_game_list_column_header
+	printf '%s\n' "${recent_lines[@]}"
 }
 
 # tui_pick_recent_game_appid — Select from recent games only; prints AppID.
 tui_pick_recent_game_appid() {
-	local line appid header script_q
-	script_q="$(printf '%q' "$LAUNCHLAYER_MAIN_SCRIPT")"
-	header="Recent games (from launch.log, Ctrl-E: editor, Ctrl-D: dry-run)"
+	local line appid header
+	local -a lines=()
+	header="Recent games (from launch.log)"
+	mapfile -t lines < <(tui_build_recent_picker_lines)
+	((${#lines[@]} > 1)) || {
+		tui_show_text "No recent games in launch.log — launch a game through LaunchLayer first." "Recent games"
+		return 1
+	}
 	if tui_has_fzf; then
-		line="$(tui_build_recent_picker_lines | fzf \
-			--header="$header" \
-			--height="${LAUNCHLAYER_TUI_HEIGHT:-40%}" \
-			--border \
-			--layout=reverse \
-			--preview "${script_q} --tui-game-preview \$(echo {} | grep -oE '[0-9]+' | head -1) 2>/dev/null" \
-			--preview-window="${LAUNCHLAYER_TUI_PREVIEW:-right:50%:wrap}" \
-			--bind "ctrl-e:execute-silent(${script_q} --edit-appid \$(echo {} | grep -oE '[0-9]+' | head -1) < /dev/tty)+abort" \
-			--bind "ctrl-d:execute(${script_q} --dry-run \$(echo {} | grep -oE '[0-9]+' | head -1) 2>&1 | head -n 35)+abort" \
-			--info=inline)" || return 1
+		line="$(printf '%s\n' "${lines[@]}" | tui_fzf_run_stdin single "$header" game)" || return 1
 	else
-		local -a lines=()
-		mapfile -t lines < <(tui_build_recent_picker_lines)
-		((${#lines[@]})) || {
-			echo "No recent games in launch.log — launch a game through LaunchLayer first." >&2
-			return 1
-		}
-		line="$(tui_select_pick "$header" "${lines[@]}")" || return 1
+		line="$(tui_select_pick "$header" "${lines[@]:1}")" || return 1
 	fi
 	appid="$(tui_parse_game_picker_line "$line")"
 	[[ "$appid" =~ ^[0-9]+$ ]] || return 1
@@ -272,7 +283,7 @@ tui_clear_override_menu() {
 	local appid=$1 key -a keys=()
 	mapfile -t keys < <(tui_game_override_keys "$appid")
 	((${#keys[@]})) || {
-		echo "No per-game overrides in $(basename "$(tui_appid_env_path "$appid")")"
+		tui_panel_note "No per-game overrides in $(basename "$(tui_appid_env_path "$appid")")" "Override"
 		return 0
 	}
 	key="$(tui_menu "Pick key to clear" \

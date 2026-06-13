@@ -1,8 +1,5 @@
 # shellcheck shell=bash
-# lib/tui/primitives.sh — fzf/select menus, pickers, and UI chrome.
-# ---------------------------------------------------------------------------
-# UI primitives
-# ---------------------------------------------------------------------------
+# lib/tui/primitives.sh — Core TUI helpers: footers, menus, breadcrumbs, status chrome.
 
 # tui_require_tty — TUI needs interactive stdin/stdout.
 tui_require_tty() {
@@ -17,10 +14,151 @@ tui_has_fzf() {
 	command -v fzf >/dev/null 2>&1
 }
 
+# tui_fzf_footer_for — Contextual key-hint line (lazygit/k9s-style footer).
+tui_fzf_footer_for() {
+	case "${1:-menu}" in
+		game)
+			printf '%s' '↑↓ move · home/end jump · pgup/pgdn page · alt-s sort · enter select · ctrl-e editor · ctrl-d dry-run · ? help · esc back'
+			;;
+		multi)
+			printf '%s' 'tab toggle · shift-tab prev · alt-s sort · enter confirm · ? help · esc cancel'
+			;;
+		confirm)
+			printf '%s' 'enter confirm · esc cancel · ? help'
+			;;
+		help)
+			printf '%s' 'esc close'
+			;;
+		main)
+			printf '%s' '↑↓ navigate · enter select · ? shortcuts · esc quit'
+			;;
+		actions)
+			printf '%s' '↑↓ navigate · enter select · ctrl-d dry-run · ? help · esc back'
+			;;
+		toggles)
+			printf '%s' 'enter flip toggle · ? help · esc back'
+			;;
+		*)
+			printf '%s' '↑↓ navigate · home/end jump · pgup/pgdn page · alt-s sort · enter select · ? help · esc back'
+			;;
+	esac
+}
+
+# tui_games_footer_brief — Game hub status for menu footers (non-blocking).
+tui_games_footer_brief() {
+	tui_games_cache_start
+	printf 'filter:%s · %s games' "${TUI_GAME_FILTER:-all}" "$(tui_games_cache_count)"
+}
+
+# tui_backup_footer_brief — Backup hub status for menu footers.
+tui_backup_footer_brief() {
+	printf '%s · maint:%s' \
+		"$(backup_prune_summary 2>/dev/null || echo keep?)" \
+		"$(tui_maintenance_timer_brief 2>/dev/null || echo off)"
+}
+
+# tui_fzf_context_footer — Contextual hint line plus live hub status when relevant.
+tui_fzf_context_footer() {
+	local context=${1:-menu} hint extra=""
+	hint="$(tui_fzf_footer_for "$context")"
+	case "$context" in
+		main)
+			extra="$(tui_status_footer_brief)"
+			if [[ -n "${TUI_FZF_FOOTER_SUFFIX:-}" ]]; then
+				hint="${hint} · ${TUI_FZF_FOOTER_SUFFIX}"
+			fi
+			;;
+		games)
+			extra="$(tui_games_footer_brief)"
+			;;
+		backup)
+			extra="$(tui_backup_footer_brief)"
+			;;
+		hub)
+			extra="hub:$(tui_hub_status_brief 2>/dev/null || echo off)"
+			;;
+		actions)
+			[[ -n "${TUI_ACTION_APPID:-}" ]] && extra="appid:${TUI_ACTION_APPID}"
+			;;
+	esac
+	if [[ -n "$extra" ]]; then
+		printf '%s │ %s' "$hint" "$extra"
+	else
+		printf '%s' "$hint"
+	fi
+}
+
+# tui_status_footer_brief — One-line live status for menu footers.
+tui_status_footer_brief() {
+	local issues required current vm_label backup_timer maint_timer
+	issues="$(doctor_issue_count 2>/dev/null || echo 0)"
+	required="$(sysctl_required_value 2>/dev/null || echo 0)"
+	current="$(sysctl_current_value 2>/dev/null || echo "")"
+	backup_timer="$(tui_backup_timer_brief 2>/dev/null || echo off)"
+	maint_timer="$(tui_maintenance_timer_brief 2>/dev/null || echo off)"
+	if [[ -n "$current" && "$current" =~ ^[0-9]+$ && "$current" -ge "$required" ]]; then
+		vm_label="ok"
+	else
+		vm_label="low"
+	fi
+	printf 'filter:%s · doctor:%s · vm:%s · backup:%s · maint:%s · hub:%s' \
+		"${TUI_GAME_FILTER:-all}" \
+		"$(tui_glyph_doctor "$issues")" \
+		"$(tui_glyph_vm "$vm_label")" \
+		"$(tui_glyph_timer "$backup_timer")" \
+		"$(tui_glyph_timer "$maint_timer")" \
+		"$(tui_hub_status_brief 2>/dev/null || echo off)"
+}
+
 # tui_press_enter — Wait for Enter after showing command output.
 tui_press_enter() {
 	echo
 	read -r -p "Press Enter to continue… " _ </dev/tty
+}
+
+# tui_maybe_press_enter — Skip the pause when output is shown in the side panel.
+tui_maybe_press_enter() {
+	tui_panel_active_p && return 0
+	tui_press_enter
+}
+
+# tui_show_text — Show a short message in the panel or above the menu.
+tui_show_text() {
+	local text=$1 label=${2:-Note}
+	if tui_panel_active_p; then
+		tui_panel_append_text "$label" "$text"
+		return 0
+	fi
+	printf '%s\n' "$text"
+	tui_press_enter
+}
+
+# tui_panel_note — Record feedback without pausing (toggles, saves, inline edits).
+tui_panel_note() {
+	local text=$1 label=${2:-Note}
+	if tui_panel_active_p; then
+		tui_panel_append_text "$label" "$text"
+		return 0
+	fi
+	printf '%s\n' "$text"
+}
+
+# tui_run_capture — Run a command with a custom spinner label; route output to the panel.
+tui_run_capture() {
+	local msg=$1
+	shift
+	local output rc=0
+	output="$(tui_spinner_capture "$msg" "$@")" || rc=$?
+	if tui_json_enabled && [[ "$output" =~ ^[[:space:]]*[\{\[] ]]; then
+		output="$(tui_pretty_json "$output")"
+	fi
+	if tui_panel_active_p; then
+		tui_panel_append_text "$msg" "$output"
+		return "$rc"
+	fi
+	printf '%s\n' "$output"
+	tui_maybe_press_enter
+	return "$rc"
 }
 
 # tui_crumb_init — Ensure breadcrumb stack exists (set -u safe).
@@ -58,18 +196,37 @@ tui_remember_main_menu() {
 	tui_save_config_quiet
 }
 
-# tui_run_paged — Run a command and only pause when output spans multiple lines.
+# tui_run_paged — Run a command; show output in the side panel or above the menu.
 tui_run_paged() {
-	local output lines rc=0
-	output="$("$@" 2>&1)" || rc=$?
+	local output lines rc=0 msg cmd=$1
+	msg="$(tui_spinner_message_for "$cmd")"
+	output="$(tui_spinner_capture "$msg" "$@")" || rc=$?
 	if tui_json_enabled && [[ "$output" =~ ^[[:space:]]*[\{\[] ]]; then
 		output="$(tui_pretty_json "$output")"
+	fi
+	if tui_panel_active_p; then
+		tui_panel_append_command "$cmd" "$output"
+		return "$rc"
 	fi
 	lines="$(printf '%s\n' "$output" | wc -l)"
 	printf '%s\n' "$output"
 	if (( lines >= TUI_PRESS_ENTER_LINES )); then
 		tui_press_enter
 	fi
+	return "$rc"
+}
+
+# tui_run_side_effect — Run a command; route stdout to the panel without pausing.
+tui_run_side_effect() {
+	local output msg cmd=$1 rc=0
+	shift
+	msg="$(tui_spinner_message_for "$cmd")"
+	output="$(tui_spinner_capture "$msg" "$cmd" "$@")" || rc=$?
+	if tui_panel_active_p; then
+		[[ -n "$output" ]] && tui_panel_append_command "$cmd" "$output"
+		return "$rc"
+	fi
+	printf '%s\n' "$output"
 	return "$rc"
 }
 
@@ -93,7 +250,8 @@ tui_open_last_menu() {
 		"Backup & restore") tui_backup_menu ;;
 		"Community hub") tui_hub_menu ;;
 		"System & tools") tui_system_menu ;;
-		"TUI settings") tui_settings_menu ;;
+		Settings|"TUI settings") tui_prefs_hub_menu ;;
+		Status) tui_status_menu ;;
 		*) return 1 ;;
 	esac
 }
@@ -121,34 +279,13 @@ tui_render_game_preview() {
 		override=""
 		[[ -f "$file" ]] && override="$(tui_env_file_get "$file" "$key")"
 		if [[ -n "$override" ]]; then
-			printf '  %s=%s *\n' "$key" "${val:-0}"
+			printf '  %s=%s *\n' "$key" "$(tui_glyph_bool_onoff "${val:-0}")"
 		else
-			printf '  %s=%s\n' "$key" "${val:-0}"
+			printf '  %s=%s\n' "$key" "$(tui_glyph_bool_onoff "${val:-0}" 1)"
 		fi
 	done
 	echo
 	print_effective_config_summary 2>/dev/null | head -n 10 || true
-}
-
-# tui_fzf_pick — Fuzzy-select one line; returns 1 on cancel.
-tui_fzf_pick() {
-	local header=$1
-	shift
-	local result
-	local -a fzf_args=(
-		--header="$header"
-		--height="${LAUNCHLAYER_TUI_HEIGHT:-40%}"
-		--border
-		--layout=reverse
-		--info=inline
-	)
-	[[ $# -gt 0 ]] || return 1
-	if cli_uses_color; then
-		fzf_args+=(--ansi)
-	fi
-	result="$(printf '%s\n' "$@" | fzf "${fzf_args[@]}")" || return 1
-	[[ -n "$result" ]] || return 1
-	printf '%s\n' "$result"
 }
 
 # tui_select_pick — Numbered menu fallback when fzf is missing.
@@ -160,14 +297,26 @@ tui_select_pick() {
 
 	[[ $# -gt 0 ]] || return 1
 	echo "$prompt"
+	if ! tui_has_fzf; then
+		printf '%s\n' "$(cli_dim "$(tui_fzf_footer_for "${TUI_MENU_CONTEXT:-menu}") (install fzf for fuzzy search)")" >&2
+	fi
 	for i in "${!items[@]}"; do
+		[[ -z "${items[$i]}" ]] && continue
 		printf '  %2d) %s\n' "$((i + 1))" "${items[$i]}"
 	done
 	printf '  %2d) %s\n' "$(( ${#items[@]} + 1 ))" "Back"
+	local default_choice="" prompt="Choice: "
+	if [[ -n "${TUI_FZF_START_POS:-}" && "${TUI_FZF_START_POS}" =~ ^[0-9]+$ ]]; then
+		default_choice=$TUI_FZF_START_POS
+		prompt="Choice [${default_choice}]: "
+	fi
+	unset TUI_FZF_START_POS
 	while true; do
-		read -r -p "Choice: " choice </dev/tty || return 1
+		read -r -p "$prompt" choice </dev/tty || return 1
+		[[ -z "$choice" && -n "$default_choice" ]] && choice=$default_choice
 		[[ "$choice" =~ ^[0-9]+$ ]] || continue
 		if (( choice >= 1 && choice <= ${#items[@]} )); then
+			[[ -n "${items[choice - 1]}" ]] || continue
 			printf '%s\n' "${items[choice - 1]}"
 			return 0
 		fi
@@ -177,15 +326,62 @@ tui_select_pick() {
 	done
 }
 
+# tui_menu_items_skip_empty — Drop blank separator rows for numbered fallback.
+tui_menu_items_skip_empty() {
+	local item
+	for item in "$@"; do
+		[[ -n "$item" ]] && printf '%s\n' "$item"
+	done
+}
+
+# tui_menu_set_start_pos — Re-select a row on the next tui_menu call (1-based fzf position).
+# Anchor is a stable prefix: toggle key (GAMEMODE), "JSON view output:", "[Includes] local.env:", etc.
+tui_menu_set_start_pos() {
+	local anchor=$1
+	shift
+	local i=0 item stripped item_key
+	unset TUI_FZF_START_POS
+	[[ -n "$anchor" ]] || return 0
+	for item in "$@"; do
+		stripped="$(printf '%s' "$item" | tui_strip_ansi)"
+		if [[ "$anchor" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
+			item_key="$(tui_toggle_key_from_option "$stripped")"
+			if [[ "$item_key" == "$anchor" ]]; then
+				export TUI_FZF_START_POS=$((i + 1))
+				return 0
+			fi
+		elif [[ "$stripped" == "$anchor"* ]]; then
+			export TUI_FZF_START_POS=$((i + 1))
+			return 0
+		fi
+		((i++)) || true
+	done
+	return 0
+}
+
+# tui_menu_anchored — Pick one menu row; restore selection via anchor when set.
+# Build items once: local -a items=(...); tui_menu_anchored "header" "$anchor" "${items[@]}"
+tui_menu_anchored() {
+	local header=$1 anchor=$2
+	shift 2
+	tui_menu_set_start_pos "$anchor" "$@"
+	tui_menu "$header" "$@"
+}
+
 # tui_menu — Pick one item via fzf or numbered menu.
+# Set TUI_MENU_CONTEXT for footer hints (main, games, backup, hub, actions, toggles).
+# Set TUI_ACTION_APPID when TUI_MENU_CONTEXT=actions for preview + ctrl-d dry-run.
+# Set TUI_FZF_START_POS (or call tui_menu_set_start_pos) to keep selection after in-menu edits.
 tui_menu() {
-	local header=$1
+	local header=$1 context
 	shift
 	header="$(tui_crumb_label "$header")"
+	context="${TUI_MENU_CONTEXT:-menu}"
 	if tui_has_fzf; then
-		tui_fzf_pick "$header" "$@"
+		tui_fzf_pick "$header" "$context" "$@"
 	else
-		tui_select_pick "$header" "$@"
+		mapfile -t _tui_menu_items < <(tui_menu_items_skip_empty "$@")
+		tui_select_pick "$header" "${_tui_menu_items[@]}"
 	fi
 }
 
@@ -193,7 +389,7 @@ tui_menu() {
 tui_confirm() {
 	local prompt=$1 choice
 	if tui_has_fzf; then
-		choice="$(tui_fzf_pick "$prompt" "Yes" "No")" || return 1
+		choice="$(tui_fzf_pick "$prompt" confirm "Yes" "No")" || return 1
 		[[ "$choice" == Yes ]]
 	else
 		read -r -p "$prompt [y/N]: " choice </dev/tty || return 1
@@ -201,70 +397,9 @@ tui_confirm() {
 	fi
 }
 
-# tui_recent_game_appids — AppIDs from launch.log ordered by most recent play.
-tui_recent_game_appids() {
-	local limit=${1:-8}
-	[[ -f "$LAUNCH_LOG_FILE" ]] || return 0
-	tac "$LAUNCH_LOG_FILE" 2>/dev/null | awk -v limit="$limit" '
-		function parse_line(    i) {
-			appid = ""
-			for (i = 2; i <= NF; i++) {
-				if ($i ~ /^appid=/) {
-					sub(/^appid=/, "", $i)
-					appid = $i
-				}
-			}
-		}
-		{
-			parse_line()
-			if (appid == "" || appid == "unknown" || appid in seen) next
-			seen[appid] = 1
-			print appid
-			if (++count >= limit) exit
-		}
-	'
-}
-
-# tui_build_game_picker_lines — Recent games first, then full library (deduped).
-tui_build_game_picker_lines() {
-	local -a all_lines=() recent_ids=() line appid
-	local -A seen=()
-	mapfile -t all_lines < <(tui_list_games_lines)
-	mapfile -t recent_ids < <(tui_recent_game_appids 8)
-	for appid in "${recent_ids[@]}"; do
-		for line in "${all_lines[@]}"; do
-			[[ "${line%% *}" == "$appid" ]] || continue
-			printf '[recent] %s\n' "$line"
-			seen["$appid"]=1
-			break
-		done
-	done
-	for line in "${all_lines[@]}"; do
-		appid="${line%% *}"
-		[[ -n "${seen[$appid]:-}" ]] && continue
-		printf '%s\n' "$line"
-	done
-}
-
-# tui_parse_game_picker_line — Extract AppID from a picker row (strips [recent] prefix).
-tui_parse_game_picker_line() {
-	local line=$1
-	line="${line#\[recent\] }"
-	printf '%s' "${line%% *}"
-}
-
 # tui_backup_timer_brief — Short backup timer label for status banner.
 tui_backup_timer_brief() {
-	local timer
-	timer="$(systemd_user_dir)/launchlayer-backup.timer"
-	if command -v systemctl >/dev/null 2>&1 \
-		&& systemctl --user is-enabled launchlayer-backup.timer >/dev/null 2>&1; then
-		printf 'enabled'
-	elif [[ -f "$timer" ]]; then
-		printf 'installed'
-	else
-		printf 'off'
-	fi
+	systemd_backup_timer_brief_state 2>/dev/null || printf 'off\n'
 }
 
 # tui_maintenance_timer_brief — Short maintenance timer label for status banner.
@@ -281,8 +416,16 @@ tui_maintenance_timer_brief() {
 	fi
 }
 
-# tui_print_status_banner — One-line summary shown when the TUI starts.
+# tui_print_status_banner — Status summary at TUI start (non-fzf fallback only).
 tui_print_status_banner() {
+	tui_panel_active_p && return 0
+	local banner
+	banner="$(tui_spinner_capture "Loading status…" tui_print_status_banner_body)" || true
+	printf '%s\n' "$banner"
+}
+
+# tui_print_status_banner_body — Status lines without spinner (used by tui_print_status_banner).
+tui_print_status_banner_body() {
 	local issues required current vm_label backup_timer maint_timer prune
 	issues="$(doctor_issue_count)"
 	required="$(sysctl_required_value)"
@@ -295,9 +438,8 @@ tui_print_status_banner() {
 	else
 		vm_label="low"
 	fi
-	echo "── filter: ${TUI_GAME_FILTER:-all} │ doctor: ${issues} issue(s) │ vm.max_map_count: ${vm_label}"
-	echo "── backup: ${backup_timer} │ maintenance: ${maint_timer} │ ${prune} │ hub: $(tui_hub_status_brief)"
-	echo
+	printf '%s\n' "── filter: ${TUI_GAME_FILTER:-all} │ doctor: $(tui_glyph_doctor "$issues") │ vm: $(tui_glyph_vm "$vm_label")"
+	printf '%s\n' "── backup: $(tui_glyph_timer "$backup_timer") │ maint: $(tui_glyph_timer "$maint_timer") │ ${prune} │ hub: $(tui_hub_status_brief)"
 }
 
 # tui_change_game_filter — Quick filter change (saved to tui.conf).
@@ -306,56 +448,6 @@ tui_change_game_filter() {
 	val="$(tui_menu "Game picker filter" "${TUI_GAME_FILTERS[@]}")" || return 0
 	TUI_GAME_FILTER=$val
 	tui_save_config
-}
-
-# tui_list_games_lines — Game list rows for the picker, honoring TUI_GAME_FILTER.
-tui_list_games_lines() {
-	local filter=${TUI_GAME_FILTER:-all}
-	"$LAUNCHLAYER_MAIN_SCRIPT" --list-games 2>/dev/null | tail -n +2 | {
-		if [[ "$filter" == configured ]]; then
-			awk '$2 == "yes"'
-		elif [[ "$filter" == unconfigured ]]; then
-			awk '$2 == "no"'
-		else
-			cat
-		fi
-	}
-}
-
-# tui_pick_game_appid — Select an installed game; prints AppID.
-tui_pick_game_appid() {
-	local line appid header script_q
-	script_q="$(printf '%q' "$LAUNCHLAYER_MAIN_SCRIPT")"
-	header="Select a game ([recent] at top, Ctrl-E: editor, Ctrl-D: dry-run, filter=${TUI_GAME_FILTER:-all})"
-	if tui_has_fzf; then
-		line="$(tui_build_game_picker_lines | fzf \
-			--header="$header" \
-			--height="${LAUNCHLAYER_TUI_HEIGHT:-40%}" \
-			--border \
-			--layout=reverse \
-			--preview "${script_q} --tui-game-preview \$(echo {} | grep -oE '[0-9]+' | head -1) 2>/dev/null" \
-			--preview-window="${LAUNCHLAYER_TUI_PREVIEW:-right:50%:wrap}" \
-			--bind "ctrl-e:execute-silent(${script_q} --edit-appid \$(echo {} | grep -oE '[0-9]+' | head -1) < /dev/tty)+abort" \
-			--bind "ctrl-d:execute(${script_q} --dry-run \$(echo {} | grep -oE '[0-9]+' | head -1) 2>&1 | head -n 35)+abort" \
-			--info=inline)" || return 1
-	else
-		local -a lines=()
-		mapfile -t lines < <(tui_build_game_picker_lines)
-		((${#lines[@]})) || {
-			echo "No games match filter: ${TUI_GAME_FILTER:-all}" >&2
-			return 1
-		}
-		line="$(tui_select_pick "$header" "${lines[@]}")" || return 1
-	fi
-	appid="$(tui_parse_game_picker_line "$line")"
-	[[ "$appid" =~ ^[0-9]+$ ]] || return 1
-	printf '%s\n' "$appid"
-}
-
-# tui_pick_preset — Choose a launch preset name.
-tui_pick_preset() {
-	local default=${TUI_DEFAULT_PRESET:-standard}
-	tui_menu "Choose preset (default: $default)" "${TUI_PRESETS[@]}"
 }
 
 # tui_strip_ansi — Remove ANSI escape sequences from a string.
@@ -379,105 +471,3 @@ tui_bool_on() {
 		*) return 1 ;;
 	esac
 }
-
-# tui_game_scope_count — Count games for bulk preset scopes.
-tui_game_scope_count() {
-	local mode=$1
-	case "$mode" in
-		filter)
-			tui_list_games_lines | wc -l
-			;;
-		configured)
-			"$LAUNCHLAYER_MAIN_SCRIPT" --list-games 2>/dev/null \
-				| tail -n +2 | awk '$2 == "yes"' | wc -l
-			;;
-		*)
-			printf '0\n'
-			;;
-	esac
-}
-
-# tui_collect_appids — Collect AppIDs for a bulk preset scope.
-tui_collect_appids() {
-	local scope=$1 line appid -a appids=()
-	case "$scope" in
-		filter)
-			while IFS= read -r line || [[ -n "$line" ]]; do
-				appid="${line%% *}"
-				[[ "$appid" =~ ^[0-9]+$ ]] && appids+=("$appid")
-			done < <(tui_list_games_lines)
-			;;
-		configured)
-			while IFS= read -r line || [[ -n "$line" ]]; do
-				appid="${line%% *}"
-				[[ "$appid" =~ ^[0-9]+$ ]] && appids+=("$appid")
-			done < <("$LAUNCHLAYER_MAIN_SCRIPT" --list-games 2>/dev/null | tail -n +2 | awk '$2 == "yes"')
-			;;
-		multi)
-			mapfile -t appids < <(tui_pick_game_appids_multi)
-			;;
-	esac
-	((${#appids[@]})) || return 1
-	printf '%s\n' "${appids[@]}"
-}
-
-# tui_pick_game_appids_multi — Fuzzy multi-select installed games; prints AppIDs.
-tui_pick_game_appids_multi() {
-	local -a lines=() selected=() line appid
-	tui_has_fzf || {
-		echo "Multi-select requires fzf$(tool_warn_suffix fzf)." >&2
-		return 1
-	}
-	mapfile -t lines < <(tui_build_game_picker_lines)
-	((${#lines[@]})) || {
-		echo "No games match filter: ${TUI_GAME_FILTER:-all}" >&2
-		return 1
-	}
-	mapfile -t selected < <(printf '%s\n' "${lines[@]}" | fzf \
-		--multi \
-		--header="Select games (Tab/Shift-Tab toggle, Enter confirm)" \
-		--height="${LAUNCHLAYER_TUI_HEIGHT:-40%}" \
-		--border \
-		--layout=reverse \
-		--info=inline) || return 1
-	((${#selected[@]})) || return 1
-	for line in "${selected[@]}"; do
-		appid="$(tui_parse_game_picker_line "$line")"
-		[[ "$appid" =~ ^[0-9]+$ ]] && printf '%s\n' "$appid"
-	done
-}
-
-# tui_bulk_preset_menu — Apply INCLUDE preset to many games at once.
-tui_bulk_preset_menu() {
-	local action scope preset appid -a appids=()
-	local filter_n configured_n
-	filter_n="$(tui_game_scope_count filter)"
-	configured_n="$(tui_game_scope_count configured)"
-
-	action="$(tui_menu "Bulk INCLUDE preset" \
-		"Current filter ($filter_n games)" \
-		"All configured ($configured_n games)" \
-		"Pick games (multi-select)" \
-		"Back")" || return 0
-
-	case "$action" in
-		"Current filter"*) scope=filter ;;
-		"All configured"*) scope=configured ;;
-		"Pick games (multi-select)")
-			scope=multi
-			;;
-		*) return 0 ;;
-	esac
-
-	mapfile -t appids < <(tui_collect_appids "$scope") || {
-		echo "No games matched that scope."
-		return 0
-	}
-	preset="$(tui_pick_preset)" || return 0
-	tui_confirm "Set INCLUDE=presets/${preset}.env on ${#appids[@]} game(s)?" || return 0
-	for appid in "${appids[@]}"; do
-		tui_set_include_preset "$appid" "$preset"
-	done
-	echo "Updated INCLUDE preset on ${#appids[@]} game(s)."
-}
-

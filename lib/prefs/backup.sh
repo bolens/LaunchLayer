@@ -107,7 +107,11 @@ reset_backup_prefs() {
 	mkdir -p "$(dirname "$user_file")"
 	cp "$example" "$user_file"
 	load_backup_prefs
-	echo "Reset backup preferences to defaults ($user_file)"
+	if declare -f tui_panel_note >/dev/null 2>&1; then
+		tui_panel_note "Reset backup preferences to defaults ($user_file)" "Backup settings"
+	else
+		echo "Reset backup preferences to defaults ($user_file)"
+	fi
 }
 
 # backup_prefs_schedule_summary — Human-readable schedule label for menus/status.

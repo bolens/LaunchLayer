@@ -7,6 +7,10 @@ setup() {
 	source_lib platform hardware cli hub
 }
 
+teardown() {
+	bats_integration_teardown
+}
+
 @test "minimal fingerprint omits detailed GPU and display lists" {
 	export LAUNCHLAYER_HUB_FINGERPRINT_LEVEL=minimal
 	run bash "$SCRIPT" --hub-fingerprint --json

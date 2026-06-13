@@ -6,6 +6,10 @@ setup() {
 	bats_integration_setup
 }
 
+teardown() {
+	bats_integration_teardown
+}
+
 @test "completions status runs" {
 	run "$SCRIPT" --completions status
 	[[ $status -eq 0 ]]
@@ -16,16 +20,14 @@ setup() {
 @test "completions enable and disable in temp home" {
 	local tmp_home
 	tmp_home="$(mktemp -d)"
-	# shellcheck disable=SC2030
-	export HOME="$tmp_home"
-	export XDG_CONFIG_HOME="$tmp_home/.config"
-	mkdir -p "$XDG_CONFIG_HOME"
-	run "$SCRIPT" --completions enable --shell bash
+	mkdir -p "$tmp_home/.config"
+	run env HOME="$tmp_home" XDG_CONFIG_HOME="$tmp_home/.config" "$SCRIPT" --completions enable --shell bash
 	[[ $status -eq 0 ]]
-	[[ -f "$XDG_CONFIG_HOME/launchlayer/completions.bash" ]]
-	run "$SCRIPT" --completions disable --shell bash
+	[[ "$output" == *"bash"* || "$output" == *"enabled"* || -f "$tmp_home/.config/launchlayer/completions.bash" ]]
+	[[ -f "$tmp_home/.config/launchlayer/completions.bash" ]]
+	run env HOME="$tmp_home" XDG_CONFIG_HOME="$tmp_home/.config" "$SCRIPT" --completions disable --shell bash
 	[[ $status -eq 0 ]]
-	[[ ! -f "$XDG_CONFIG_HOME/launchlayer/completions.bash" ]]
+	[[ ! -f "$tmp_home/.config/launchlayer/completions.bash" ]]
 	rm -rf "$tmp_home"
 }
 
@@ -63,33 +65,35 @@ setup() {
 @test "completions enable nu and disable in temp home" {
 	local tmp_home
 	tmp_home="$(mktemp -d)"
-	# shellcheck disable=SC2030
-	export HOME="$tmp_home"
-	export XDG_CONFIG_HOME="$tmp_home/.config"
-	mkdir -p "$XDG_CONFIG_HOME"
-	run "$SCRIPT" --completions enable --shell nu
+	mkdir -p "$tmp_home/.config"
+	run env HOME="$tmp_home" XDG_CONFIG_HOME="$tmp_home/.config" "$SCRIPT" --completions enable --shell nu
 	[[ $status -eq 0 ]]
-	[[ -L "$XDG_CONFIG_HOME/nushell/completions/launchlayer.nu" ]]
-	run "$SCRIPT" --completions disable --shell nu
+	[[ "$output" == *"nu:"* ]]
+	[[ "$output" == *"enabled"* ]]
+	[[ -L "$tmp_home/.config/nushell/completions/launchlayer.nu" ]]
+	run env HOME="$tmp_home" XDG_CONFIG_HOME="$tmp_home/.config" "$SCRIPT" --completions disable --shell nu
 	[[ $status -eq 0 ]]
-	[[ ! -L "$XDG_CONFIG_HOME/nushell/completions/launchlayer.nu" ]]
+	[[ "$output" == *"nu:"* ]]
+	[[ "$output" == *"disabled"* ]]
+	[[ ! -L "$tmp_home/.config/nushell/completions/launchlayer.nu" ]]
 	rm -rf "$tmp_home"
 }
 
 @test "completions enable pwsh and disable in temp home" {
 	local tmp_home
 	tmp_home="$(mktemp -d)"
-	# shellcheck disable=SC2030
-	export HOME="$tmp_home"
-	export XDG_CONFIG_HOME="$tmp_home/.config"
-	mkdir -p "$XDG_CONFIG_HOME/powershell"
-	run "$SCRIPT" --completions enable --shell pwsh
+	mkdir -p "$tmp_home/.config/powershell"
+	run env HOME="$tmp_home" XDG_CONFIG_HOME="$tmp_home/.config" "$SCRIPT" --completions enable --shell pwsh
 	[[ $status -eq 0 ]]
-	[[ -f "$XDG_CONFIG_HOME/launchlayer/completions.pwsh" ]]
-	grep -q 'launchlayer completions' "$XDG_CONFIG_HOME/powershell/Microsoft.PowerShell_profile.ps1"
-	run "$SCRIPT" --completions disable --shell pwsh
+	[[ "$output" == *"pwsh:"* ]]
+	[[ "$output" == *"enabled"* ]]
+	[[ -f "$tmp_home/.config/launchlayer/completions.pwsh" ]]
+	grep -q 'launchlayer completions' "$tmp_home/.config/powershell/Microsoft.PowerShell_profile.ps1"
+	run env HOME="$tmp_home" XDG_CONFIG_HOME="$tmp_home/.config" "$SCRIPT" --completions disable --shell pwsh
 	[[ $status -eq 0 ]]
-	[[ ! -f "$XDG_CONFIG_HOME/launchlayer/completions.pwsh" ]]
+	[[ "$output" == *"pwsh:"* ]]
+	[[ "$output" == *"disabled"* ]]
+	[[ ! -f "$tmp_home/.config/launchlayer/completions.pwsh" ]]
 	rm -rf "$tmp_home"
 }
 
@@ -104,37 +108,38 @@ setup() {
 @test "completions_shell_is_enabled tracks nu install" {
 	local tmp_home
 	tmp_home="$(mktemp -d)"
-	# shellcheck disable=SC2030
-	export HOME="$tmp_home"
-	export XDG_CONFIG_HOME="$tmp_home/.config"
-	mkdir -p "$XDG_CONFIG_HOME"
-	source_lib completions
-	if completions_shell_is_enabled nu; then
-		nu_was_enabled=1
-	else
-		nu_was_enabled=0
-	fi
-	[[ "$nu_was_enabled" -eq 0 ]]
-	"$SCRIPT" --completions enable --shell nu >/dev/null
-	source_lib completions
-	completions_shell_is_enabled nu
+	run env HOME="$tmp_home" XDG_CONFIG_HOME="$tmp_home/.config" bash -c '
+		export XDG_CONFIG_HOME="'"$tmp_home"'/.config"
+		mkdir -p "$XDG_CONFIG_HOME"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib completions
+		completions_shell_is_enabled nu && echo enabled || echo disabled
+		"'"$SCRIPT"'" --completions enable --shell nu >/dev/null
+		source_lib completions
+		completions_shell_is_enabled nu && echo enabled-after || echo disabled-after
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *disabled* ]]
+	[[ "$output" == *enabled-after* ]]
 	rm -rf "$tmp_home"
 }
 
 @test "completions_shell_status_brief reports enabled and disabled" {
 	local tmp_home brief
 	tmp_home="$(mktemp -d)"
-	# shellcheck disable=SC2030
-	export HOME="$tmp_home"
-	export XDG_CONFIG_HOME="$tmp_home/.config"
-	mkdir -p "$XDG_CONFIG_HOME/powershell"
-	source_lib completions
-	brief="$(completions_shell_status_brief pwsh)"
-	[[ "$brief" == disabled ]]
-	"$SCRIPT" --completions enable --shell pwsh >/dev/null
-	source_lib completions
-	brief="$(completions_shell_status_brief pwsh)"
-	[[ "$brief" == enabled ]]
+	run env HOME="$tmp_home" XDG_CONFIG_HOME="$tmp_home/.config" bash -c '
+		export XDG_CONFIG_HOME="'"$tmp_home"'/.config"
+		mkdir -p "$XDG_CONFIG_HOME/powershell"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib completions
+		completions_shell_status_brief pwsh
+		"'"$SCRIPT"'" --completions enable --shell pwsh >/dev/null
+		source_lib completions
+		completions_shell_status_brief pwsh
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *disabled* ]]
+	[[ "$output" == *enabled* ]]
 	rm -rf "$tmp_home"
 }
 

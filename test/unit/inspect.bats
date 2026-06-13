@@ -41,6 +41,27 @@ EOF
 			launch_stats 42424242 1
 		'
 	[[ $status -eq 0 ]]
+	[[ "$output" == *'"entries"'* ]]
+	[[ "$output" == *'"appid":"42424242"'* ]]
+	[[ "$output" == *'"launches":2'* ]]
+	[[ "$output" == *'"failures":1'* ]]
 	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); e=d["entries"][0]; assert e["appid"]=="42424242" and e["launches"]==2 and e["failures"]==1' "$output"
 	rm -rf "$tmp"
+}
+
+@test "show_paths json includes install and cache paths" {
+	local fake_steam
+	fake_steam="$(fake_steam_root 42424242 "Paths Game")"
+	mkdir -p "$fake_steam/steamapps/shadercache/42424242"
+	run env STEAM_ROOT="$fake_steam" bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform steam keys config preflight cli vdf inspect
+		show_paths 42424242 1
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *'"appid"'* ]]
+	[[ "$output" == *'"shader_cache"'* ]]
+	python3 -c 'import json,sys; json.loads(sys.argv[1])' "$output"
+	rm -rf "$fake_steam"
 }

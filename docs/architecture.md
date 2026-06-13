@@ -10,15 +10,17 @@ lib/
   load-modules.sh           # module load order
   common.sh                 # paths: LAUNCHD_DIR, GAMES_DIR, launchlayer_share_dir()
   platform/                 # OS, GPU, Steam detection, profiles
-  hardware/                 # CPU topology, compositors, display
+  steam/                    # library discovery, native/EAC/engine detection
+  hardware/                 # CPU topology, compositors/, display
   config.sh                 # layer loading, games path helpers
   hub/                      # community hub client (fingerprint, HTTP, similarity)
-  inspect/                  # show, validate, backup, maintenance
+  inspect/                  # show, validate, backup/, maintenance
   prefs/                    # backup.conf + tui.conf path helpers (hub.conf paths in lib/hub/)
   setup/                    # doctor, sysctl, systemd, onboard
-  commands/                 # CLI subcommands + dispatch
+  commands/                 # status, games, hub/, dispatch-*.sh
   completions/              # shell completion installers
-  tui/                      # interactive fzf menus
+  cli/                      # colors, json, help; cli.sh — version and flags
+  tui/                      # primitives, games-cache/, menus-backup/, hub/, main loop
 hub/                        # Convex backend for community config sharing (optional)
 share/launchlayer/
   templates/                # backup.conf, tui.conf, hub.conf examples
@@ -64,8 +66,8 @@ User preferences follow the same pattern for all three config files:
 
 | File | CLI | TUI |
 |------|-----|-----|
-| `tui.conf` | `--tui-prefs` | **TUI settings** |
-| `backup.conf` | `--backup-prefs` | **Backup & restore → Settings & preferences** |
+| `tui.conf` | `--tui-prefs` | **Settings → Interface** |
+| `backup.conf` | `--backup-prefs` | **Backup & restore → Settings** |
 | `hub.conf` | `--hub-prefs` | **Community hub → Hub settings** |
 
 Bulk preset changes: **`--bulk-set-include PRESET`** or **Games → Bulk change INCLUDE preset**.
@@ -84,9 +86,11 @@ Bulk preset changes: **`--bulk-set-include PRESET`** or **Games → Bulk change 
 `launchlayer` sources `load-modules.sh` and calls:
 
 - `launchlayer_load_pre_main` — platform + tools (before main script path is set)
-- `launchlayer_load_post_main` — hardware, config, inspect, prefs, setup, commands, completions, tui, launch
+- `launchlayer_load_post_main` — remaining modules in dependency order
 
-Each subtree uses a load guard (`LAUNCHLAYER_*_LOADED`) on its first file.
+Subtree loaders (`launchlayer_source_steam`, `launchlayer_source_cli`, `launchlayer_source_compositors`, `launchlayer_source_backup`, `launchlayer_source_dispatch`, `launchlayer_source_tui_hub`, `launchlayer_source_tui_system`, etc.) source leaf modules directly—no thin orchestrator files.
+
+Each leaf file uses a load guard (`LAUNCHLAYER_*_LOADED`) so tests can load individual subtrees via `source_lib` in `test/helpers.bash`.
 
 ## Launch pipeline
 
@@ -101,7 +105,7 @@ Each subtree uses a load guard (`LAUNCHLAYER_*_LOADED`) on its first file.
 7. Runtime tuning (network, PipeWire, CPU perf, NVIDIA, Proton env)
 8. `build_launch_chain` → exec with pre/post hooks → log
 
-Wrapper order (`lib/runtime.sh`): `LAUNCH_WRAPPERS_BEFORE` → `gamemoderun` → `taskset` → `game-performance` → `LAUNCH_WRAPPERS` → `gamescope` (optional `--mangoapp`) → `mangohud`.
+Wrapper order (`lib/runtime/chain.sh`): `LAUNCH_WRAPPERS_BEFORE` → `gamemoderun` → `taskset` → `game-performance` → `LAUNCH_WRAPPERS` → `gamescope` (optional `--mangoapp`) → `mangohud`.
 
 ## Backup / export format
 

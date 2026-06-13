@@ -6,6 +6,10 @@ setup() {
 	bats_integration_setup
 }
 
+teardown() {
+	bats_integration_teardown
+}
+
 @test "detect-environment runs" {
 	run "$SCRIPT" --detect-environment
 	[[ $status -eq 0 ]]
@@ -18,6 +22,8 @@ setup() {
 @test "detect-environment json is valid" {
 	run "$SCRIPT" --detect-environment --json
 	[[ $status -eq 0 ]]
+	[[ "$output" == *'"gpu_vendor"'* ]]
+	[[ "$output" == *'"profiles"'* ]]
 	python3 -c 'import json,sys; json.loads(sys.argv[1])' "$output"
 }
 
@@ -55,7 +61,8 @@ setup() {
 @test "detect-defaults json is valid" {
 	run "$SCRIPT" --detect-defaults --json
 	[[ $status -eq 0 ]]
-	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert "defaults" in d' "$output"
+	[[ "$output" == *'"defaults"'* ]]
+	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert "defaults" in d and isinstance(d["defaults"], list)' "$output"
 }
 
 @test "write-local-config dry-run" {

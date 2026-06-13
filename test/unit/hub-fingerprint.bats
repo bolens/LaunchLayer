@@ -114,18 +114,21 @@ setup() {
 		export LAUNCHLAYER_HUB_FINGERPRINT_LEVEL=standard
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib hub
-		hub_fingerprint_level_at_least minimal && hub_fingerprint_level_at_least standard
+		hub_fingerprint_level_at_least minimal && echo minimal-ok || echo minimal-fail
+		hub_fingerprint_level_at_least standard && echo standard-ok || echo standard-fail
 	'
 	[[ $status -eq 0 ]]
+	[[ "$output" == $'minimal-ok\nstandard-ok' ]]
 
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"
 		export LAUNCHLAYER_HUB_FINGERPRINT_LEVEL=minimal
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib hub
-		hub_fingerprint_level_at_least detailed
+		hub_fingerprint_level_at_least detailed && echo detailed-ok || echo detailed-fail
 	'
-	[[ $status -eq 1 ]]
+	[[ $status -eq 0 ]]
+	[[ "$output" == detailed-fail ]]
 }
 
 @test "hub_fingerprint_hash is stable for same input" {

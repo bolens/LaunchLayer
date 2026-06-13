@@ -12,8 +12,10 @@ setup() {
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib keys
 		known_config_key INCLUDE && known_config_key GAMEMODE && known_config_key MANGOHUD
+		echo all-known
 	'
 	[[ $status -eq 0 ]]
+	[[ "$output" == all-known ]]
 }
 
 @test "known_config_key accepts proton and wine prefixes" {
@@ -22,8 +24,10 @@ setup() {
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib keys
 		known_config_key PROTON_USE_WINED3D && known_config_key WINEPREFIX && known_config_key __GL_SYNC_TO_VBLANK
+		echo all-known
 	'
 	[[ $status -eq 0 ]]
+	[[ "$output" == all-known ]]
 }
 
 @test "known_config_key rejects unknown keys" {
@@ -31,7 +35,8 @@ setup() {
 		export CONFIG_DIR="'"$CONFIG_DIR"'"
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib keys
-		known_config_key TOTALLY_FAKE_KEY
+		known_config_key TOTALLY_FAKE_KEY && echo known || echo unknown
 	'
-	[[ $status -eq 1 ]]
+	[[ $status -eq 0 ]]
+	[[ "$output" == unknown ]]
 }

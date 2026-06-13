@@ -1,5 +1,8 @@
 # shellcheck shell=bash
 # lib/prefs/tui.sh — TUI preferences and --tui-prefs helpers.
+
+LAUNCHLAYER_TUI_PREVIEW_DEFAULT='right:35%:wrap'
+
 # _tui_prefs_set_defaults — Initialize TUI preference globals.
 _tui_prefs_set_defaults() {
 	TUI_GAME_FILTER=${TUI_GAME_FILTER:-all}
@@ -10,7 +13,7 @@ _tui_prefs_set_defaults() {
 	TUI_RESUME_LAST_MENU=${TUI_RESUME_LAST_MENU:-0}
 	TUI_PRESS_ENTER_LINES=${TUI_PRESS_ENTER_LINES:-8}
 	export LAUNCHLAYER_TUI_HEIGHT="${LAUNCHLAYER_TUI_HEIGHT:-40%}"
-	export LAUNCHLAYER_TUI_PREVIEW="${LAUNCHLAYER_TUI_PREVIEW:-right:50%:wrap}"
+	export LAUNCHLAYER_TUI_PREVIEW="${LAUNCHLAYER_TUI_PREVIEW:-$LAUNCHLAYER_TUI_PREVIEW_DEFAULT}"
 }
 
 # _tui_prefs_parse_file — Parse tui.conf lines into TUI globals.
@@ -67,11 +70,15 @@ json_output=${TUI_JSON_OUTPUT:-0}
 resume_last_menu=${TUI_RESUME_LAST_MENU:-0}
 press_enter_lines=${TUI_PRESS_ENTER_LINES:-8}
 fzf_height=${LAUNCHLAYER_TUI_HEIGHT:-40%}
-fzf_preview=${LAUNCHLAYER_TUI_PREVIEW:-right:50%:wrap}
+fzf_preview=${LAUNCHLAYER_TUI_PREVIEW:-$LAUNCHLAYER_TUI_PREVIEW_DEFAULT}
 EOF
 	} > "$file"
 	if (( ! quiet )); then
-		echo "Saved TUI settings to $file"
+		if declare -f tui_panel_note >/dev/null 2>&1; then
+			tui_panel_note "Saved TUI settings to $file" "TUI settings"
+		else
+			echo "Saved TUI settings to $file"
+		fi
 	fi
 }
 
@@ -97,7 +104,11 @@ reset_tui_prefs() {
 	mkdir -p "$(dirname "$user_file")"
 	cp "$example" "$user_file"
 	tui_load_config
-	echo "Reset TUI preferences to defaults ($user_file)"
+	if declare -f tui_panel_note >/dev/null 2>&1; then
+		tui_panel_note "Reset TUI preferences to defaults ($user_file)" "TUI settings"
+	else
+		echo "Reset TUI preferences to defaults ($user_file)"
+	fi
 }
 
 # show_tui_prefs — Print current TUI preferences.
@@ -116,7 +127,7 @@ show_tui_prefs() {
 			"${TUI_RESUME_LAST_MENU:-0}" \
 			"${TUI_PRESS_ENTER_LINES:-8}" \
 			"$(json_string "${LAUNCHLAYER_TUI_HEIGHT:-40%}")" \
-			"$(json_string "${LAUNCHLAYER_TUI_PREVIEW:-right:50%:wrap}")"
+			"$(json_string "${LAUNCHLAYER_TUI_PREVIEW:-$LAUNCHLAYER_TUI_PREVIEW_DEFAULT}")"
 		return 0
 	fi
 	echo "=== TUI preferences ==="
@@ -130,7 +141,7 @@ show_tui_prefs() {
 	echo "resume_last_menu=${TUI_RESUME_LAST_MENU:-0}"
 	echo "press_enter_lines=${TUI_PRESS_ENTER_LINES:-8}"
 	echo "fzf_height=${LAUNCHLAYER_TUI_HEIGHT:-40%}"
-	echo "fzf_preview=${LAUNCHLAYER_TUI_PREVIEW:-right:50%:wrap}"
+	echo "fzf_preview=${LAUNCHLAYER_TUI_PREVIEW:-$LAUNCHLAYER_TUI_PREVIEW_DEFAULT}"
 }
 
 # handle_tui_prefs_subcommand — Manage tui.conf (show, reset, set).

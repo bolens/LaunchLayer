@@ -5,7 +5,9 @@
 launchlayer                  # same when symlinked; also opens TUI with no args when fzf + TTY
 ```
 
-Requires an interactive terminal. With [fzf](https://github.com/junegunn/fzf) menus are fuzzy lists with a header, border, and reverse layout; without fzf, the same items appear as numbered prompts (`1) …`, `Choice:`).
+Requires an interactive terminal. With [fzf](https://github.com/junegunn/fzf) menus are fuzzy lists with a bordered header, contextual footer key hints, and reverse layout; without fzf, the same items appear as numbered prompts (`1) …`, `Choice:`).
+
+Press **`?`** in any fzf menu to open a keyboard-shortcuts panel (Esc to close). Patterns follow common TUIs (lazygit, k9s, yazi): footer hints, live status on hubs, split preview panes, and section gaps in grouped menus.
 
 [← README](../README.md) · [CLI reference](cli.md) · [Architecture](architecture.md)
 
@@ -17,7 +19,7 @@ Regenerate screenshots after UI changes: `make tui-screenshots` ([VHS](https://g
 
 ### Main menu
 
-Status banner, then the top-level hub (`LaunchLayer` version in the fzf header):
+Status banner, then the top-level hub with a live status footer (`filter`, `doctor`, `vm`, `backup`, `hub`):
 
 <p align="center">
   <img src="assets/tui-main-menu.png" alt="LaunchLayer main menu" width="720">
@@ -25,15 +27,19 @@ Status banner, then the top-level hub (`LaunchLayer` version in the fzf header):
 
 ### Game picker
 
-Fuzzy search with live config preview. **Ctrl-E** opens the editor; **Ctrl-D** dry-runs the launch chain.
+Fuzzy search with live config preview and footer key hints. **Ctrl-E** opens the editor; **Ctrl-D** dry-runs the launch chain; **?** shows shortcuts. Multi-select omits the preview pane for speed.
 
 <p align="center">
   <img src="assets/tui-game-picker.png" alt="LaunchLayer game picker with live preview" width="720">
 </p>
 
+### Game actions
+
+Split view: action list on the left, live config preview on the right (same as the game picker). **Ctrl-D** dry-runs from here too. Blank rows separate View / Edit / Manage / Hub groups.
+
 ### Quick toggles
 
-Per-game boolean overrides. Green/red labels mark values set in `GAMES_DIR/<AppID>.env`; dim text marks inherited layers.
+Per-game boolean overrides. Green/red labels mark values set in `GAMES_DIR/<AppID>.env`; dim text marks inherited layers. Footer: `enter flip toggle · ? help · esc back`.
 
 <p align="center">
   <img src="assets/tui-quick-toggles.png" alt="LaunchLayer per-game quick toggles" width="720">
@@ -43,34 +49,51 @@ Per-game boolean overrides. Green/red labels mark values set in `GAMES_DIR/<AppI
 
 ## On launch
 
-Status banner (two lines, then the main menu):
+With fzf, **command output** from menu actions appears in the **right preview pane** on hub menus (no section headers — just the output). Highlight **Status** on the main menu (or open the Status hub) to see a grouped status dashboard in that pane. The footer still shows a one-line summary.
+
+Without fzf, the two-line status banner prints above the numbered menu as before:
 
 ```
-── filter: all │ doctor: 0 issue(s) │ vm.max_map_count: ok
-── backup: off │ maintenance: off │ keep newest 7 after backup │ hub: not configured · fp:minimal
+── filter: all │ doctor: ● │ vm: ●
+── backup: ● │ maint: ◑ │ keep newest 7 after backup │ ○ fp:minimal
 ```
+
+**Glyphs:** ● active · ○ inactive · ◑ installed (timer not enabled) · ⚠ caution · ✕ error · — n/a. Game list CFG/NAT use ●/○; anticheat `-` becomes —.
 
 ---
 
 ## Main menu
 
-Header `LaunchLayer 0.9.0` (version from `LAUNCHLAYER_VERSION`). Optional prefix rows appear first when applicable:
+Header `LaunchLayer 0.9.0` (version from `LAUNCHLAYER_VERSION`). Footer shows live status, e.g. `filter:all · doctor:0 · vm:ok · backup:off · maint:off · hub:not configured · fp:minimal`. Optional prefix rows appear first when applicable:
 
 ```
 LaunchLayer 0.9.0                          ← fzf --header
 ────────────────────────────────────────
 Doctor: 2 issue(s)                         ← only when doctor finds issues
 ▶ Resume: Games                            ← when a previous hub was saved
-Games  ← last visit                        ← suffix on the last main hub visited
+Status                                     ← sidebar shows grouped health/timers/hub
+Games
 Config library
 Backup & restore
 Community hub
 System & tools
-TUI settings
+Settings
 Quit
 ```
 
-With **auto-resume** enabled (`TUI settings → Auto-resume last hub`), the saved hub opens immediately instead of showing this menu.
+With **auto-resume** enabled (`Settings → Interface → [UI]`), the saved hub opens immediately instead of showing this menu.
+
+### Settings › `tui.conf · backup.conf · hub.conf`
+
+Single entry point for all preference files:
+
+- **Interface** — `tui.conf` (games filter, UI behavior, cache threshold, fzf layout)
+- **Backup** — `backup.conf` + systemd timer (same as **Backup & restore → Settings**)
+- **Community hub** — `hub.conf` (same as **Community hub → Hub settings**)
+
+### Status › At-a-glance system health
+
+Sidebar shows grouped rows (Health, Automation, Library, Community). Actions run doctor / runtime / detect checks; output appears in the sidebar.
 
 ---
 
@@ -82,10 +105,11 @@ Exact labels from the TUI.
 
 - Browse & configure game
 - Recent games
-- Change game filter (`all` / `configured` / `unconfigured`)
 - Bulk change INCLUDE preset
 - Init unconfigured games
 - Prune uninstalled configs
+
+Game picker filter lives in **Settings → Interface → [Games]** (footer still shows `filter:…`).
 
 ### Games › *Game* › Actions `(config ok | validation issues | inherits layers)`
 
@@ -96,12 +120,13 @@ Exact labels from the TUI.
 
 ### Game picker (fzf)
 
-Header: `Select a game ([recent] at top, Ctrl-E: editor, Ctrl-D: dry-run, filter=…)`
+Header: `Select a game (filter=…)` · Footer: `↑↓ filter · enter select · ctrl-e editor · ctrl-d dry-run · ? help · esc back`
 
 - `[recent]` rows sort to the top
 - Live preview via `--tui-game-preview`
 - **Ctrl-E** → `--edit-appid`
 - **Ctrl-D** → `--dry-run`
+- **?** → keyboard shortcuts panel
 
 ### Config library › Layers & validation
 
@@ -109,25 +134,64 @@ Header: `Select a game ([recent] at top, Ctrl-E: editor, Ctrl-D: dry-run, filter
 - Anticheat & detections · Edit machine profile · Edit gameplay preset
 - Validate default + presets · Validate all game configs
 
-### Backup & restore › `(prune policy │ maint: …)`
+### Backup & restore › `(prune policy │ backup: ● │ maint: …)`
 
-- Settings & preferences · Backup actions · Export & import · Prune archives · Backup timer
+- Settings · Backup actions · Restore from backup · Export & import · Prune archives
+
+**Settings** (also under **Settings → Backup**) — five compact rows, each opens a detail submenu when needed:
+
+| Row | Opens / shows |
+|-----|----------------|
+| `[Path]` | Backup directory |
+| `[Keep]` | Archive count · auto-prune ●/○ |
+| `[When]` | Schedule preset · jitter seconds |
+| `[Pack]` | local · profiles · tui includes |
+| `[Timer]` | units · scheduling · manual start |
+
+Footer: `[·] Show all` · Reset · Save. Saving auto-refreshes installed systemd units.
 
 ### Community hub › `(url · fp:minimal | not configured · fp:minimal)`
 
-- Hub settings · Fingerprint level: *minimal* · Machine fingerprint · Similar machines
+- Hub settings · Machine fingerprint · Similar machines
 - Recommend configs (pick game) · Publish config · Update shared configs · Delete config by ID · Apply config by ID
 - Publish/update flows support optional **config ID** and **include-new** (same as `--config-id` / `--include-new` on the CLI)
 
 ### System & tools › Diagnostics & setup
 
 - Doctor · Detect environment · Runtime status · CPU topology · vm.max_map_count
-- VRAM hogs & launch cleanup · Cache report (full / shader-only / compat-only / grep / min GB) · Setup / onboarding
+- VRAM hogs & launch cleanup · Cache report · Setup / onboarding (includes **Backup timer settings**)
 
-### TUI settings › `saved to tui.conf`
+### Interface › `tui.conf`
 
-- Game picker filter · JSON view output · Auto-resume last hub · Press-enter line threshold
-- Cache report min GB · Default init preset · fzf height · fzf preview layout · Reset to defaults
+Four compact rows + footer:
+
+- `[Games]` filter · preset — opens filter/preset picker
+- `[UI]` json · resume · pause — JSON/resume toggles + press-enter threshold
+- `[Cache]` min N GB
+- `[fzf]` height · preview layout
+- `[·] Show all` · Reset · Save and return · Back without saving
+
+### Hub settings › `hub.conf`
+
+- `[Hub]` URL · `[Auth]` token ●/○ · `[You]` machine label · `[Privacy]` fingerprint level
+- `[·] Open hub.conf in $EDITOR` · Show all · Reset · Save
+
+---
+
+## Keyboard shortcuts
+
+| Context | Keys / footer |
+|---------|----------------|
+| All fzf menus | Type to filter · ↑↓ navigate · Enter select · Esc back · **?** help |
+| Main menu | Live status footer; **Ctrl-D** doctor when issues are reported |
+| Games hub | Footer adds `filter:… · N games` |
+| Game actions | Preview pane · **Ctrl-D** dry-run · grouped rows (View / Edit / Manage / Hub) |
+| Game picker | **Ctrl-E** editor · **Ctrl-D** dry-run · preview pane |
+| Quick toggles | `enter flip toggle` footer |
+| Multi-select | Tab toggle · no preview pane |
+| Backup / hub hubs | Footer shows prune policy or hub status |
+
+Without fzf, numbered menus still work; preview, multi-select, footer hints, and **?** help require fzf.
 
 ---
 
@@ -135,7 +199,7 @@ Header: `Select a game ([recent] at top, Ctrl-E: editor, Ctrl-D: dry-run, filter
 
 - Breadcrumb headers use ` › ` (e.g. `Games › Overwatch 2 › Quick toggles`)
 - Quick toggles show inherited vs per-game override coloring when the terminal supports it
-- JSON view mode (`TUI settings`) makes view commands emit `--json` output, pretty-printed when `jq`/`python3` is available
+- JSON view mode (`Settings → Interface → [UI]`) makes view commands emit `--json` output, pretty-printed when `jq`/`python3` is available
 - Long output only pauses at “Press Enter to continue…” when it spans `press_enter_lines` (default 8)
 
 ---
@@ -150,4 +214,4 @@ Files in `~/.config/launchlayer/`:
 | `backup.conf` | `share/launchlayer/templates/backup.conf.example` |
 | `hub.conf` | `share/launchlayer/templates/hub.conf.example` |
 
-Reset via `--tui-prefs reset`, `--backup-prefs reset`, `--hub-prefs reset`, or **TUI settings** / **Backup & restore → Settings & preferences** / **Community hub → Hub settings**.
+Reset via `--tui-prefs reset`, `--backup-prefs reset`, `--hub-prefs reset`, or **Settings** (Interface / Backup / Hub panes) and the matching hub shortcuts.

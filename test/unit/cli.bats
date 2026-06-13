@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unit tests for lib/cli.sh helpers.
+# Unit tests for lib/cli/ and lib/cli.sh helpers.
 load '../helpers.bash'
 
 setup() {
@@ -77,22 +77,36 @@ setup() {
 		export CONFIG_DIR="'"$CONFIG_DIR"'"
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib cli
-		cli_is_known_subcommand --doctor && cli_is_known_subcommand --not-real
+		cli_is_known_subcommand --doctor && echo doctor || echo unknown
 	'
-	[[ $status -eq 1 ]]
-}
+	[[ $status -eq 0 ]]
+	[[ "$output" == doctor ]]
 
-@test "cli_parse_global_flags strips quiet and verbose" {
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib cli
-		cli_parse_global_flags --quiet --verbose --doctor > /tmp/ll-flags-$$.txt
-		[[ "${LAUNCH_QUIET:-0}" == "1" && "${LAUNCH_VERBOSE:-0}" == "1" ]]
-		grep -qx -- "--doctor" /tmp/ll-flags-$$.txt
-		rm -f /tmp/ll-flags-$$.txt
+		cli_is_known_subcommand --not-real && echo known || echo unknown
 	'
 	[[ $status -eq 0 ]]
+	[[ "$output" == unknown ]]
+}
+
+@test "cli_parse_global_flags strips quiet and verbose" {
+	local tmp
+	tmp="$(mktemp)"
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib cli
+		cli_parse_global_flags --quiet --verbose --doctor > "'"$tmp"'"
+		echo "quiet:${LAUNCH_QUIET:-0} verbose:${LAUNCH_VERBOSE:-0}"
+		cat "'"$tmp"'"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"quiet:1 verbose:1"* ]]
+	[[ "$output" == *"--doctor"* ]]
+	rm -f "$tmp"
 }
 
 @test "json_object_pair prints comma-prefixed fields" {
