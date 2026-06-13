@@ -55,7 +55,7 @@ tui_crumb_label() {
 # tui_remember_main_menu — Persist last top-level hub for resume hint on next launch.
 tui_remember_main_menu() {
 	TUI_LAST_MENU=$1
-	tui_save_config 1
+	tui_save_config_quiet
 }
 
 # tui_run_paged — Run a command and only pause when output spans multiple lines.

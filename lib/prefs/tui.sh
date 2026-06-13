@@ -47,9 +47,9 @@ tui_load_config() {
 	return 0
 }
 
-# tui_save_config — Persist TUI preferences.
-tui_save_config() {
-	local file dir example quiet=${1:-0}
+# _tui_write_config_file — Write tui.conf; quiet=1 skips the confirmation line.
+_tui_write_config_file() {
+	local quiet=$1 file dir example
 	_tui_prefs_set_defaults
 	file="$(tui_config_path)"
 	dir="$(dirname "$file")"
@@ -73,6 +73,16 @@ EOF
 	if (( ! quiet )); then
 		echo "Saved TUI settings to $file"
 	fi
+}
+
+# tui_save_config — Persist TUI preferences.
+tui_save_config() {
+	_tui_write_config_file 0
+}
+
+# tui_save_config_quiet — Persist TUI preferences without printing confirmation.
+tui_save_config_quiet() {
+	_tui_write_config_file 1
 }
 
 # reset_tui_prefs — Restore tui.conf from the repo example template.

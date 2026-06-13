@@ -302,10 +302,10 @@ parse_kscreen_doctor_outputs() {
 	'
 }
 
-# detect_kwin_display_mode — Width, height, refresh via kscreen-doctor (primary unless output given).
+# detect_kwin_display_mode — Width, height, refresh via kscreen-doctor (primary/active output).
 detect_kwin_display_mode() {
-	local want=${1:-} name w h rate
-	[[ -n "$want" ]] || want="$(detect_kwin_primary_output 2>/dev/null || true)"
+	local want="" name w h rate
+	want="$(detect_kwin_primary_output 2>/dev/null || true)"
 	[[ -n "$want" ]] || want="$(detect_kwin_active_output 2>/dev/null || true)"
 	if [[ -n "$want" ]]; then
 		read -r w h rate name < <(parse_kscreen_doctor_outputs 2>/dev/null | awk -v want="$want" '

@@ -186,11 +186,11 @@ detect_display_refresh() {
 	echo "$rate"
 }
 
-# detect_wlr_vrr_enabled — True when wlr-randr reports adaptive sync on an output.
+# detect_wlr_vrr_enabled — True when wlr-randr reports adaptive sync on the active output.
 detect_wlr_vrr_enabled() {
-	local output=${1:-} result=""
+	local output="" result=""
 	command -v wlr-randr >/dev/null 2>&1 || return 1
-	[[ -n "$output" ]] || output="$(detect_active_output 2>/dev/null || true)"
+	output="$(detect_active_output 2>/dev/null || true)"
 	[[ -n "$output" ]] || return 1
 	result="$(wlr-randr 2>/dev/null | awk -v out="$output" '
 		$1 == out { block=1; next }
