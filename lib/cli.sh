@@ -6,7 +6,7 @@
 LAUNCHLAYER_CLI_LOADED=1
 
 # Bump when user-visible CLI behavior or subcommands change materially.
-LAUNCHLAYER_VERSION=0.8.0
+LAUNCHLAYER_VERSION=0.9.0
 
 # All utility subcommands (for completion parity and typo suggestions).
 LAUNCHLAYER_SUBCOMMANDS=(
@@ -15,6 +15,8 @@ LAUNCHLAYER_SUBCOMMANDS=(
 	--doctor
 	--setup
 	--detect-environment
+	--detect-defaults
+	--write-local-config
 	--completions
 	--install-systemd
 	--sysctl
@@ -23,6 +25,16 @@ LAUNCHLAYER_SUBCOMMANDS=(
 	--list-games
 	--init-appid
 	--init-unconfigured
+	--prune-uninstalled
+	--export-config
+	--backup-config
+	--import-config
+	--prune-backups
+	--run-scheduled-backup
+	--backup-timer
+	--backup-prefs
+	--tui-prefs
+	--tui-game-preview
 	--show-config
 	--edit-appid
 	--paths
@@ -63,6 +75,61 @@ cli_dim() {
 	else
 		printf '%s' "$*"
 	fi
+}
+
+# cli_green / cli_yellow / cli_red / cli_cyan — Semantic ANSI colors for status output.
+cli_green() {
+	if cli_uses_color; then
+		printf '\033[32m%s\033[0m' "$*"
+	else
+		printf '%s' "$*"
+	fi
+}
+
+cli_yellow() {
+	if cli_uses_color; then
+		printf '\033[33m%s\033[0m' "$*"
+	else
+		printf '%s' "$*"
+	fi
+}
+
+cli_red() {
+	if cli_uses_color; then
+		printf '\033[31m%s\033[0m' "$*"
+	else
+		printf '%s' "$*"
+	fi
+}
+
+cli_cyan() {
+	if cli_uses_color; then
+		printf '\033[36m%s\033[0m' "$*"
+	else
+		printf '%s' "$*"
+	fi
+}
+
+# cli_yesno — Colorized yes/no (and common variants).
+cli_yesno() {
+	case "${1,,}" in
+		yes|true|1|ok|enabled|on|running)
+			cli_green "$1"
+			;;
+		no|false|0|off|disabled|dead|missing|unknown|unset)
+			cli_yellow "$1"
+			;;
+		needs_override|*)
+			cli_red "$1"
+			;;
+	esac
+}
+
+# cli_section — Bold section heading with trailing blank line.
+cli_section() {
+	printf '\n'
+	cli_bold "$1"
+	printf '\n'
 }
 
 # print_version — Version and install paths.
@@ -111,17 +178,38 @@ $(cli_bold "Steam launch options")
 
 $(cli_bold "Onboarding & health")
   --doctor [--json]                 Full environment + config health check
-  --setup [--completions] [--systemd] [--symlink] [--print-launch-option]
+  --setup [--completions] [--systemd] [--backup-timer] [--symlink] [--print-launch-option]
+          [--write-local-config]
   --detect-environment [--json]   Auto-detected platform, GPU, display, tools
-  --completions [status|enable|disable|print] [--shell bash|zsh|fish|all] [--json]
+  --detect-defaults [--json]      Recommended machine-local env settings
+  --write-local-config [--force] [--dry-run]
+                                    Write launch.d/local.env from detection
+  --completions [status|enable|disable|print] [--shell bash|zsh|fish|nu|pwsh|osh|all] [--json]
   --install-systemd                 Install user maintenance timer
+  --backup-timer [install|enable|disable|status|reinstall] [--dir PATH] [--keep N] [--schedule ON_CALENDAR]
+                                    Install/manage backup timer (prefs: ~/.config/launchlayer/backup.conf)
+  --backup-prefs [show|reset|set|set-schedule] [args...] [--json] [--reinstall-timer]
+                                    Manage backup preferences (keep, auto_prune, schedule, includes)
   --sysctl [status|install]         vm.max_map_count helper (install needs root)
 
 $(cli_bold "Games & config")
   --list-games [--configured] [--json] [--grep NAME]
-  --init-appid APPID|NAME [preset] [--force]  Create launch.d/<AppID>.env
+  --init-appid APPID|NAME [preset] [--force]  Create games/<AppID>.env
   --paths APPID|NAME [--json]         Shader cache, compatdata, install paths
   --init-unconfigured [--preset P] [--eac-only] [--dry-run]
+  --prune-uninstalled [--dry-run] [--yes] [--json]
+                                    Remove per-game .env for uninstalled games
+  --export-config [--output PATH] [--include-local] [--no-profiles] [--include-tui] [--json]
+                                    Pack launch.d + games configs into a tarball
+  --backup-config [--output DIR|PATH] [--exclude-local] [--no-profiles] [--include-tui] [--json]
+                                    Timestamped export (default: ~/launchlayer-backup-*.tar.gz)
+  --import-config ARCHIVE [--dry-run] [--yes] [--merge|--replace] [--exclude-local]
+                          [--no-profiles] [--include-tui] [--json]
+                                    Restore configs from export/backup tarball
+  --prune-backups [--dir PATH] [--keep N] [--dry-run] [--json]
+                                    Remove oldest launchlayer-backup-*.tar.gz archives (keep=0: unlimited)
+  --run-scheduled-backup [--dir PATH] [--keep N] [--json]
+                                    Backup configs then prune per backup.conf (auto_prune, keep)
   --show-config APPID|NAME [--json]   Resolved config layers + launch chain
   --edit-appid APPID|NAME             Open/create per-game config in \$EDITOR
   --validate-config [APPID|all] [--json]  Lint .env files
@@ -138,20 +226,24 @@ $(cli_bold "Runtime & diagnostics")
 
 $(cli_bold "Interactive")
   --tui                             Browse games, toggle settings, edit configs (fzf recommended)
-                                    Preferences: ~/.config/launchlayer/tui.conf
+  --tui-prefs [show|reset|set] [args...] [--json]
+                                    Manage TUI preferences (template: share/launchlayer/templates/tui.conf.example)
+                                    User file: ~/.config/launchlayer/tui.conf
 
 $(cli_bold "General")
   --help, -h                        Show this help
   --version, -V                     Show version and paths
 
 $(cli_bold "Config layers") $(cli_dim "(later overrides earlier)")
+  launch.d/local.env                Optional machine-local file (--write-local-config)
   launch.d/profiles/<profile>.env   LAUNCHLAYER_PROFILES or auto-detected
   launch.d/default.env              Global infrastructure defaults
   launch.d/presets/*.env            Via INCLUDE= or auto-selected preset
-  launch.d/<AppID>.env              Per-game overrides
+  games/<AppID>.env                 Per-game overrides (LAUNCHLAYER_GAMES_DIR)
 
 $(cli_bold "Environment")
   LAUNCHLAYER_CONFIG_DIR           Override config root (launch.d parent)
+  LAUNCHLAYER_GAMES_DIR            Per-game .env directory (default: ~/.local/share/launchlayer/games)
   LAUNCHLAYER_PROFILES           Comma-separated machine profiles
   NO_COLOR=1                        Disable ANSI colors in help output
   LAUNCHLAYER_QUIET=1              Same as --quiet (also suppresses launch warnings)

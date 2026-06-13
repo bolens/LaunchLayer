@@ -18,7 +18,19 @@ LAUNCHLAYER_COMMON_LOADED=1
 
 LAUNCHD_DIR="$CONFIG_DIR/launch.d"
 PROFILES_DIR="$LAUNCHD_DIR/profiles"
-# STEAM_ROOT resolved in lib/platform.sh unless already exported and valid.
+GAMES_DIR="${LAUNCHLAYER_GAMES_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/launchlayer/games}"
+
+# launchlayer_share_dir — Shipped templates, completions, systemd units, sysctl drop-ins.
+launchlayer_share_dir() {
+	printf '%s/share/launchlayer' "$CONFIG_DIR"
+}
+
+# sysctl_dropin_source — Repo path to elasticsearch.conf sysctl drop-in.
+sysctl_dropin_source() {
+	printf '%s/sysctl/elasticsearch.conf' "$(launchlayer_share_dir)"
+}
+
+# STEAM_ROOT resolved in lib/platform/profiles.sh unless already exported and valid.
 : "${STEAM_ROOT:=}"
 
 # migrate_legacy_install_paths — Move pre-rename config/state dirs on first run.

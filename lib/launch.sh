@@ -2,7 +2,7 @@
 # shellcheck source=common.sh
 # shellcheck source=config.sh
 # shellcheck source=steam.sh
-# shellcheck source=hardware.sh
+# shellcheck source=hardware/cpu.sh
 # shellcheck source=preflight.sh
 # shellcheck source=runtime.sh
 # shellcheck source=vram.sh
@@ -18,6 +18,7 @@ prepare_launch_context() {
 	steam_app_id="$appid"
 	load_launch_config
 	apply_defaults
+	apply_detected_defaults
 	resolve_game_flags
 	apply_auto_hardware_defaults
 	parse_game_extra_args
@@ -44,6 +45,7 @@ run_game_launch() {
 	detect_steam_app_id "$@"
 	load_launch_config
 	apply_defaults
+	apply_detected_defaults
 	resolve_game_flags
 	apply_auto_hardware_defaults
 	parse_game_extra_args

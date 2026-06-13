@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # One-time workstation tuning: irqbalance, btrfs autodefrag, X3D IRQ affinity.
-# Run: sudo /path/to/setup-workstation-tuning.sh
+# Run: sudo scripts/setup-workstation-tuning.sh
 set -euo pipefail
 
-CONFIG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 TARGET_USER="${SUDO_USER:-${USER:-root}}"
 TARGET_HOME="$(getent passwd "$TARGET_USER" 2>/dev/null | cut -d: -f6 || echo "$HOME")"
 IRQ_AFFINITY_CANDIDATES=(
@@ -27,6 +28,14 @@ install_irqbalance() {
 		apt-get update && apt-get install -y irqbalance
 	elif command -v dnf >/dev/null 2>&1; then
 		dnf install -y irqbalance
+	elif command -v zypper >/dev/null 2>&1; then
+		zypper --non-interactive install irqbalance
+	elif command -v apk >/dev/null 2>&1; then
+		apk add irqbalance
+	elif command -v emerge >/dev/null 2>&1; then
+		emerge --ask=n sysutils/irqbalance
+	elif command -v xbps-install >/dev/null 2>&1; then
+		xbps-install -Sy irqbalance
 	else
 		echo "Install irqbalance manually (unsupported package manager)" >&2
 		exit 1
@@ -64,10 +73,10 @@ for mount in / /home; do
 done
 
 IRQ_AFFINITY_SRC="$(resolve_irq_affinity_src || true)"
-if [[ -n "$IRQ_AFFINITY_SRC" && -f "$CONFIG_DIR/systemd/irq-affinity-x3d.service" ]]; then
+if [[ -n "$IRQ_AFFINITY_SRC" && -f "$(launchlayer_share_dir)/systemd/irq-affinity-x3d.service" ]]; then
 	echo "==> Installing X3D IRQ affinity helper + systemd service"
 	install -Dm755 "$IRQ_AFFINITY_SRC" /usr/local/bin/irq-affinity-x3d
-	install -Dm644 "$CONFIG_DIR/systemd/irq-affinity-x3d.service" /etc/systemd/system/irq-affinity-x3d.service
+	install -Dm644 "$(launchlayer_share_dir)/systemd/irq-affinity-x3d.service" /etc/systemd/system/irq-affinity-x3d.service
 	systemctl daemon-reload
 	systemctl enable --now irq-affinity-x3d.service
 else
@@ -79,4 +88,5 @@ echo "Done."
 echo "  irqbalance:     systemctl status irqbalance"
 echo "  IRQ affinity:   systemctl status irq-affinity-x3d"
 echo "  autodefrag:     btrfs property get /home autodefrag"
+echo "  vm.max_map_count: launchlayer --sysctl status"
 echo "  nvidia gaming:  enabled via NVIDIA_POWER_MODE=1 in competitive preset"

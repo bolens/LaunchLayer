@@ -14,13 +14,24 @@ _launchlayer() {
 		'--status:show runtime and cache state'
 		'--show-cpu-topology:show X3D CPU topology hints'
 		'--detect-environment:show auto-detected platform state'
+		'--detect-defaults:show recommended machine-local env settings'
+		'--write-local-config:write launch.d/local.env from detection'
 		'--doctor:full environment and config health check'
 		'--tui:interactive game and config browser'
 		'--setup:onboarding helper (completions, launch option)'
 		'--completions:manage shell tab completions'
 		'--list-games:list installed Steam games'
-		'--init-appid:scaffold launch.d/<AppID>.env'
+		'--init-appid:scaffold games/<AppID>.env'
 		'--init-unconfigured:scaffold configs for unconfigured games'
+		'--prune-uninstalled:remove configs for uninstalled games'
+		'--export-config:pack launch.d configs into a tarball'
+		'--backup-config:timestamped config backup'
+		'--import-config:restore configs from tarball'
+		'--prune-backups:remove oldest backup archives'
+		'--run-scheduled-backup:backup then prune (timer hook)'
+		'--backup-timer:install/manage backup timer'
+		'--backup-prefs:manage backup preferences'
+		'--tui-prefs:manage TUI preferences'
 		'--paths:shader cache, compatdata, and install paths'
 		'--show-config:show resolved config for an AppID'
 		'--edit-appid:open per-game config in $EDITOR'
@@ -77,6 +88,66 @@ _launchlayer() {
 						'(--dry-run)*--dry-run[print actions without writing files]' \
 						'(--eac-only)*--eac-only[only anticheat titles]'
 					;;
+				--prune-uninstalled)
+					_arguments \
+						'(--dry-run)*--dry-run[print actions without deleting files]' \
+						'(--yes)*--yes[delete orphan configs without prompting]' \
+						'(--json)*--json[JSON output]'
+					;;
+				--export-config)
+					_arguments \
+						'(--output)*--output[output archive path]:path:' \
+						'(--include-local)*--include-local[include launch.d/local.env]' \
+						'(--no-profiles)*--no-profiles[exclude launch.d/profiles]' \
+						'(--include-tui)*--include-tui[include TUI preferences]' \
+						'(--json)*--json[JSON output]'
+					;;
+				--backup-config)
+					_arguments \
+						'(--output)*--output[output directory or archive path]:path:' \
+						'(--exclude-local)*--exclude-local[exclude launch.d/local.env]' \
+						'(--no-profiles)*--no-profiles[exclude launch.d/profiles]' \
+						'(--include-tui)*--include-tui[include TUI preferences]' \
+						'(--json)*--json[JSON output]'
+					;;
+				--import-config)
+					_arguments \
+						'1:archive:_files -g "*.(tar.gz|tgz|tar)"' \
+						'(--dry-run)*--dry-run[preview import without writing files]' \
+						'(--yes)*--yes[apply import]' \
+						'(--merge)*--merge[skip existing files]' \
+						'(--replace)*--replace[overwrite existing files]' \
+						'(--exclude-local)*--exclude-local[skip launch.d/local.env]' \
+						'(--no-profiles)*--no-profiles[skip launch.d/profiles]' \
+						'(--include-tui)*--include-tui[import TUI preferences]' \
+						'(--json)*--json[JSON output]'
+					;;
+				--prune-backups)
+					_arguments \
+						'(--dir)*--dir[backup directory]:path:_directories' \
+						'(--keep)*--keep[keep newest N archives]:count:' \
+						'(--dry-run)*--dry-run[preview without deleting]' \
+						'(--json)*--json[JSON output]'
+					;;
+				--backup-timer)
+					_arguments \
+						'1:action:(install enable disable status reinstall)' \
+						'(--dir)*--dir[backup directory]:path:_directories' \
+						'(--keep)*--keep[keep newest N archives]:count:' \
+						'(--schedule)*--schedule[systemd OnCalendar expression]:calendar:' \
+						'(--no-enable)*--no-enable[install without enabling timer]'
+					;;
+				--backup-prefs)
+					_arguments \
+						'1:action:(show reset set set-schedule)' \
+						'(--json)*--json[JSON output]' \
+						'(--reinstall-timer)*--reinstall-timer[reinstall systemd timer after reset]'
+					;;
+				--tui-prefs)
+					_arguments \
+						'1:action:(show reset set)' \
+						'(--json)*--json[JSON output]'
+					;;
 				--list-games)
 					_arguments \
 						'(--configured)*--configured[only configured games]' \
@@ -95,7 +166,7 @@ _launchlayer() {
 				--completions)
 					_arguments \
 						'1:action:(status enable disable print)' \
-						'(--shell)*--shell[shell to configure]:shell:(bash zsh fish all)'
+						'(--shell)*--shell[shell to configure]:shell:(bash zsh fish nu pwsh osh all)'
 					;;
 			esac
 			;;

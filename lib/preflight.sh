@@ -84,7 +84,7 @@ check_oversized_cache_dirs() {
 			rm -rf "$dir" && mkdir -p "$dir"
 			warn "trimmed shader cache: $dir"
 		elif [[ "$kind" == "shader" ]]; then
-			warn "set SHADER_CACHE_TRIM=1 in launch.d/${steam_app_id}.env to auto-trim"
+			warn "set SHADER_CACHE_TRIM=1 in games/${steam_app_id}.env to auto-trim"
 		elif [[ "$kind" == compat && "$trim_enabled" == "1" ]]; then
 			warn "COMPATDATA_TRIM=1 set but trim is disabled for safety — remove prefix manually if needed"
 		fi
@@ -92,6 +92,7 @@ check_oversized_cache_dirs() {
 }
 
 check_vm_max_map_count() {
+	is_linux || return 0
 	local required="${VM_MAX_MAP_COUNT_MIN:-$LAUNCHLAYER_VM_MAX_MAP_COUNT_DEFAULT}"
 	local current=0
 	current="$(sysctl -n vm.max_map_count 2>/dev/null || echo 0)"
@@ -106,7 +107,8 @@ check_vm_max_map_count() {
 		fi
 	fi
 	warn "vm.max_map_count=$current (recommend >= $required for Proton stability)"
-	warn "fix: sudo cp $CONFIG_DIR/elasticsearch.conf /etc/sysctl.d/ && sudo sysctl --system"
+	warn "fix: sudo cp $(sysctl_dropin_source) /etc/sysctl.d/ && sudo sysctl --system"
+	warn "     or: sudo $LAUNCHLAYER_MAIN_SCRIPT --sysctl install"
 }
 
 # collect_app_cache_dirs — Populate shader_cache_dirs or compatdata_dirs for an AppID.
@@ -253,7 +255,7 @@ check_gpu_power() {
 	local pstate=""
 	[[ "${GPU_POWER_CHECK:-0}" == "1" ]] || return 0
 	[[ "$(detect_gpu_vendor)" == nvidia ]] || return 0
-	command -v nvidia-smi >/dev/null 2>&1 || return 0
+	optional_tool_installed nvidia-smi || return 0
 	pstate="$(nvidia-smi --query-gpu=pstate --format=csv,noheader 2>/dev/null | head -1 | tr -d ' ')"
 	[[ -n "$pstate" ]] || return 0
 	if [[ "$pstate" != "P0" ]]; then

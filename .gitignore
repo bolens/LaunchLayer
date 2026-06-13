@@ -1,3 +1,6 @@
+# LaunchLayer — ignore user/local/generated data.
+# Shipped in git: launch.d/ (layers + lists), share/launchlayer/, examples/, lib/, test/
+
 # OS junk
 .DS_Store
 .DS_Store?
@@ -19,12 +22,12 @@ Desktop.ini
 .project
 .settings/
 
-# Local env overrides (never commit secrets)
+# Secrets at repo root (not launch.d/*.env shipped layers)
 .env
 .env.*
 !.env.example
 
-# Runtime / launch state (normally under XDG_STATE_HOME)
+# Runtime / launch state (live data: ~/.local/state/launchlayer/)
 *.log
 .state/
 launchlayer-state/
@@ -35,9 +38,29 @@ launchlayer-state/
 *.orig
 .launchlayer.tmp
 
-# User-specific per-game configs (reference example kept below)
+# launch.d — shipped layers only (default, presets/, profiles/, *.txt)
+# Per-game configs belong in GAMES_DIR, not here.
+launch.d/local.env
 launch.d/[0-9]*.env
-!launch.d/2357570.env
+
+# GAMES_DIR — per-game configs (default: ~/.local/share/launchlayer/games)
+# Ignore when LAUNCHLAYER_GAMES_DIR points inside the repo.
+/games/
+
+# examples/games — tracked reference configs only
+examples/games/*.env
+!examples/games/2357570.env
+
+# Pre share/ layout (do not re-add moved assets under old paths)
+/config/
+/systemd/
+/completions/
+
+# Config export / backup archives (also written to ~/launchlayer-backups by default)
+launchlayer-backup-*.tar.gz
+launchlayer-export-*.tar.gz
+*.tar.gz
+*.zip
 
 # Deprecated entry points from pre-rename installs
 steam-game-launch-settings.sh
@@ -49,5 +72,3 @@ test-results/
 
 # Packaging / install scratch
 dist/
-*.tar.gz
-*.zip

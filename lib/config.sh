@@ -7,8 +7,10 @@
 # Config resolution order:
 #   0. launch.d/profiles/*.env (LAUNCHLAYER_PROFILES or auto-detected, layered)
 #   1. launch.d/default.env
-#   2. launch.d/presets/*.env (via INCLUDE= or auto-selected standard/native)
-#   3. launch.d/<AppID>.env (overrides everything above)
+#   2. launch.d/local.env (optional machine-local file from --write-local-config)
+#   3. launch.d/presets/*.env (via INCLUDE= or auto-selected standard/native)
+#   4. games/<AppID>.env (overrides everything above)
+# Runtime: apply_detected_defaults() fills unset keys after apply_defaults().
 
 [[ -n "${LAUNCHLAYER_CONFIG_LOADED:-}" ]] && return 0
 LAUNCHLAYER_CONFIG_LOADED=1
@@ -91,11 +93,30 @@ appid_in_list_file() {
 	return 1
 }
 
+# Per-game configs live in GAMES_DIR (default: ~/.local/share/launchlayer/games).
+
+# appid_env_write_path — Path for per-game configs.
+appid_env_write_path() {
+	printf '%s/%s.env' "$GAMES_DIR" "$1"
+}
+
+# resolve_appid_env_path — Per-game config path (existing or default write target).
+resolve_appid_env_path() {
+	appid_env_write_path "$1"
+}
+
+# appid_env_exists — True when a per-game config exists in GAMES_DIR.
+appid_env_exists() {
+	[[ -f "$(appid_env_write_path "$1")" ]]
+}
+
 # config_file_relative — Strip LAUNCHD_DIR prefix for display.
 config_file_relative() {
 	local file=$1
 	if [[ "$file" == "$LAUNCHD_DIR/"* ]]; then
 		echo "${file#"$LAUNCHD_DIR/"}"
+	elif [[ "$file" == "$GAMES_DIR/"* ]]; then
+		echo "games/$(basename "$file")"
 	else
 		basename "$file"
 	fi
@@ -178,14 +199,19 @@ load_launch_config() {
 	config_layers=()
 	load_profile_config
 	load_config_file "$LAUNCHD_DIR/default.env" 0
+	if [[ -f "$LAUNCHD_DIR/local.env" ]]; then
+		load_config_file "$LAUNCHD_DIR/local.env" 1
+	fi
 
 	if [[ -z "$steam_app_id" ]]; then
 		return 0
 	fi
 
-	if [[ -f "$LAUNCHD_DIR/${steam_app_id}.env" ]]; then
+	local appid_env
+	appid_env="$(resolve_appid_env_path "$steam_app_id")"
+	if [[ -f "$appid_env" ]]; then
 		# Per-game file overrides preset selection entirely.
-		load_config_file "$LAUNCHD_DIR/${steam_app_id}.env" 1
+		load_config_file "$appid_env" 1
 	elif detect_native_game "$steam_app_id"; then
 		debug "auto-selected preset: native"
 		load_config_file "$LAUNCHD_DIR/presets/native.env" 0
@@ -249,10 +275,69 @@ apply_defaults() {
 	: "${GAME_PERFORMANCE:=1}"
 }
 
-# write_appid_env_scaffold — Create launch.d/<AppID>.env from a preset name.
+# config_file_display_name — Parse game name from scaffold header, or fall back to AppID.
+config_file_display_name() {
+	local file=$1 appid=$2 line=""
+	[[ -f "$file" ]] || {
+		echo "AppID $appid"
+		return 0
+	}
+	line="$(head -n1 "$file" 2>/dev/null || true)"
+	if [[ "$line" =~ ^#[[:space:]]*(.+)[[:space:]]+\(Steam[[:space:]]AppID[[:space:]]+[0-9]+ ]]; then
+		echo "${BASH_REMATCH[1]}"
+	else
+		echo "AppID $appid"
+	fi
+}
+
+# collect_managed_config_files — Relative paths under CONFIG_DIR for export/import bundles.
+collect_managed_config_files() {
+	local include_local=${1:-0} include_profiles=${2:-1}
+	local -n _files=$3
+	local file base
+
+	_files=()
+	[[ -f "$LAUNCHD_DIR/default.env" ]] && _files+=("launch.d/default.env")
+	if [[ "$include_local" == "1" && -f "$LAUNCHD_DIR/local.env" ]]; then
+		_files+=("launch.d/local.env")
+	fi
+	if [[ "$include_profiles" == "1" ]]; then
+		for file in "$LAUNCHD_DIR"/profiles/*.env; do
+			[[ -f "$file" ]] || continue
+			_files+=("launch.d/profiles/$(basename "$file")")
+		done
+	fi
+	for file in "$LAUNCHD_DIR"/presets/*.env; do
+		[[ -f "$file" ]] || continue
+		_files+=("launch.d/presets/$(basename "$file")")
+	done
+	for file in "$GAMES_DIR"/[0-9]*.env; do
+		[[ -f "$file" ]] || continue
+		_files+=("games/$(basename "$file")")
+	done
+	for base in anticheat-appids.txt native-appids.txt; do
+		[[ -f "$LAUNCHD_DIR/$base" ]] && _files+=("launch.d/$base")
+	done
+}
+
+# config_file_abs_from_rel — Map manifest-relative path to absolute file path.
+config_file_abs_from_rel() {
+	local rel=$1
+	case "$rel" in
+		games/*)
+			printf '%s/%s\n' "$GAMES_DIR" "$(basename "$rel")"
+			;;
+		*)
+			printf '%s/%s\n' "$CONFIG_DIR" "$rel"
+			;;
+	esac
+}
+
+# write_appid_env_scaffold — Create per-game config from a preset name.
 write_appid_env_scaffold() {
 	local appid=$1 name=$2 preset=$3 path=${4:-}
-	[[ -n "$path" ]] || path="$LAUNCHD_DIR/${appid}.env"
+	[[ -n "$path" ]] || path="$(appid_env_write_path "$appid")"
+	mkdir -p "$(dirname "$path")"
 	cat > "$path" <<EOF
 # $name (Steam AppID $appid)
 INCLUDE=presets/${preset}.env

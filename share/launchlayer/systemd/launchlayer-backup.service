@@ -1,0 +1,14 @@
+# Template — install a user unit with your script path via:
+#   launchlayer --backup-timer install
+#
+# Installed copy lives at:
+#   ~/.config/systemd/user/launchlayer-backup.service
+#   ~/.config/systemd/user/launchlayer-backup.timer
+
+[Unit]
+Description=LaunchLayer config backup and archive pruning
+
+[Service]
+Type=oneshot
+# ExecStart is rewritten by --backup-timer install to use the resolved script path.
+ExecStart=/bin/bash -c 'echo "Run launchlayer --backup-timer install to generate this unit"'

@@ -97,7 +97,7 @@ pause_vram_hogs() {
 		return 0
 	fi
 
-	warn "VRAM_HOGS=1 but systemd user session unavailable and VRAM_HOG_PIDS unset"
+	debug "VRAM_HOGS=1 but systemd user session is unavailable and VRAM_HOG_PIDS is unset — hogs not paused"
 }
 
 # resume_vram_hogs — Decrement refcount and restart paused units when it hits zero.

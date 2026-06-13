@@ -1,0 +1,25 @@
+# LaunchLayer TUI preferences
+# Installed copy: ~/.config/launchlayer/tui.conf
+# Reset: launchlayer --tui-prefs reset  |  TUI → TUI settings → Reset to defaults
+# CLI:   launchlayer --tui-prefs set KEY VALUE
+#
+# Keys:
+#   game_filter         Game picker filter: all | configured | unconfigured
+#   cache_min_gb        Cache report minimum size threshold (GB)
+#   default_preset      Default preset for init-unconfigured scaffolding
+#   last_menu           Last main-menu hub visited (auto-saved; resume hint on launch)
+#   json_output         1 = view commands use JSON (pretty-printed when possible)
+#   resume_last_menu    1 = auto-open last_menu hub when TUI starts
+#   press_enter_lines   Minimum output lines before "Press Enter" pause
+#   fzf_height          fzf height (e.g. 40%)
+#   fzf_preview         fzf preview window layout (e.g. right:50%:wrap)
+
+game_filter=all
+cache_min_gb=5
+default_preset=standard
+last_menu=
+json_output=0
+resume_last_menu=0
+press_enter_lines=8
+fzf_height=40%
+fzf_preview=right:50%:wrap

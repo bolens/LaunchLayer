@@ -8,7 +8,7 @@
 #   launch.d/profiles/<profile>.env (LAUNCHLAYER_PROFILE or auto-detected)
 #   launch.d/default.env
 #   launch.d/presets/*.env (via INCLUDE= or auto-selected standard/native)
-#   launch.d/<AppID>.env
+#   games/<AppID>.env (GAMES_DIR / LAUNCHLAYER_GAMES_DIR)
 #
 # Utility subcommands:
 #   --list-games [--configured] [--json] [--grep NAME]
@@ -40,7 +40,7 @@
 # Machine profiles (layered, before default.env):
 #   LAUNCHLAYER_PROFILES=steam-deck,flatpak-steam   or legacy LAUNCHLAYER_PROFILE=
 #
-# Per-game .env keys (see launch.d/presets/ and 2357570.env for examples):
+# Per-game .env keys (see launch.d/presets/ and examples/games/2357570.env):
 #   INCLUDE=presets/competitive.env
 #   LAUNCH_WRAPPERS="dlss-swapper"   LAUNCH_WRAPPERS_BEFORE=""
 #   GAME_EXTRA_ARGS="-flag1 -flag2"  UNSET_VARS="DXVK_ASYNC"
@@ -51,23 +51,36 @@
 #   SHADER_CACHE_* COMPATDATA_* PROTON_* DXVK_* VKD3D_* __GL_*
 #
 # Module layout (lib/):
-#   common.sh    — paths, globals, logging
-#   keys.sh      — config key registry (reset, summary, validation)
-#   platform.sh  — Steam root, GPU, desktop detection; portable helpers
-#   config.sh    — layered .env loading
-#   vdf.sh       — libraryfolders.vdf parsing
-#   steam.sh     — library discovery, native/EAC detection
-#   hardware.sh  — X3D CPU + display auto-detection
-#   preflight.sh — sysctl, shader cache, compatdata, VRAM/GPU/disk checks
-#   runtime.sh   — env tuning and launch-chain assembly
-#   vram.sh      — VRAM hog pause/resume and watchdog cleanup
-#   inspect.sh   — show-config, cache-report, launch-stats, validation
-#   cli.sh       — help, version, usage hints
-#   commands.sh  — CLI subcommands
-#   completions.sh — shell completion install/remove
-#   setup.sh       — doctor, setup, systemd, sysctl helpers
-#   tui.sh         — interactive terminal UI (--tui)
-#   launch.sh      — main launch orchestration
+#   common.sh       — paths, globals, logging
+#   keys.sh         — config key registry
+#   load-modules.sh — shared source order for lib/* subtrees
+#   platform/       — paths, os, steam-detect, gpu, desktop, profiles
+#   tools.sh        — optional dependency detection
+#   config.sh       — layered .env loading
+#   vdf.sh          — libraryfolders.vdf parsing
+#   steam.sh        — library discovery, native/EAC detection
+#   hardware/       — cpu, compositors, display detection
+#   detected-defaults.sh — auto-detected machine defaults
+#   gpu.sh          — GPU-specific launch helpers
+#   preflight.sh    — pre-launch checks
+#   runtime.sh      — env tuning and launch-chain assembly
+#   vram.sh         — VRAM hog pause/resume
+#   inspect/        — show, maintenance, reports, validation, backup
+#   cli.sh          — help, version, JSON helpers
+#   prefs/          — paths, backup, tui preference helpers
+#   completions/    — core, shells, helpers, cli
+#   setup/          — sysctl, systemd, doctor, onboard
+#   commands/       — status, environment, games, dispatch
+#   tui/            — config, primitives, menus, main loop
+#   launch.sh       — main launch orchestration
+#
+# Other repo paths:
+#   share/launchlayer/templates/  user pref templates (backup.conf, tui.conf)
+#   share/launchlayer/sysctl/     vm.max_map_count drop-in (elasticsearch.conf)
+#   share/launchlayer/systemd/    user systemd unit templates
+#   share/launchlayer/completions/ shell completion scripts
+#   examples/games/               example per-game .env files
+#   scripts/                      one-time root setup (setup-workstation-tuning.sh)
 
 set -euo pipefail
 
@@ -103,39 +116,11 @@ LIB_DIR="$SCRIPT_DIR/lib"
 source "$LIB_DIR/common.sh"
 # shellcheck source=lib/keys.sh
 source "$LIB_DIR/keys.sh"
-# shellcheck source=lib/platform.sh
-source "$LIB_DIR/platform.sh"
+# shellcheck source=lib/load-modules.sh
+source "$LIB_DIR/load-modules.sh"
+launchlayer_load_pre_main
 LAUNCHLAYER_MAIN_SCRIPT="$(realpath_portable "${BASH_SOURCE[0]}")"
-# shellcheck source=lib/vdf.sh
-source "$LIB_DIR/vdf.sh"
-# shellcheck source=lib/config.sh
-source "$LIB_DIR/config.sh"
-# shellcheck source=lib/steam.sh
-source "$LIB_DIR/steam.sh"
-# shellcheck source=lib/hardware.sh
-source "$LIB_DIR/hardware.sh"
-# shellcheck source=lib/gpu.sh
-source "$LIB_DIR/gpu.sh"
-# shellcheck source=lib/preflight.sh
-source "$LIB_DIR/preflight.sh"
-# shellcheck source=lib/runtime.sh
-source "$LIB_DIR/runtime.sh"
-# shellcheck source=lib/vram.sh
-source "$LIB_DIR/vram.sh"
-# shellcheck source=lib/inspect.sh
-source "$LIB_DIR/inspect.sh"
-# shellcheck source=lib/cli.sh
-source "$LIB_DIR/cli.sh"
-# shellcheck source=lib/completions.sh
-source "$LIB_DIR/completions.sh"
-# shellcheck source=lib/commands.sh
-source "$LIB_DIR/commands.sh"
-# shellcheck source=lib/setup.sh
-source "$LIB_DIR/setup.sh"
-# shellcheck source=lib/tui.sh
-source "$LIB_DIR/tui.sh"
-# shellcheck source=lib/launch.sh
-source "$LIB_DIR/launch.sh"
+launchlayer_load_post_main
 
 # Global flags (--quiet, --verbose) apply to subcommands and game launches.
 mapfile -t _launchlayer_argv < <(cli_parse_global_flags "$@")

@@ -1,0 +1,30 @@
+# LaunchLayer backup preferences
+# Installed copy: ~/.config/launchlayer/backup.conf
+# Reset: launchlayer --backup-prefs reset  |  TUI → Backup settings → Reset to defaults
+# CLI:   launchlayer --backup-prefs set KEY VALUE
+#        launchlayer --backup-prefs set-schedule {daily|weekly|interval|custom} [args...]
+#
+# Keys (aliases in parentheses):
+#   backup_dir (dir)        Directory for launchlayer-backup-*.tar.gz archives
+#   keep                    Newest archives to retain (0 = unlimited, never prune)
+#   timer_type              calendar | interval
+#   on_calendar             systemd OnCalendar expression (when timer_type=calendar)
+#   on_boot_sec             First run delay after boot (when timer_type=interval)
+#   on_unit_active_sec      Repeat interval (when timer_type=interval)
+#   randomized_delay_sec    Jitter for calendar timers (seconds; alias: delay)
+#   include_local           Include launch.d/local.env in scheduled backups (0|1)
+#   include_profiles        Include launch.d/profiles/ in scheduled backups (0|1)
+#   include_tui             Include ~/.config/launchlayer/tui.conf in backups (0|1)
+#   auto_prune (prune)      Prune old archives after scheduled backup (0|1)
+
+backup_dir=$HOME/launchlayer-backups
+keep=7
+timer_type=calendar
+on_calendar=*-*-* 03:15:00
+on_boot_sec=15min
+on_unit_active_sec=12h
+randomized_delay_sec=1800
+include_local=1
+include_profiles=1
+include_tui=0
+auto_prune=1

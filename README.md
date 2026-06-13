@@ -2,7 +2,7 @@
 
 Layered launch orchestration for games. LaunchLayer sits in Steam’s **Launch Options** ahead of `%command%`, applies per-game and machine-wide tuning, runs preflight checks, and assembles a wrapper chain (GameMode, CPU affinity, MangoHUD, Gamescope, and so on) before the game starts.
 
-Originally tuned for **7900X3D + RTX 3080 Ti** on **Wayland / Plasma 6**, but machine profiles and auto-detection make it usable on Steam Deck, Flatpak Steam, and AMD-only setups.
+Originally tuned for **7900X3D + RTX 3080 Ti** on **Wayland / Plasma 6**, but machine profiles and auto-detection make it usable across **Linux distros** (Arch, Debian/Ubuntu, Fedora, openSUSE, NixOS, Alpine, Void, Gentoo, Solus, Clear Linux, immutable OSTree variants), **Steam Deck**, **Flatpak Steam**, **BSD**, and **WSL2**.
 
 ## Quick start
 
@@ -10,10 +10,10 @@ Originally tuned for **7900X3D + RTX 3080 Ti** on **Wayland / Plasma 6**, but ma
 2. Run onboarding (optional but recommended):
 
    ```bash
-   ./launchlayer --setup --completions --symlink --print-launch-option
+   ./launchlayer --setup --completions --symlink --print-launch-option --write-local-config
    ```
 
-   This enables shell tab completion, installs a `~/.local/bin/launchlayer` shortcut, and prints the Steam launch option string. Add `--systemd` to install the maintenance timer.
+   This enables shell tab completion, installs a `~/.local/bin/launchlayer` shortcut, prints the Steam launch option string, and writes `launch.d/local.env` with detected machine defaults. Add `--systemd` to install the maintenance timer.
 
 3. In Steam → game → **Properties → Launch Options**, set:
 
@@ -46,7 +46,7 @@ When Steam invokes the script with the game command, `run_game_launch` in `lib/l
 2. **Resolve AppID** — From `SteamAppId`, `STEAM_APPID`, or launch argv (`lib/config.sh`).
 3. **Load layered config** — Profile → `default.env` → preset or per-game file (`lib/config.sh`).
 4. **Detect game flags** — Native vs Proton, EAC/BattlEye, engine hints (`lib/steam.sh`).
-5. **Auto hardware defaults** — X3D V-Cache CPU mask, display resolution/refresh for Gamescope (`lib/hardware.sh`).
+5. **Auto hardware defaults** — X3D V-Cache CPU mask, display resolution/refresh for Gamescope (`lib/hardware/`).
 6. **Preflight checks** — Skipped when `BENCHMARK=1` (`lib/preflight.sh`):
    - `vm.max_map_count`
    - Shader cache / compatdata size (optional trim)
@@ -67,10 +67,15 @@ Settings are plain `KEY=VALUE` files under `launch.d/`. Later layers override ea
 |------:|------|---------|
 | 0 | `launch.d/profiles/*.env` | Machine profiles (`LAUNCHLAYER_PROFILES` or auto-detected, layered) |
 | 1 | `launch.d/default.env` | Global infrastructure (cache limits, VRAM hog units, sysctl hints) |
-| 2 | `launch.d/presets/*.env` | Gameplay profile via `INCLUDE=` or auto-selection |
-| 3 | `launch.d/<AppID>.env` | Per-game overrides (wins over everything) |
+| 2 | `launch.d/local.env` | Optional machine-local file (`--write-local-config`); gitignored |
+| 3 | `launch.d/presets/*.env` | Gameplay profile via `INCLUDE=` or auto-selection |
+| 4 | `games/<AppID>.env` | Per-game overrides in `GAMES_DIR` (wins over everything) |
 
-**Auto preset** (when no `launch.d/<AppID>.env` exists):
+After file layers load, **runtime detection** fills any still-unset keys (`apply_detected_defaults`): PipeWire latency, network tuning, NVIDIA checks, VRAM hog unit filtering, disk preflight thresholds, and platform guardrails (Steam Deck, WSL2, containers).
+
+**Cross-compositor display detection** (`lib/hardware/`, `lib/platform/`): session-aware resolution, refresh, and VRR probing for KDE/Plasma (KWin, kscreen-doctor), GNOME/COSMIC/Budgie/Pantheon/Deepin (Mutter DBus + gsettings VRR), Hyprland, Sway, Niri, River, wlroots compositors (labwc, Wayfire, Weston, Miracle), and X11 stacks (XFCE, MATE, Cinnamon, LXQt, i3, Openbox, … via xrandr). Compositor IPC probes are gated so installed-but-inactive tools (e.g. `hyprctl` on KDE) do not false-match. Wayland sessions auto-set `GAMESCOPE_EXPOSE_WAYLAND=0`. Use `--detect-environment` to inspect what was detected on your machine.
+
+**Auto preset** (when no per-game `.env` exists in `GAMES_DIR`):
 
 - Native Linux build → `presets/native.env`
 - Otherwise → `presets/standard.env`
@@ -82,6 +87,20 @@ Settings are plain `KEY=VALUE` files under `launch.d/`. Later layers override ea
 | `wsl2.env` | Windows Subsystem for Linux |
 | `steam-deck.env` | Steam Deck / SteamOS |
 | `flatpak-steam.env` | Flatpak Steam install |
+| `arch-linux.env` | Arch, CachyOS, Manjaro, EndeavourOS, … |
+| `debian.env` | Debian, Ubuntu, Pop!_OS, Mint, … |
+| `fedora.env` | Fedora, Nobara, RHEL, Rocky, Alma, … |
+| `immutable-linux.env` | rpm-ostree / OSTree (Silverblue, Bazzite, Aurora, uBlue, …) |
+| `suse.env` | openSUSE / SUSE |
+| `nixos.env` | NixOS |
+| `alpine.env` | Alpine Linux (musl / OpenRC) |
+| `void.env` | Void Linux |
+| `gentoo.env` | Gentoo |
+| `solus.env` | Solus |
+| `clearlinux.env` | Clear Linux OS |
+| `bsd.env` | FreeBSD, OpenBSD, NetBSD |
+| `macos.env` | macOS (config tooling; no Proton chain) |
+| `non-systemd.env` | OpenRC, runit, etc. (no systemd user session) |
 | `amd-gpu.env` | AMD GPU primary |
 | `intel-gpu.env` | Intel GPU primary |
 | `nvidia-desktop.env` | NVIDIA GPU (auto-layered; no forced overrides) |
@@ -97,7 +116,7 @@ Set explicitly: `LAUNCHLAYER_PROFILES=steam-deck,flatpak-steam` or legacy `LAUNC
 | `lightweight.env` | 2D / indie — minimal overhead |
 | `native.env` | Native Linux — skips Proton env and cache checks |
 
-Reference per-game file: `launch.d/2357570.env` (Overwatch 2).
+Reference per-game file: `examples/games/2357570.env` (Overwatch 2). Live configs live in `GAMES_DIR` (`~/.local/share/launchlayer/games` by default).
 
 ### Common config keys
 
@@ -153,14 +172,35 @@ launchlayer                    # same, when installed via --setup --symlink
 
 Requires an interactive terminal. With [fzf](https://github.com/junegunn/fzf) installed you get fuzzy game search and a live `--show-config` preview pane. Without fzf, numbered menus still work.
 
-**Saved preferences** (`~/.config/launchlayer/tui.conf`): game picker filter (all / configured / unconfigured), cache report threshold, default init preset, fzf layout.
+**Saved preferences** (`~/.config/launchlayer/`):
+
+| File | Template | Keys |
+|------|----------|------|
+| `tui.conf` | `share/launchlayer/templates/tui.conf.example` | `game_filter`, `cache_min_gb`, `default_preset`, `last_menu`, `json_output`, `resume_last_menu`, `press_enter_lines`, `fzf_height`, `fzf_preview` |
+| `backup.conf` | `share/launchlayer/templates/backup.conf.example` | `backup_dir`, `keep`, `timer_type`, `on_calendar`, `on_boot_sec`, `on_unit_active_sec`, `randomized_delay_sec`, `include_local`, `include_profiles`, `include_tui`, `auto_prune` |
+
+Reset via CLI (`--tui-prefs reset`, `--backup-prefs reset`) or the matching TUI settings menus.
 
 | Menu | Actions |
 |------|---------|
-| **Main** | Browse games, quick toggles, init unconfigured, edit `default.env` / profiles, doctor, environment, status, setup, cache report, validate all, TUI settings |
-| **Per game** | Show config, dry-run chain, **quick toggles** (GameMode, MangoHUD, Gamescope, VRAM hogs, …), **advanced config** (INCLUDE preset, game args, wrappers, Gamescope W/H/R, shader cache, MangoHUD, UNSET_VARS), paths, launch stats, `$EDITOR`, re-init preset, validate, delete config |
+| **Main** | Games, Config library, Backup & restore, System & tools, TUI settings; **▶ Resume** last hub; **Doctor** shortcut when issues exist |
+| **Games** | Browse & configure (`[recent]` at top), **Recent games**, change filter, bulk INCLUDE preset, init unconfigured, prune uninstalled |
+| **Config library** | Edit `default.env` / `local.env` / profiles / presets, show detected defaults, write `local.env` from detection, anticheat scans, validate |
+| **Backup & restore** | Settings, backup actions, export/import, prune archives, systemd timer (header shows prune + maintenance timer) |
+| **System & tools** | Doctor, environment, status, CPU topology, sysctl, VRAM hogs/cleanup, cache report, setup |
+| **Per game** | Actions header shows validation status · [View] config/dry-run/paths/stats · [Edit] toggles/advanced/clear override/editor/preset · [Manage] validate/delete |
 
-Quick toggles flip boolean keys in `launch.d/<AppID>.env` (shows inherited vs override). Advanced config prompts for string values without leaving the TUI.
+On launch, the TUI prints a status banner (doctor issues, `vm.max_map_count`, backup/maintenance timers, prune policy, active filter). The last main-menu hub is marked `← last visit`; enable **auto-resume** in TUI settings to open it immediately.
+
+**Breadcrumb headers** show where you are, e.g. `Games › Overwatch 2 › Quick toggles`.
+
+**Game picker** (fzf): live preview shows INCLUDE, toggles, and key settings (`--tui-game-preview`). **Ctrl-E** opens `$EDITOR`, **Ctrl-D** shows dry-run. Quick toggles use color when supported (green/red overrides, dim inherited). **Clear ALL overrides** resets every per-game key to inherited layers.
+
+**JSON view mode** (TUI settings): view commands emit JSON, pretty-printed when `python3` or `jq` is available.
+
+Long command output only pauses when it spans `press_enter_lines` (default 8); one-liner confirmations return immediately.
+
+Quick toggles flip boolean keys in per-game `.env` files under `GAMES_DIR` (shows inherited vs override). Advanced config prompts for string values without leaving the TUI.
 
 ### Onboarding and health
 
@@ -169,8 +209,10 @@ Quick toggles flip boolean keys in `launch.d/<AppID>.env` (shows inherited vs ov
 | `--help`, `-h` | Grouped command reference |
 | `--version`, `-V` | Version and install paths |
 | `--doctor [--json]` | Environment + config health check; runs `--validate-config all`; **exits non-zero** when issues remain |
-| `--setup [--completions] [--systemd] [--symlink] [--print-launch-option]` | Non-destructive onboarding |
+| `--setup [--completions] [--systemd] [--symlink] [--print-launch-option] [--write-local-config]` | Non-destructive onboarding |
 | `--detect-environment [--json]` | Auto-detected platform, GPU, display, optional tools |
+| `--detect-defaults [--json]` | Recommended machine-local env settings from detection |
+| `--write-local-config [--force] [--dry-run]` | Persist detected defaults to `launch.d/local.env` |
 | `--completions [status\|enable\|disable\|print] [--shell S] [--json]` | Shell tab completions (`print` writes script to stdout) |
 | `--install-systemd` | Install user maintenance timer with resolved script path |
 | `--sysctl [status\|install]` | `vm.max_map_count` helper (install needs root) |
@@ -182,8 +224,9 @@ Most game commands accept **AppID or name fragment** (case-insensitive). Ambiguo
 | Command | Description |
 |---------|-------------|
 | `--list-games [--configured] [--json] [--grep NAME]` | Installed games with native/EAC hints; scan progress on stderr when TTY |
-| `--init-appid APPID\|NAME [preset] [--force]` | Create `launch.d/<AppID>.env` |
+| `--init-appid APPID\|NAME [preset] [--force]` | Create `games/<AppID>.env` |
 | `--init-unconfigured [--preset P] [--eac-only] [--dry-run]` | Bulk-scaffold missing configs |
+| `--prune-uninstalled [--dry-run] [--yes] [--json]` | Remove per-game `.env` for uninstalled games |
 | `--show-config APPID\|NAME [--json]` | Resolved layers, settings, launch chain |
 | `--edit-appid APPID\|NAME` | Open/create per-game config in `$EDITOR` |
 | `--paths APPID\|NAME [--json]` | Shader cache, compatdata, install, and config paths |
@@ -215,6 +258,7 @@ Place before any subcommand:
 | `--verbose`, `-v` | Extra debug output (`DEBUG=1`) |
 | `LAUNCHLAYER_QUIET=1` | Same as `--quiet` |
 | `LAUNCHLAYER_CONFIG_DIR` | Override config root (parent of `launch.d/`) |
+| `LAUNCHLAYER_GAMES_DIR` | Per-game `.env` directory (default: `~/.local/share/launchlayer/games`) |
 | `LAUNCHLAYER_PROFILES` | Comma-separated machine profiles (or auto-detect) |
 | `NO_COLOR=1` | Disable ANSI colors in help output |
 
@@ -224,49 +268,65 @@ Add `--json` where supported for scripting: `--show-config`, `--status`, `--vali
 
 ### Shell completion
 
+Supported shells: **bash**, **zsh**, **fish**, **nushell** (`nu`), **PowerShell** (`pwsh`), and **Oil** (`osh`, reuses bash completions).
+
 ```bash
 ./launchlayer --completions enable          # login shell
 ./launchlayer --completions enable --shell all
 ./launchlayer --completions print --shell bash   # Nix/packaging
+./launchlayer --completions enable --shell osh     # Oil shell (bash completions)
+./launchlayer --completions enable --shell nu      # ~/.config/nushell/completions/
+./launchlayer --completions enable --shell pwsh    # $PROFILE drop-in (WSL-friendly)
 ```
 
 Disable with `--completions disable`. Unknown flags suggest close matches (“Did you mean …?”).
 
 ## Directory layout
 
+See [docs/architecture.md](docs/architecture.md) for module load order and config layers.
+
 ```
-launchlayer   # Entry point
-setup-workstation-tuning.sh       # One-time root setup (irqbalance, btrfs, X3D IRQ)
+launchlayer          # Entry point
+scripts/
+  setup-workstation-tuning.sh   # One-time root setup (irqbalance, btrfs, X3D IRQ)
+share/launchlayer/
+  templates/         backup.conf.example, tui.conf.example
+  sysctl/            elasticsearch.conf (vm.max_map_count)
+  systemd/           maintenance timer, backup timer, X3D IRQ affinity unit
+  completions/       bash, zsh, fish, nu, pwsh scripts (osh uses bash)
+examples/games/      example per-game .env files
 lib/
-  common.sh      paths, state, logging
-  platform.sh    Steam root, GPU vendor, desktop detection
-  config.sh      layered .env loading
-  vdf.sh         libraryfolders.vdf parsing
-  steam.sh       library discovery, native/EAC detection
-  hardware.sh    X3D CPU + display auto-detection
-  gpu.sh         NVIDIA VRAM/power helpers
-  preflight.sh   sysctl, caches, VRAM/disk checks
-  runtime.sh     env tuning, launch chain assembly
-  vram.sh        VRAM hog pause/resume, watchdog
-  inspect.sh     show-config, validation, cache reports
-  cli.sh         help, version, usage hints
-  commands.sh    CLI subcommands
-  completions.sh shell completion install/remove
-  setup.sh       doctor, setup, systemd, sysctl helpers
-  tui.sh         interactive terminal UI (--tui)
-  launch.sh      main orchestration
+  load-modules.sh    module load order
+  common.sh          paths, state, logging
+  platform/          Steam root, GPU vendor, compositor/desktop detection
+  config.sh          layered .env loading, games path helpers
+  vdf.sh             libraryfolders.vdf parsing
+  steam.sh           library discovery, native/EAC detection
+  detected-defaults.sh  system-aware default env population
+  hardware/          X3D CPU + cross-compositor display/VRR auto-detection
+  gpu.sh             NVIDIA VRAM/power helpers
+  preflight.sh       sysctl, caches, VRAM/disk checks
+  runtime.sh         env tuning, launch chain assembly
+  vram.sh            VRAM hog pause/resume, watchdog
+  inspect/           show-config, validation, cache reports, backup
+  cli.sh             help, version, usage hints
+  commands/          CLI subcommands + dispatch
+  completions/       shell completion install/remove
+  prefs/             backup.conf + tui.conf helpers
+  setup/             doctor, setup, systemd, sysctl helpers
+  tui/               interactive terminal UI (--tui)
+  launch.sh          main orchestration
 launch.d/
   default.env
-  profiles/      machine profiles
-  presets/       standard, competitive, lightweight, native
-  <AppID>.env    per-game overrides
+  profiles/          machine profiles
+  presets/           standard, competitive, lightweight, native
   native-appids.txt
   anticheat-appids.txt
-systemd/         maintenance timer, X3D IRQ affinity unit
-completions/     bash, zsh, and fish completion scripts
-test/            bats tests
-elasticsearch.conf   sysctl drop-in for vm.max_map_count
-99-proton-vm.conf    deprecated; see elasticsearch.conf
+test/
+  integration/       bats integration tests
+  lib-units.bats     unit tests for lib helpers
+docs/
+  architecture.md
 ```
 
 ## Runtime state
@@ -290,7 +350,9 @@ Persistent data under `$XDG_STATE_HOME/launchlayer` (default `~/.local/state/lau
 Elasticsearch’s package sysctl can reset `vm.max_map_count` to `262144`, which breaks some Proton games. Install the override:
 
 ```bash
-sudo cp elasticsearch.conf /etc/sysctl.d/
+./launchlayer --sysctl install
+# or manually:
+sudo cp share/launchlayer/sysctl/elasticsearch.conf /etc/sysctl.d/
 sudo sysctl --system
 sysctl -n vm.max_map_count   # expect 2147483642
 ```
@@ -302,14 +364,14 @@ Set `VM_MAX_MAP_COUNT_FIX=1` in config to raise the value at launch when passwor
 ### Workstation setup (optional)
 
 ```bash
-sudo ./setup-workstation-tuning.sh
+sudo ./scripts/setup-workstation-tuning.sh
 ```
 
 Installs/enables **irqbalance**, enables **btrfs autodefrag** on `/` and `/home` when applicable, and installs the **X3D IRQ affinity** helper + `irq-affinity-x3d.service` when the helper binary is found.
 
 ### systemd maintenance timer
 
-Enable `systemd/launchlayer-maintenance.timer` via:
+Enable `share/launchlayer/systemd/launchlayer-maintenance.timer` via:
 
 ```bash
 ./launchlayer --install-systemd
@@ -319,7 +381,7 @@ This writes user units under `~/.config/systemd/user/` with the resolved script 
 
 ## Optional dependencies
 
-The script degrades gracefully when tools are missing (warnings only):
+The script degrades gracefully when tools are missing (warnings only). Use `./launchlayer --detect-environment` or `--doctor` to see which tools are installed and get **distro-aware install hints** (pacman, apt, dnf, rpm-ostree, nix, …).
 
 | Tool | Used for |
 |------|----------|
@@ -348,4 +410,6 @@ bats test/
 
 ## License
 
-No license file is included in this repository; treat as personal/homelab configuration unless you add one.
+[CC BY-NC-SA 4.0](LICENSE) — non-commercial use with attribution; derivatives must use the same license.
+
+You may use, modify, and share this project for personal or non-commercial purposes if you credit **bolens**, link to [github.com/bolens/LaunchLayer](https://github.com/bolens/LaunchLayer), and release any derivatives under the same terms. Commercial use requires separate permission.

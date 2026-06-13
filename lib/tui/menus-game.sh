@@ -1,0 +1,280 @@
+# shellcheck shell=bash
+# lib/tui/menus-game.sh — Game browse, toggles, and per-title actions.
+# ---------------------------------------------------------------------------
+# Configuration menus
+# ---------------------------------------------------------------------------
+
+# tui_format_toggle_option — Menu line using already-loaded effective settings.
+tui_format_toggle_option() {
+	local appid=$1 key=$2 effective override file label
+	file="$(tui_appid_env_path "$appid")"
+	effective="${!key-}"
+	override=""
+	[[ -f "$file" ]] && override="$(tui_env_file_get "$file" "$key")"
+	if [[ -n "$override" ]]; then
+		if cli_uses_color; then
+			if tui_bool_on "$effective"; then
+				label="$(printf '\033[1;32m%s=on\033[0m' "$key")"
+			else
+				label="$(printf '\033[1;31m%s=off\033[0m' "$key")"
+			fi
+			printf '%s  %s' "$label" "$(cli_dim override)"
+		else
+			printf '%s=%s  (override)' "$key" "${effective:-0}"
+		fi
+	else
+		if cli_uses_color; then
+			if tui_bool_on "$effective"; then
+				printf '%s  %s' "$(cli_dim "${key}=on")" "$(cli_dim inherited)"
+			else
+				printf '%s  %s' "$(cli_dim "${key}=off")" "$(cli_dim inherited)"
+			fi
+		else
+			printf '%s=%s  (inherited)' "$key" "${effective:-0}"
+		fi
+	fi
+}
+
+# tui_quick_toggles — Toggle boolean launch settings in per-game .env.
+tui_quick_toggles() {
+	local appid=$1 action key -a options=()
+	tui_ensure_appid_env "$appid"
+	tui_crumb_enter "Quick toggles"
+
+	while true; do
+		prepare_launch_context "$appid"
+		options=()
+		for key in "${TUI_TOGGLE_KEYS[@]}"; do
+			options+=("$(tui_format_toggle_option "$appid" "$key")")
+		done
+		options+=("Clear override (inherit from layers)")
+		options+=("Clear ALL overrides")
+		options+=("Back")
+
+		action="$(tui_menu "Flip per-game override" "${options[@]}")" || {
+			tui_crumb_leave
+			return 0
+		}
+		[[ "$action" == Back ]] && break
+		if [[ "$action" == "Clear override (inherit from layers)" ]]; then
+			tui_clear_override_menu "$appid"
+			continue
+		fi
+		if [[ "$action" == "Clear ALL overrides" ]]; then
+			tui_clear_all_game_overrides "$appid"
+			continue
+		fi
+		key="$(tui_toggle_key_from_option "$action")"
+		[[ -n "$key" ]] || continue
+		tui_toggle_game_key "$appid" "$key"
+		tui_validate_game_config_brief "$appid"
+	done
+	tui_crumb_leave
+}
+
+# tui_advanced_config — String keys and preset INCLUDE changes.
+tui_advanced_config() {
+	local appid=$1 name preset action include_label
+	name="$(get_game_name "$appid" 2>/dev/null || echo "AppID $appid")"
+
+	while true; do
+		prepare_launch_context "$appid"
+		include_label="${INCLUDE:-auto}"
+		action="$(tui_menu "Advanced config: $name (INCLUDE=${include_label})" \
+			"Change INCLUDE preset" \
+			"Edit GAME_EXTRA_ARGS" \
+			"Edit LAUNCH_WRAPPERS" \
+			"Edit LAUNCH_WRAPPERS_BEFORE" \
+			"Edit GAMESCOPE_W / H / R" \
+			"Edit SHADER_CACHE_MAX_GB" \
+			"Edit MANGOHUD_CONFIG" \
+			"Edit UNSET_VARS" \
+			"Back")" || return 0
+
+		case "$action" in
+			"Change INCLUDE preset")
+				preset="$(tui_pick_preset)" || continue
+				tui_set_include_preset "$appid" "$preset"
+				tui_validate_game_config_brief "$appid"
+				;;
+			"Edit GAME_EXTRA_ARGS")
+				tui_prompt_env_key "$appid" GAME_EXTRA_ARGS "Game CLI args"
+				tui_validate_game_config_brief "$appid"
+				;;
+			"Edit LAUNCH_WRAPPERS")
+				tui_prompt_env_key "$appid" LAUNCH_WRAPPERS "Wrappers after game-performance"
+				tui_validate_game_config_brief "$appid"
+				;;
+			"Edit LAUNCH_WRAPPERS_BEFORE")
+				tui_prompt_env_key "$appid" LAUNCH_WRAPPERS_BEFORE "Wrappers before gamemoderun"
+				tui_validate_game_config_brief "$appid"
+				;;
+			"Edit GAMESCOPE_W / H / R")
+				tui_prompt_env_key "$appid" GAMESCOPE_W "Gamescope width"
+				tui_prompt_env_key "$appid" GAMESCOPE_H "Gamescope height"
+				tui_prompt_env_key "$appid" GAMESCOPE_R "Gamescope refresh Hz"
+				tui_validate_game_config_brief "$appid"
+				;;
+			"Edit SHADER_CACHE_MAX_GB")
+				tui_prompt_env_key "$appid" SHADER_CACHE_MAX_GB "Shader cache max GB"
+				tui_validate_game_config_brief "$appid"
+				;;
+			"Edit MANGOHUD_CONFIG")
+				tui_prompt_env_key "$appid" MANGOHUD_CONFIG "MangoHUD config string"
+				tui_validate_game_config_brief "$appid"
+				;;
+			"Edit UNSET_VARS")
+				tui_prompt_env_key "$appid" UNSET_VARS "Space-separated vars to unset"
+				tui_validate_game_config_brief "$appid"
+				;;
+			*) return 0 ;;
+		esac
+	done
+}
+
+# tui_init_game_config — Scaffold or overwrite per-game config interactively.
+tui_init_game_config() {
+	local appid=$1 preset force=0 name
+	name="$(get_game_name "$appid" 2>/dev/null || echo "AppID $appid")"
+	if [[ -f "$(tui_appid_env_path "$appid")" ]] || appid_env_exists "$appid"; then
+		tui_confirm "Overwrite existing config for $name?" || return 0
+		force=1
+	fi
+	preset="$(tui_pick_preset)" || return 0
+	init_appid_config "$appid" "$preset" "$force"
+}
+
+# tui_delete_game_config — Remove per-game .env after confirmation.
+tui_delete_game_config() {
+	local appid=$1 path
+	path="$(resolve_appid_env_path "$appid")"
+	[[ -f "$path" ]] || {
+		echo "No per-game config at $path"
+		return 0
+	}
+	if tui_confirm "Delete $(basename "$path")? (preset auto-selection will apply)"; then
+		rm -f "$path"
+		echo "Deleted $path"
+	fi
+}
+
+# tui_show_dry_run — Print resolved launch chain without running a game.
+tui_show_dry_run() {
+	local appid=$1
+	prepare_launch_context "$appid"
+	print_dry_run /bin/true
+}
+
+# tui_game_actions — Action menu for one game.
+tui_game_actions() {
+	local appid=$1 name action status_label
+	name="$(get_game_name "$appid" 2>/dev/null || echo "AppID $appid")"
+	tui_crumb_enter "$name"
+
+	while true; do
+		status_label="$(tui_game_validation_label "$appid")"
+		action="$(tui_menu "Actions (${status_label})" \
+			"[View] Resolved config" \
+			"[View] Dry-run launch chain" \
+			"[View] Paths (cache / install)" \
+			"[View] Launch stats" \
+			"[Edit] Quick toggles" \
+			"[Edit] Advanced config" \
+			"[Edit] Clear override" \
+			"[Edit] Open in \$EDITOR" \
+			"[Edit] Set preset (re-init)" \
+			"[Manage] Validate config" \
+			"[Manage] Delete per-game config" \
+			"Back to games menu")" || {
+			tui_crumb_leave
+			return 0
+		}
+
+		case "$action" in
+			"[View] Resolved config")
+				tui_run_paged show_config "$appid" "$(tui_json_flag)" || true
+				;;
+			"[View] Dry-run launch chain")
+				tui_run_paged tui_show_dry_run "$appid" || true
+				;;
+			"[View] Paths (cache / install)")
+				tui_run_paged show_paths "$appid" "$(tui_json_flag)" || true
+				;;
+			"[View] Launch stats")
+				tui_run_paged launch_stats "$appid" "$(tui_json_flag)" || true
+				;;
+			"[Edit] Quick toggles")
+				tui_quick_toggles "$appid"
+				;;
+			"[Edit] Advanced config")
+				tui_advanced_config "$appid"
+				;;
+			"[Edit] Clear override")
+				tui_clear_override_menu "$appid"
+				;;
+			"[Edit] Open in \$EDITOR")
+				edit_appid_config "$appid"
+				;;
+			"[Edit] Set preset (re-init)")
+				tui_init_game_config "$appid"
+				;;
+			"[Manage] Validate config")
+				tui_run_paged validate_config "$appid" "$(tui_json_flag)" || true
+				;;
+			"[Manage] Delete per-game config")
+				tui_delete_game_config "$appid"
+				;;
+			"Back to games menu"|*)
+				tui_crumb_leave
+				return 0
+				;;
+		esac
+	done
+}
+
+# tui_games_menu — Per-game browsing and library maintenance.
+tui_games_menu() {
+	local action appid
+	tui_crumb_enter "Games"
+	tui_remember_main_menu "Games"
+
+	while true; do
+		action="$(tui_menu "(filter: ${TUI_GAME_FILTER:-all})" \
+			"Browse & configure game" \
+			"Recent games" \
+			"Change game filter" \
+			"Bulk change INCLUDE preset" \
+			"Init unconfigured games" \
+			"Prune uninstalled configs" \
+			"Back")" || {
+			tui_crumb_leave
+			return 0
+		}
+
+		case "$action" in
+			"Browse & configure game")
+				appid="$(tui_pick_game_appid)" || continue
+				tui_game_actions "$appid"
+				;;
+			"Recent games")
+				tui_recent_games_menu
+				;;
+			"Change game filter")
+				tui_change_game_filter
+				;;
+			"Bulk change INCLUDE preset")
+				tui_bulk_preset_menu
+				;;
+			"Init unconfigured games")
+				tui_init_unconfigured_menu
+				;;
+			"Prune uninstalled configs")
+				tui_prune_uninstalled_menu
+				;;
+			*)
+				tui_crumb_leave
+				return 0
+				;;
+		esac
+	done
+}

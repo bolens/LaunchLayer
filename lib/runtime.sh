@@ -55,18 +55,25 @@ print_config_layers() {
 # apply_network_tuning — Low-latency NIC settings (requires passwordless sudo).
 apply_network_tuning() {
 	[[ "${NETWORK_TUNE:-0}" == "1" ]] || return 0
-	command -v ethtool >/dev/null 2>&1 || return 0
+	require_tool_or_skip ethtool "NETWORK_TUNE=1 skipped" || return 0
 	sudo -n true 2>/dev/null || {
-		debug "NETWORK_TUNE skipped: sudo requires a password"
+		warn "NETWORK_TUNE=1 skipped: sudo requires a password"
 		return 0
 	}
 	local nic="${GAME_NIC:-}"
 	[[ -n "$nic" ]] || nic="$(detect_default_nic 2>/dev/null || true)"
 	[[ -n "$nic" ]] || {
-		debug "NETWORK_TUNE skipped: no default NIC detected"
+		warn "NETWORK_TUNE=1 skipped: no default NIC detected"
 		return 0
 	}
-	ip link show "$nic" >/dev/null 2>&1 || return 0
+	if ! command_available ip; then
+		warn "NETWORK_TUNE=1 skipped: ip is not installed$(tool_warn_suffix ip)"
+		return 0
+	fi
+	ip link show "$nic" >/dev/null 2>&1 || {
+		warn "NETWORK_TUNE=1 skipped: NIC '$nic' not found"
+		return 0
+	}
 	local max_rx=256 max_tx=256 ethtool_out
 	if ethtool_out=$(ethtool -g "$nic" 2>/dev/null); then
 		max_rx=$(printf '%s\n' "$ethtool_out" | awk '/^RX:/{print $2; exit}')
@@ -88,8 +95,10 @@ apply_pipewire_low_latency() {
 	case "$audio" in
 		pipewire)
 			export PULSE_LATENCY_MSEC=30
-			if command -v pw-metadata >/dev/null 2>&1; then
+			if optional_tool_installed pw-metadata; then
 				pw-metadata -n settings 0 clock.force-quantum 512 2>/dev/null || true
+			else
+				debug "PIPEWIRE_LOW_LATENCY: pw-metadata unavailable — using PULSE_LATENCY_MSEC only"
 			fi
 			debug "pipewire low-latency mode enabled"
 			;;
@@ -107,7 +116,7 @@ apply_pipewire_low_latency() {
 restore_pipewire_low_latency() {
 	[[ "${PIPEWIRE_LOW_LATENCY:-0}" == "1" ]] || return 0
 	[[ "$(detect_audio_server)" == pipewire ]] || return 0
-	if command -v pw-metadata >/dev/null 2>&1; then
+	if optional_tool_installed pw-metadata; then
 		pw-metadata -n settings 0 clock.force-quantum 0 2>/dev/null || true
 	fi
 }
@@ -115,16 +124,16 @@ restore_pipewire_low_latency() {
 # apply_cpu_performance — Fallback when game-performance wrapper is absent.
 apply_cpu_performance() {
 	[[ "${GAME_PERFORMANCE:-1}" == "1" ]] || return 0
-	command -v game-performance >/dev/null 2>&1 && return 0
-	if command -v cpupower >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+	command_available game-performance && return 0
+	if command_available cpupower && sudo -n true 2>/dev/null; then
 		sudo -n cpupower frequency-set -g performance >/dev/null 2>&1 \
 			&& debug "cpupower performance (fallback)" && return 0
 	fi
-	if command -v powerprofilesctl >/dev/null 2>&1; then
+	if command_available powerprofilesctl; then
 		powerprofilesctl set performance >/dev/null 2>&1 \
 			&& debug "powerprofilesctl performance (fallback)" && return 0
 	fi
-	debug "GAME_PERFORMANCE=1 but no game-performance/cpupower/powerprofilesctl"
+	debug "GAME_PERFORMANCE=1: no game-performance/cpupower/powerprofilesctl — continuing without CPU perf tuning"
 }
 
 # apply_unset_vars — Remove env vars listed in UNSET_VARS (space-separated).
@@ -204,26 +213,18 @@ apply_proton_env() {
 
 # warn_missing_tools — Surface missing optional dependencies before launch fails.
 warn_missing_tools() {
-	local wrapper
-	if [[ "${GAMEMODE:-1}" == "1" ]] && ! command -v gamemoderun >/dev/null 2>&1; then
-		warn "GAMEMODE=1 but gamemoderun is not installed"
-	fi
-	if ! command -v game-performance >/dev/null 2>&1; then
-		[[ "${GAME_PERFORMANCE:-1}" == "1" ]] \
-			&& ! command -v cpupower >/dev/null 2>&1 \
-			&& ! command -v powerprofilesctl >/dev/null 2>&1 \
-			&& warn "GAME_PERFORMANCE=1 but no game-performance/cpupower/powerprofilesctl"
-	fi
-	for wrapper in ${LAUNCH_WRAPPERS_BEFORE} ${LAUNCH_WRAPPERS}; do
-		command -v "$wrapper" >/dev/null 2>&1 || warn "LAUNCH_WRAPPERS expects '$wrapper' but it is not installed"
-	done
+	warn_enabled_missing_tools
 }
 
 # append_launch_wrappers_from — Append installed binaries from a wrapper list to launch[].
 append_launch_wrappers_from() {
 	local wrappers=$1 wrapper
 	for wrapper in $wrappers; do
-		command_available "$wrapper" && launch+=("$wrapper")
+		if command_available "$wrapper"; then
+			launch+=("$wrapper")
+		else
+			debug "launch wrapper skipped (not installed): $wrapper"
+		fi
 	done
 }
 
@@ -259,14 +260,18 @@ build_launch_chain() {
 	launch=( )
 	append_launch_wrappers
 
-	if [[ "${GAMEMODE:-1}" == "1" ]] && command -v gamemoderun >/dev/null 2>&1; then
+	if [[ "${GAMEMODE:-1}" == "1" ]] && optional_tool_installed gamemoderun; then
 		launch+=(gamemoderun)
+	elif [[ "${GAMEMODE:-1}" == "1" ]]; then
+		debug "gamemoderun unavailable — continuing without GameMode wrapper"
 	fi
 
-	if [[ "${DISABLE_CPU_AFFINITY:-0}" != "1" ]]; then
+	if [[ "${DISABLE_CPU_AFFINITY:-0}" != "1" ]] && optional_tool_installed taskset; then
 		launch+=(taskset -c "${X3D_CPUS:-$(default_online_cpus)}")
+	elif [[ "${DISABLE_CPU_AFFINITY:-0}" != "1" ]]; then
+		debug "taskset unavailable — continuing without CPU affinity wrapper"
 	fi
-	if [[ "${GAME_PERFORMANCE:-1}" == "1" ]] && command -v game-performance >/dev/null 2>&1; then
+	if [[ "${GAME_PERFORMANCE:-1}" == "1" ]] && command_available game-performance; then
 		launch+=(game-performance)
 	fi
 	append_launch_wrappers_after_performance
@@ -275,7 +280,7 @@ build_launch_chain() {
 		warn "GAMESCOPE=1 on native game — set FORCE_PROTON=1 if intentional"
 	fi
 
-	if [[ "${GAMESCOPE:-0}" == "1" ]] && command -v gamescope >/dev/null 2>&1; then
+	if [[ "${GAMESCOPE:-0}" == "1" ]] && optional_tool_installed gamescope; then
 		launch+=(gamescope)
 		launch+=(-W "${GAMESCOPE_W}" -H "${GAMESCOPE_H}" -r "${GAMESCOPE_R:-120}")
 		launch+=(-f --force-grab-cursor)
@@ -289,12 +294,14 @@ build_launch_chain() {
 		fi
 		launch+=(--)
 	elif [[ "${GAMESCOPE:-0}" == "1" ]]; then
-		warn "GAMESCOPE=1 but gamescope is not installed"
+		debug "gamescope unavailable — continuing without Gamescope wrapper"
 	fi
 
 	if [[ "${BENCHMARK:-0}" != "1" && "${MANGOHUD:-0}" == "1" && "$use_mangoapp" != "1" ]] \
-		&& command -v mangohud >/dev/null 2>&1; then
+		&& optional_tool_installed mangohud; then
 		launch+=(mangohud)
+	elif [[ "${BENCHMARK:-0}" != "1" && "${MANGOHUD:-0}" == "1" && "$use_mangoapp" != "1" ]]; then
+		debug "mangohud unavailable — continuing without MangoHUD wrapper"
 	fi
 
 	debug "launch chain: ${launch[*]}"

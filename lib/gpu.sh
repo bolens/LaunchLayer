@@ -12,10 +12,7 @@ apply_nvidia_power_mode() {
 	local current=""
 	[[ "${NVIDIA_POWER_MODE:-0}" == "1" ]] || return 0
 	[[ "$(detect_gpu_vendor)" == nvidia ]] || return 0
-	command -v nvidia-settings >/dev/null 2>&1 || {
-		warn "NVIDIA_POWER_MODE=1 but nvidia-settings is not installed"
-		return 0
-	}
+	optional_tool_installed nvidia-settings || return 0
 
 	current="$(nvidia-settings -q GPUPowerMizerMode -t 2>/dev/null | head -1 | tr -d ' ')"
 	[[ "$current" =~ ^[0-2]$ ]] || {
