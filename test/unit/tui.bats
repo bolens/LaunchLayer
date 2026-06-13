@@ -519,6 +519,7 @@ setup() {
 }
 
 @test "tui_fzf_build_args adds panel preview on main menu context" {
+	command -v fzf >/dev/null 2>&1 || skip "fzf not installed"
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"
 		export LAUNCHLAYER_MAIN_SCRIPT="'"$SCRIPT"'"
