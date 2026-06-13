@@ -319,7 +319,9 @@ apply_auto_hardware_defaults() {
 
 	if [[ -z "${GAME_NIC:-}" ]]; then
 		GAME_NIC="$(detect_default_nic 2>/dev/null || true)"
-		[[ -n "$GAME_NIC" ]] || GAME_NIC="$(ip -4 route show default 2>/dev/null | awk '{print $5; exit}')"
+		if [[ -z "$GAME_NIC" ]] && command_available ip; then
+			GAME_NIC="$( { ip -4 route show default 2>/dev/null || true; } | awk '{print $5; exit}')"
+		fi
 		export GAME_NIC
 	fi
 

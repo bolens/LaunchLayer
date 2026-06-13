@@ -59,7 +59,7 @@ _gpu_primary_score() {
 
 # _gpu_sysfs_name — Human-readable GPU name from DRM device path.
 _gpu_sysfs_name() {
-	local device=$1 slot name card
+	local device=$1 slot="" name="" card=""
 	slot="$(grep -m1 '^PCI_SLOT_NAME=' "$device/uevent" 2>/dev/null | cut -d= -f2- || true)"
 	if [[ -n "$slot" ]] && command -v lspci >/dev/null 2>&1; then
 		name="$(lspci -s "$slot" 2>/dev/null | cut -d: -f3- | sed 's/^[[:space:]]*//')"
