@@ -75,7 +75,12 @@ EOF
 		tui_games_cache_paths
 		mkdir -p "$TUI_GAMES_CACHE_DIR"
 		printf "loading\n" > "$TUI_GAMES_CACHE_STATUS"
+		sleep 300 &
+		loader_pid=$!
+		printf "%s\n" "$loader_pid" > "$TUI_GAMES_CACHE_PID_FILE"
 		dispatch_tui_subcommand --tui-games-picker-reload
+		kill "$loader_pid" 2>/dev/null || true
+		wait "$loader_pid" 2>/dev/null || true
 	'
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"Loading installed games"* ]]
