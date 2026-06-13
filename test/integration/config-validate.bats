@@ -28,7 +28,7 @@ setup() {
 	local fake_steam merged
 	fake_steam="$(fake_steam_root 2357570 "Overwatch")"
 	merged="$(
-		env STEAM_ROOT="$fake_steam" LAUNCHLAYER_GAMES_DIR="$REPO_ROOT/examples/games" \
+		env LAUNCHLAYER_TEST_TRACE=1 STEAM_ROOT="$fake_steam" LAUNCHLAYER_GAMES_DIR="$REPO_ROOT/examples/games" \
 			LAUNCHLAYER_PROFILES= "$SCRIPT" --dry-run /bin/echo test AppId=2357570 2>&1
 	)" || status=$?
 	status=${status:-0}
@@ -45,7 +45,7 @@ setup() {
 	local fake_steam merged
 	fake_steam="$(fake_steam_root 2357570 "Overwatch")"
 	merged="$(
-		env STEAM_ROOT="$fake_steam" LAUNCHLAYER_GAMES_DIR="$REPO_ROOT/examples/games" \
+		env LAUNCHLAYER_TEST_TRACE=1 STEAM_ROOT="$fake_steam" LAUNCHLAYER_GAMES_DIR="$REPO_ROOT/examples/games" \
 			LAUNCHLAYER_PROFILES= "$SCRIPT" --verbose --dry-run /bin/echo test AppId=2357570 2>&1
 	)" || status=$?
 	status=${status:-0}
