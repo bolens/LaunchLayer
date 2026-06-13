@@ -1,23 +1,11 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalQuery } from "./_generated/server";
 import { fingerprintValidator } from "./schema";
 import { similarityScore, type Fingerprint } from "./lib/similarity";
-import { mergeMachineCandidates, upsertMachineRecord } from "./lib/machines";
-import type { Doc, Id } from "./_generated/dataModel";
+import { mergeMachineCandidates } from "./lib/machines";
+import { validateSimilarMachinesRequest, MAX_MACHINES_SCORED, capScoredCandidates } from "./lib/validation";
 
-export const upsertMachine = mutation({
-  args: {
-    fingerprintHash: v.string(),
-    fingerprint: fingerprintValidator,
-    machineLabel: v.optional(v.string()),
-  },
-  returns: v.id("machines"),
-  handler: async (ctx, args) => {
-    return await upsertMachineRecord(ctx, args);
-  },
-});
-
-export const similarMachines = query({
+export const similarMachines = internalQuery({
   args: {
     fingerprint: fingerprintValidator,
     limit: v.optional(v.number()),
@@ -33,7 +21,10 @@ export const similarMachines = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 10;
+    const limit = validateSimilarMachinesRequest({
+      fingerprint: args.fingerprint as Fingerprint,
+      limit: args.limit,
+    });
     const byVendor = await ctx.db
       .query("machines")
       .withIndex("by_gpu_vendor", (q) =>
@@ -48,7 +39,10 @@ export const similarMachines = query({
       )
       .collect();
 
-    const candidates = mergeMachineCandidates(byVendor, byDisplayTier);
+    const candidates = capScoredCandidates(
+      mergeMachineCandidates(byVendor, byDisplayTier),
+      MAX_MACHINES_SCORED,
+    );
 
     return candidates
       .map((machine) => ({

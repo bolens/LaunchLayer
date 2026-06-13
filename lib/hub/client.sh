@@ -96,7 +96,7 @@ for row in data.get("results") or []:
 # hub_curl_json — HTTP JSON call; pass privileged=1 for publish/delete (auth enforced).
 hub_curl_json() {
 	local method=$1 path=$2 body=${3:-} privileged=${4:-0}
-	local url tmp code
+	local url tmp code max_bytes=${HUB_MAX_RESPONSE_BYTES:-131072}
 	hub_require_url || return 1
 	load_hub_prefs
 	if [[ "$privileged" == "1" ]]; then
@@ -124,10 +124,16 @@ hub_curl_json() {
 			}
 		fi
 	else
-		code="$(curl -sS -o "$tmp" -w '%{http_code}' "$url")" || {
-			echo "Hub request failed: $url" >&2
+		local curl_status=0
+		code="$(curl -sS -o "$tmp" -w '%{http_code}' --max-filesize "$max_bytes" "$url")" || curl_status=$?
+		if (( curl_status != 0 )); then
+			if (( curl_status == 63 )); then
+				echo "Hub response exceeded ${max_bytes} bytes: $url" >&2
+			else
+				echo "Hub request failed: $url" >&2
+			fi
 			return 1
-		}
+		fi
 	fi
 
 	if [[ "$code" =~ ^2 ]]; then
@@ -244,8 +250,11 @@ hub_parse_publish_config_id() {
 
 # hub_delete_payload — Build JSON body for deleting a shared config.
 hub_delete_payload() {
-	local config_id=$1
-	printf '{"config_id":%s}\n' "$(json_string "$config_id")"
+	local config_id=$1 fingerprint=${2:-}
+	[[ -n "$fingerprint" ]] || fingerprint="$(hub_fingerprint_from_detection)"
+	printf '{"config_id":%s,"fingerprint_hash":%s}\n' \
+		"$(json_string "$config_id")" \
+		"$(json_string "$(hub_fingerprint_hash "$fingerprint")")"
 }
 
 # hub_recommend_payload — Build JSON body for recommendation request.

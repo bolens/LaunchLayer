@@ -92,6 +92,18 @@ export default defineSchema({
   })
     .index("by_appid", ["appid"])
     .index("by_machine_and_appid", ["machineId", "appid"]),
+
+  rateLimitBuckets: defineTable({
+    bucketKey: v.string(),
+    windowStart: v.number(),
+    count: v.number(),
+  }).index("by_bucket_key", ["bucketKey"]),
+
+  configDownloadDedup: defineTable({
+    configId: v.id("sharedConfigs"),
+    identifier: v.string(),
+    recordedAt: v.number(),
+  }).index("by_config_and_identifier", ["configId", "identifier"]),
 });
 
 export {

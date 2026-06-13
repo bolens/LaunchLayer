@@ -56,6 +56,8 @@ launchlayer_source_backup() {
 
 # launchlayer_source_inspect — Config inspection, validation, backup bundles.
 launchlayer_source_inspect() {
+	# shellcheck source=keys.sh
+	source "$LIB_DIR/keys.sh"
 	# shellcheck source=inspect/show.sh
 	source "$LIB_DIR/inspect/show.sh"
 	# shellcheck source=inspect/maintenance.sh

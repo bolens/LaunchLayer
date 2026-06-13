@@ -24,10 +24,12 @@ hub_delete_config() {
 		echo "Usage: launchlayer --hub-delete CONFIG_ID [--yes] [--json]" >&2
 		return 1
 	}
+	hub_validate_config_id "$config_id" || return 1
 
 	command_required_or_fail curl "Hub delete" || return 1
 	hub_require_url || return 1
 	load_hub_prefs
+	hub_require_privileged_auth || return 1
 
 	if [[ "$yes" != "1" && -t 0 ]]; then
 		read -r -p "Delete hub config ${config_id}? [y/N] " arg </dev/tty || true

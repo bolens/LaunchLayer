@@ -24,6 +24,25 @@ export function buildPublishConfigPatch(
   };
 }
 
+export function validateConfigDeleteTarget(
+  config: Doc<"sharedConfigs"> | null,
+  machine: Doc<"machines"> | null,
+  args: { fingerprintHash: string },
+): Doc<"sharedConfigs"> {
+  if (!config) {
+    throw new Error("NOT_FOUND: Shared config not found");
+  }
+  if (!machine) {
+    throw new Error("MACHINE_MISSING: Config machine record not found");
+  }
+  if (machine.fingerprintHash !== args.fingerprintHash) {
+    throw new Error(
+      "FINGERPRINT_MISMATCH: Config belongs to a different machine fingerprint",
+    );
+  }
+  return config;
+}
+
 export function validateConfigUpdateTarget(
   config: Doc<"sharedConfigs"> | null,
   machine: Doc<"machines"> | null,
@@ -49,6 +68,15 @@ export function validateConfigUpdateTarget(
 }
 
 export function publishHttpStatusForError(message: string): number {
+  if (message.startsWith("QUOTA_EXCEEDED:")) {
+    return 403;
+  }
+  if (message.startsWith("RATE_LIMITED:")) {
+    return 429;
+  }
+  if (message.startsWith("VALIDATION_ERROR:")) {
+    return 400;
+  }
   if (message.startsWith("NOT_FOUND:")) {
     return 404;
   }

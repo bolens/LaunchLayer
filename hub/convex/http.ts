@@ -1,6 +1,6 @@
 import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
-import { api } from "./_generated/api";
+import { httpAction, type ActionCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
   publishAuthEnforced,
@@ -8,6 +8,17 @@ import {
 } from "./lib/auth";
 import { parseFingerprint } from "./lib/fingerprint";
 import { publishHttpStatusForError } from "./lib/publish";
+import {
+  requestIdentifier,
+  type RateLimitRoute,
+} from "./lib/rate_limit";
+import {
+  assertRequestBodySize,
+  MAX_HTTP_BODY_BYTES,
+  parseDetection,
+  parseJsonObjectBody,
+} from "./lib/http_body";
+import { validateConfigId } from "./lib/validation";
 
 const http = httpRouter();
 
@@ -21,8 +32,32 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-async function readJson(request: Request): Promise<unknown> {
-  return await request.json();
+function errorResponse(error: unknown, fallbackMessage: string): Response {
+  const message = error instanceof Error ? error.message : fallbackMessage;
+  const status = publishHttpStatusForError(message);
+  return jsonResponse(
+    { error: message.replace(/^[^:]+:\s*/, ""), code: message.split(":")[0] },
+    status,
+  );
+}
+
+async function readJson(request: Request): Promise<Record<string, unknown>> {
+  const contentLength = Number(request.headers.get("Content-Length") ?? 0);
+  const body = await request.text();
+  assertRequestBodySize(contentLength, body.length, MAX_HTTP_BODY_BYTES);
+  return parseJsonObjectBody(body);
+}
+
+async function enforceRouteRateLimit(
+  ctx: ActionCtx,
+  request: Request,
+  route: RateLimitRoute,
+  body?: Record<string, unknown>,
+): Promise<void> {
+  await ctx.runMutation(internal.rate_limits.enforceRateLimit, {
+    route,
+    identifier: requestIdentifier(request, body),
+  });
 }
 
 http.route({
@@ -42,17 +77,16 @@ http.route({
       return authError;
     }
 
-    const body = (await readJson(request)) as Record<string, unknown>;
-    const settings = (body.settings as Array<{ key: string; value: string }>) ?? [];
-    const detection = body.detection as {
-      native: boolean;
-      anticheat: boolean;
-      engine?: string;
-    };
-    const configIdRaw = body.config_id ? String(body.config_id) : undefined;
-
     try {
-      const result = await ctx.runMutation(api.configs.publishConfig, {
+      const body = await readJson(request);
+      const settings = (body.settings as Array<{ key: string; value: string }>) ?? [];
+      const detection = parseDetection(body.detection);
+      const configIdRaw = body.config_id ? String(body.config_id) : undefined;
+      if (configIdRaw) {
+        validateConfigId(configIdRaw);
+      }
+
+      const result = await ctx.runMutation(internal.configs.publishConfig, {
         fingerprintHash: String(body.fingerprint_hash),
         fingerprint: parseFingerprint(body.fingerprint),
         machineLabel: body.machine_label ? String(body.machine_label) : undefined,
@@ -62,11 +96,7 @@ http.route({
         settings,
         preset: body.preset ? String(body.preset) : undefined,
         note: body.note ? String(body.note) : undefined,
-        detection: {
-          native: Boolean(detection.native),
-          anticheat: Boolean(detection.anticheat),
-          engine: detection.engine ? String(detection.engine) : undefined,
-        },
+        detection,
         launchlayerVersion: body.launchlayer_version
           ? String(body.launchlayer_version)
           : undefined,
@@ -77,10 +107,7 @@ http.route({
 
       return jsonResponse(result);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Publish failed";
-      const status = publishHttpStatusForError(message);
-      return jsonResponse({ error: message.replace(/^[^:]+:\s*/, ""), code: message.split(":")[0] }, status);
+      return errorResponse(error, "Publish failed");
     }
   }),
 });
@@ -89,12 +116,19 @@ http.route({
   path: "/api/my-config",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const body = (await readJson(request)) as Record<string, unknown>;
-    const result = await ctx.runQuery(api.configs.findMyConfig, {
-      fingerprintHash: String(body.fingerprint_hash),
-      appid: String(body.appid),
-    });
-    return jsonResponse(result);
+    try {
+      const body = await readJson(request);
+      await enforceRouteRateLimit(ctx, request, "myConfig", body);
+      const fingerprintHash = String(body.fingerprint_hash ?? "");
+      const appid = String(body.appid ?? "");
+      const result = await ctx.runQuery(internal.configs.findMyConfig, {
+        fingerprintHash,
+        appid,
+      });
+      return jsonResponse(result);
+    } catch (error) {
+      return errorResponse(error, "Lookup failed");
+    }
   }),
 });
 
@@ -107,20 +141,30 @@ http.route({
       return authError;
     }
 
-    const body = (await readJson(request)) as Record<string, unknown>;
-    const configId = String(body.config_id ?? "");
-    if (!configId) {
-      return jsonResponse({ error: "config_id is required" }, 400);
-    }
+    try {
+      const body = await readJson(request);
+      const configId = String(body.config_id ?? "");
+      const fingerprintHash = String(body.fingerprint_hash ?? "");
+      if (!configId) {
+        return jsonResponse({ error: "config_id is required" }, 400);
+      }
+      if (!fingerprintHash) {
+        return jsonResponse({ error: "fingerprint_hash is required" }, 400);
+      }
+      validateConfigId(configId);
 
-    const result = await ctx.runMutation(api.configs.deleteConfig, {
-      configId: configId as Id<"sharedConfigs">,
-    });
-    if (!result) {
-      return jsonResponse({ error: "Config not found" }, 404);
-    }
+      const result = await ctx.runMutation(internal.configs.deleteConfig, {
+        configId: configId as Id<"sharedConfigs">,
+        fingerprintHash,
+      });
+      if (!result) {
+        return jsonResponse({ error: "Config not found" }, 404);
+      }
 
-    return jsonResponse(result);
+      return jsonResponse(result);
+    } catch (error) {
+      return errorResponse(error, "Delete failed");
+    }
   }),
 });
 
@@ -128,13 +172,18 @@ http.route({
   path: "/api/recommend",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const body = (await readJson(request)) as Record<string, unknown>;
-    const results = await ctx.runQuery(api.configs.recommendConfigs, {
-      fingerprint: parseFingerprint(body.fingerprint),
-      appid: String(body.appid),
-      limit: body.limit ? Number(body.limit) : undefined,
-    });
-    return jsonResponse({ results });
+    try {
+      const body = await readJson(request);
+      await enforceRouteRateLimit(ctx, request, "recommend", body);
+      const results = await ctx.runQuery(internal.configs.recommendConfigs, {
+        fingerprint: parseFingerprint(body.fingerprint),
+        appid: String(body.appid),
+        limit: body.limit ? Number(body.limit) : undefined,
+      });
+      return jsonResponse({ results });
+    } catch (error) {
+      return errorResponse(error, "Recommend failed");
+    }
   }),
 });
 
@@ -142,12 +191,17 @@ http.route({
   path: "/api/similar-machines",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const body = (await readJson(request)) as Record<string, unknown>;
-    const results = await ctx.runQuery(api.machines.similarMachines, {
-      fingerprint: parseFingerprint(body.fingerprint),
-      limit: body.limit ? Number(body.limit) : undefined,
-    });
-    return jsonResponse({ results });
+    try {
+      const body = await readJson(request);
+      await enforceRouteRateLimit(ctx, request, "similarMachines", body);
+      const results = await ctx.runQuery(internal.machines.similarMachines, {
+        fingerprint: parseFingerprint(body.fingerprint),
+        limit: body.limit ? Number(body.limit) : undefined,
+      });
+      return jsonResponse({ results });
+    } catch (error) {
+      return errorResponse(error, "Similar machines failed");
+    }
   }),
 });
 
@@ -155,14 +209,27 @@ http.route({
   pathPrefix: "/api/config/",
   method: "GET",
   handler: httpAction(async (ctx, request) => {
-    const url = new URL(request.url);
-    const configId = url.pathname.replace(/^\/api\/config\//, "") as Id<"sharedConfigs">;
-    const config = await ctx.runQuery(api.configs.getConfig, { configId });
-    if (!config) {
-      return jsonResponse({ error: "Config not found" }, 404);
+    try {
+      const url = new URL(request.url);
+      const configId = url.pathname.replace(/^\/api\/config\//, "").split("?")[0] ?? "";
+      validateConfigId(configId);
+      await enforceRouteRateLimit(ctx, request, "getConfig");
+
+      const typedConfigId = configId as Id<"sharedConfigs">;
+      const config = await ctx.runQuery(internal.configs.getConfig, {
+        configId: typedConfigId,
+      });
+      if (!config) {
+        return jsonResponse({ error: "Config not found" }, 404);
+      }
+      await ctx.runMutation(internal.configs.recordDownload, {
+        configId: typedConfigId,
+        identifier: requestIdentifier(request),
+      });
+      return jsonResponse(config);
+    } catch (error) {
+      return errorResponse(error, "Config fetch failed");
     }
-    await ctx.runMutation(api.configs.recordDownload, { configId });
-    return jsonResponse(config);
   }),
 });
 

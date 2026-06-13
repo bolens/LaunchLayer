@@ -1,0 +1,10 @@
+{
+  "name": "launchlayer",
+  "private": true,
+  "packageManager": "pnpm@10.16.1",
+  "scripts": {
+    "dev": "pnpm --dir hub dev",
+    "test:hub": "pnpm --dir hub test",
+    "convex:deploy": "pnpm --dir hub convex:deploy"
+  }
+}

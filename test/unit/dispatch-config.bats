@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Unit tests for lib/commands/dispatch-config.sh routing.
+load '../helpers.bash'
+
+setup() {
+	bats_unit_setup
+}
+
+_dispatch_config_shell() {
+	bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib commands cli
+		'"$1"'
+	'
+}
+
+@test "dispatch_config_subcommand scan-anticheat passes update-list flag" {
+	run _dispatch_config_shell '
+		source_lib platform config inspect
+		scan_anticheat() { printf "scan:%s\n" "$1"; }
+		dispatch_config_subcommand --scan-anticheat --update-list
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "scan:1" ]]
+}
+
+@test "dispatch_config_subcommand scan-detections routes to scan_detections" {
+	run _dispatch_config_shell '
+		source_lib platform config inspect steam
+		scan_detections() { echo detections-called; }
+		dispatch_config_subcommand --scan-detections
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "detections-called" ]]
+}
+
+@test "dispatch_config_subcommand init-unconfigured dry-run delegates args" {
+	run _dispatch_config_shell '
+		source_lib platform config inspect steam
+		INIT_ARGS=()
+		init_unconfigured() { INIT_ARGS=("$@"); echo "init:${*}"; }
+		dispatch_config_subcommand --init-unconfigured --dry-run --eac-only
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"init: 1 1"* ]]
+}
+
+@test "dispatch_config_subcommand prune-uninstalled dry-run json delegates" {
+	run _dispatch_config_shell '
+		source_lib platform config inspect steam
+		PRUNE_ARGS=()
+		prune_uninstalled_configs() { PRUNE_ARGS=("$@"); echo "prune:${*}"; }
+		dispatch_config_subcommand --prune-uninstalled --dry-run --json
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"prune:1 0 1"* ]]
+}
+
+@test "dispatch_config_subcommand validate-config routes target and json flag" {
+	run _dispatch_config_shell '
+		source_lib platform config inspect
+		VALIDATE_ARGS=()
+		validate_config() { VALIDATE_ARGS=("$@"); echo "validate:${*}"; }
+		dispatch_config_subcommand --validate-config presets --json
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "validate:presets 1" ]]
+}
+
+@test "dispatch_config_subcommand write-local-config parses force and dry-run" {
+	run _dispatch_config_shell '
+		source_lib platform config detected-defaults
+		WRITE_ARGS=()
+		write_local_config() { WRITE_ARGS=("$@"); echo "write:${*}"; }
+		dispatch_config_subcommand --write-local-config --force --dry-run
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "write:1 1" ]]
+}

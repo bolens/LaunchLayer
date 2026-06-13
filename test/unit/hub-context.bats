@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Unit tests for lib/commands/hub/context.sh and hub_sync_one_game.
+load '../helpers.bash'
+
+setup() {
+	bats_unit_setup
+	HUB_TMP="$(mktemp -d)"
+	export XDG_CONFIG_HOME="$HUB_TMP"
+	start_hub_mock_server test-secret 0
+	write_hub_conf "$XDG_CONFIG_HOME" "$HUB_MOCK_URL" test-secret minimal
+}
+
+teardown() {
+	stop_hub_mock_server
+	[[ -n "${HUB_TMP:-}" ]] && rm -rf "$HUB_TMP"
+}
+
+@test "hub_validate_config_id rejects hyphens and short ids" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib commands hub
+		hub_validate_config_id cfg-test-1 2>&1
+	'
+	[[ $status -ne 0 ]]
+	[[ "$output" == *"Invalid hub config ID"* ]]
+}
+
+@test "hub_validate_config_id accepts lowercase alphanumeric ids" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib commands hub
+		hub_validate_config_id cfgtest00001
+		echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
+@test "hub_sync_one_game uploads via mock and sets HUB_SYNC_UPDATED" {
+	local fp='{"gpu_vendor":"nvidia","os_family":"arch","session_type":"wayland","profiles":[],"display_tier":"1440p","vrr":false,"wsl2":false,"flatpak_steam":false,"steam_deck":false,"immutable":false,"container":false}'
+	run env XDG_CONFIG_HOME="$HUB_TMP" bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib commands prefs platform hardware cli tools hub
+		hub_find_my_config_id() { return 1; }
+		hub_sync_one_game '"$(printf '%q' "$fp")"' 42424242 "Sync Game" "GAMEMODE=1" "unit test"
+		printf "updated:%s\n" "$HUB_SYNC_UPDATED"
+		printf "response:%s\n" "$HUB_SYNC_RESPONSE"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"updated:"* ]]
+	[[ "$output" == *"response:"* ]]
+	[[ "$output" == *"config_id"* || "$output" == *"updated"* ]]
+}

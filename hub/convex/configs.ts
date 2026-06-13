@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import {
   detectionValidator,
   fingerprintValidator,
@@ -10,10 +10,25 @@ import { rankConfigRecommendations } from "./lib/ranking";
 import { upsertMachineRecord } from "./lib/machines";
 import {
   buildPublishConfigPatch,
+  validateConfigDeleteTarget,
   validateConfigUpdateTarget,
 } from "./lib/publish";
+import { resolveDownloadIncrement } from "./lib/download_dedup";
+import {
+  machineConfigQuotaExceeded,
+  quotaExceededError,
+} from "./lib/quotas";
+import {
+  assertFingerprintHashMatches,
+  capScoredCandidates,
+  MAX_CONFIGS_SCORED,
+  validateDeleteRequest,
+  validateLookupIdentity,
+  validatePublishSubmission,
+  validateRecommendRequest,
+} from "./lib/validation";
 
-export const publishConfig = mutation({
+export const publishConfig = internalMutation({
   args: {
     fingerprintHash: v.string(),
     fingerprint: fingerprintValidator,
@@ -34,6 +49,12 @@ export const publishConfig = mutation({
     updated: v.boolean(),
   }),
   handler: async (ctx, args) => {
+    validatePublishSubmission({
+      ...args,
+      configId: args.configId,
+    });
+    await assertFingerprintHashMatches(args.fingerprint, args.fingerprintHash);
+
     const machineId = await upsertMachineRecord(ctx, {
       fingerprintHash: args.fingerprintHash,
       fingerprint: args.fingerprint,
@@ -87,6 +108,14 @@ export const publishConfig = mutation({
       };
     }
 
+    const machineConfigs = await ctx.db
+      .query("sharedConfigs")
+      .withIndex("by_machine_and_appid", (q) => q.eq("machineId", machineId))
+      .collect();
+    if (machineConfigQuotaExceeded(machineConfigs.length)) {
+      quotaExceededError();
+    }
+
     const configId = await ctx.db.insert("sharedConfigs", {
       machineId,
       appid: args.appid,
@@ -105,7 +134,7 @@ export const publishConfig = mutation({
   },
 });
 
-export const findMyConfig = query({
+export const findMyConfig = internalQuery({
   args: {
     fingerprintHash: v.string(),
     appid: v.string(),
@@ -119,6 +148,8 @@ export const findMyConfig = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
+    validateLookupIdentity(args);
+
     const machine = await ctx.db
       .query("machines")
       .withIndex("by_fingerprint_hash", (q) =>
@@ -147,7 +178,7 @@ export const findMyConfig = query({
   },
 });
 
-export const recommendConfigs = query({
+export const recommendConfigs = internalQuery({
   args: {
     fingerprint: fingerprintValidator,
     appid: v.string(),
@@ -169,14 +200,20 @@ export const recommendConfigs = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 10;
+    const limit = validateRecommendRequest({
+      fingerprint: args.fingerprint as Fingerprint,
+      appid: args.appid,
+      limit: args.limit,
+    });
     const configs = await ctx.db
       .query("sharedConfigs")
       .withIndex("by_appid", (q) => q.eq("appid", args.appid))
       .collect();
 
+    const bounded = capScoredCandidates(configs, MAX_CONFIGS_SCORED);
+
     const scored = await Promise.all(
-      configs.map(async (config) => {
+      bounded.map(async (config) => {
         const machine = await ctx.db.get(config.machineId);
         if (!machine) {
           return null;
@@ -207,7 +244,7 @@ export const recommendConfigs = query({
   },
 });
 
-export const getConfig = query({
+export const getConfig = internalQuery({
   args: { configId: v.id("sharedConfigs") },
   returns: v.union(
     v.object({
@@ -241,23 +278,47 @@ export const getConfig = query({
   },
 });
 
-export const recordDownload = mutation({
-  args: { configId: v.id("sharedConfigs") },
+export const recordDownload = internalMutation({
+  args: {
+    configId: v.id("sharedConfigs"),
+    identifier: v.string(),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     const config = await ctx.db.get(args.configId);
     if (!config) {
       throw new Error("Config not found");
     }
+
+    const existing = await ctx.db
+      .query("configDownloadDedup")
+      .withIndex("by_config_and_identifier", (q) =>
+        q.eq("configId", args.configId).eq("identifier", args.identifier),
+      )
+      .unique();
+    if (existing) {
+      return null;
+    }
+
+    const { nextDownloads } = resolveDownloadIncrement(config.downloads, false);
+
+    await ctx.db.insert("configDownloadDedup", {
+      configId: args.configId,
+      identifier: args.identifier,
+      recordedAt: Date.now(),
+    });
     await ctx.db.patch(args.configId, {
-      downloads: config.downloads + 1,
+      downloads: nextDownloads,
     });
     return null;
   },
 });
 
-export const deleteConfig = mutation({
-  args: { configId: v.id("sharedConfigs") },
+export const deleteConfig = internalMutation({
+  args: {
+    configId: v.id("sharedConfigs"),
+    fingerprintHash: v.string(),
+  },
   returns: v.union(
     v.object({
       deleted_config_id: v.id("sharedConfigs"),
@@ -266,12 +327,18 @@ export const deleteConfig = mutation({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    const config = await ctx.db.get(args.configId);
-    if (!config) {
-      return null;
-    }
+    validateDeleteRequest({
+      configId: args.configId,
+      fingerprintHash: args.fingerprintHash,
+    });
 
-    const machineId = config.machineId;
+    const config = await ctx.db.get(args.configId);
+    const machine = config ? await ctx.db.get(config.machineId) : null;
+    validateConfigDeleteTarget(config, machine, {
+      fingerprintHash: args.fingerprintHash,
+    });
+
+    const machineId = config!.machineId;
     await ctx.db.delete(args.configId);
 
     const remaining = await ctx.db

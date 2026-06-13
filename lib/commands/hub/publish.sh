@@ -66,6 +66,7 @@ hub_publish_config() {
 			name="$(hub_json_get "$line" name 2>/dev/null || echo "AppID $id")"
 			path="$(resolve_appid_env_path "$id" 2>/dev/null || true)"
 			[[ -f "$path" ]] || continue
+			hub_validate_local_env_file "$path" "Config for $name ($id)" || return 1
 			content="$(cat "$path")"
 			hub_sync_one_game "$fingerprint" "$id" "$name" "$content" "$note" || return 1
 			published+=("$id")
@@ -100,6 +101,7 @@ hub_publish_config() {
 		echo "No config at $path — run --init-appid first" >&2
 		return 1
 	}
+	hub_validate_local_env_file "$path" "Config for $name ($appid)" || return 1
 	content="$(cat "$path")"
 	hub_sync_one_game "$fingerprint" "$appid" "$name" "$content" "$note" "$config_id" || return 1
 	response="$HUB_SYNC_RESPONSE"
@@ -153,6 +155,7 @@ hub_update_config() {
 			name="$(hub_json_get "$line" name 2>/dev/null || echo "AppID $id")"
 			path="$(resolve_appid_env_path "$id" 2>/dev/null || true)"
 			[[ -f "$path" ]] || continue
+			hub_validate_local_env_file "$path" "Config for $name ($id)" || return 1
 			existing_id="$(hub_find_my_config_id "$id" "$fingerprint" 2>/dev/null || true)"
 			if [[ -z "$existing_id" ]]; then
 				if [[ "$only_existing" == "1" ]]; then
@@ -205,6 +208,7 @@ hub_update_config() {
 		echo "No local config at $path — run --init-appid first" >&2
 		return 1
 	}
+	hub_validate_local_env_file "$path" "Config for $name ($appid)" || return 1
 	content="$(cat "$path")"
 	hub_sync_one_game "$fingerprint" "$appid" "$name" "$content" "$note" "$config_id" || return 1
 	response="$HUB_SYNC_RESPONSE"

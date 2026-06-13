@@ -6,14 +6,20 @@
   "scripts": {
     "dev": "convex dev",
     "convex:deploy": "convex deploy",
-    "test": "tsx --test convex/lib/*.test.ts"
+    "test": "pnpm test:unit && pnpm test:convex",
+    "test:unit": "tsx --test convex/lib/*.test.ts",
+    "test:convex": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "convex": "^1.41.0"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
     "@types/node": "^25.9.3",
+    "convex-test": "^0.0.53",
     "tsx": "^4.19.4",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.8"
   }
 }

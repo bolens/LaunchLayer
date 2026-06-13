@@ -4,10 +4,16 @@
 [[ -n "${LAUNCHLAYER_COMMANDS_HUB_APPLY_LOADED:-}" ]] && return 0
 LAUNCHLAYER_COMMANDS_HUB_APPLY_LOADED=1
 
+# hub_validate_downloaded_env — Lint downloaded env content before writing.
+hub_validate_downloaded_env() {
+	local appid=$1 file=$2
+	hub_validate_local_env_file "$file" "Hub config for AppID $appid"
+}
+
 # hub_apply_config — Download and merge a shared config by hub config id.
 hub_apply_config() {
 	local config_id="" dry_run=0 json=0 arg
-	local response env_content path appid published_at
+	local response env_content path appid published_at tmp_env
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
@@ -24,6 +30,7 @@ hub_apply_config() {
 		echo "Usage: launchlayer --hub-apply CONFIG_ID [--dry-run] [--json]" >&2
 		return 1
 	}
+	hub_validate_config_id "$config_id" || return 1
 
 	command_required_or_fail curl "Hub apply" || return 1
 	hub_require_url || return 1
@@ -42,9 +49,21 @@ hub_apply_config() {
 		echo "Hub response missing appid or env_content" >&2
 		return 1
 	}
+	[[ "$appid" =~ ^[0-9]+$ ]] || {
+		echo "Hub response has invalid appid: $appid" >&2
+		return 1
+	}
+
+	tmp_env="$(mktemp)"
+	printf '%s\n' "$env_content" > "$tmp_env"
+	hub_validate_downloaded_env "$appid" "$tmp_env" || {
+		rm -f "$tmp_env"
+		return 1
+	}
 
 	path="$(resolve_appid_env_path "$appid")"
 	if [[ "$dry_run" == "1" ]]; then
+		rm -f "$tmp_env"
 		if [[ "$json" == "1" ]]; then
 			printf '{"appid":%s,"path":%s,"env_content":%s}\n' \
 				"$(json_string "$appid")" \
@@ -61,7 +80,8 @@ hub_apply_config() {
 	if [[ -f "$path" ]]; then
 		cp "$path" "${path}.bak.$(date +%s)"
 	fi
-	printf '%s\n' "$env_content" > "$path"
+	cat "$tmp_env" > "$path"
+	rm -f "$tmp_env"
 
 	if [[ "$json" == "1" ]]; then
 		printf '{"appid":%s,"path":%s,"applied":true}\n' \

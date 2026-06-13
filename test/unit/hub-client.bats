@@ -100,3 +100,87 @@ EOF
 	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["appid"]=="42424242"' "$output"
 	rm -rf "$tmp"
 }
+
+@test "hub_curl_json rejects oversized GET responses" {
+	local tmp
+	tmp="$(mktemp -d)"
+	start_hub_mock_server test-secret 0
+	write_hub_conf "$tmp" "$HUB_MOCK_URL" "" minimal
+	run env \
+		XDG_CONFIG_HOME="$tmp" \
+		CONFIG_DIR="$CONFIG_DIR" \
+		HUB_MAX_RESPONSE_BYTES=4096 \
+		bash -c '
+			source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+			source_lib prefs hub
+			hub_curl_json GET /api/config/cfghuge0001 2>&1
+		'
+	stop_hub_mock_server
+	[[ $status -eq 1 ]]
+	[[ "$output" == *"exceeded 4096 bytes"* ]]
+	rm -rf "$tmp"
+}
+
+@test "hub_parse_publish_updated detects updated flag" {
+	run hub_parse_publish_updated '{"config_id":"cfgtest00001","updated":true}'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "1" ]]
+
+	run hub_parse_publish_updated '{"config_id":"cfgtest00001","updated":false}'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "0" ]]
+}
+
+@test "hub_parse_publish_config_id reads config_id from publish response" {
+	run hub_parse_publish_config_id '{"config_id":"cfgtest00001","updated":true}'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "cfgtest00001" ]]
+}
+
+@test "hub_recommend_payload fingerprint_hash matches client algorithm" {
+	local fp expected
+	fp='{"gpu_vendor":"nvidia","os_family":"arch","session_type":"wayland","desktop":"kde","profiles":["arch-linux"],"display_tier":"1440p","refresh_tier":"mid75_120","has_x3d":false,"vrr":false,"wsl2":false,"flatpak_steam":false,"steam_deck":false,"immutable":false,"container":false}'
+	expected="$(hub_fingerprint_hash "$fp")"
+	run hub_recommend_payload "$fp" 42424242 10
+	[[ $status -eq 0 ]]
+	python3 -c 'import json,sys; d=json.loads(sys.argv[1]); assert d["fingerprint_hash"]==sys.argv[2]' "$output" "$expected"
+}
+
+@test "hub_find_my_config_id returns config_id from mock my-config endpoint" {
+	local tmp fp
+	tmp="$(mktemp -d)"
+	fp='{"gpu_vendor":"nvidia","os_family":"arch","session_type":"wayland","desktop":"kde","profiles":["arch-linux"],"display_tier":"1440p","refresh_tier":"mid75_120","has_x3d":false,"vrr":false,"wsl2":false,"flatpak_steam":false,"steam_deck":false,"immutable":false,"container":false}'
+	start_hub_mock_server test-secret 0
+	write_hub_conf "$tmp" "$HUB_MOCK_URL" "" minimal
+	run env \
+		XDG_CONFIG_HOME="$tmp" \
+		CONFIG_DIR="$CONFIG_DIR" \
+		bash -c '
+			source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+			source_lib prefs cli hub
+			hub_find_my_config_id 42424242 "'"$fp"'"
+		'
+	stop_hub_mock_server
+	rm -rf "$tmp"
+	[[ $status -eq 0 ]]
+	[[ "$output" == "cfgtest00001" ]]
+}
+
+@test "hub_find_my_config_id returns non-zero when mock has no config" {
+	local tmp fp
+	tmp="$(mktemp -d)"
+	fp='{"gpu_vendor":"nvidia","os_family":"arch","session_type":"wayland","profiles":[],"display_tier":"1440p","vrr":false,"wsl2":false,"flatpak_steam":false,"steam_deck":false,"immutable":false,"container":false}'
+	start_hub_mock_server test-secret 0
+	write_hub_conf "$tmp" "$HUB_MOCK_URL" "" minimal
+	run env \
+		XDG_CONFIG_HOME="$tmp" \
+		CONFIG_DIR="$CONFIG_DIR" \
+		bash -c '
+			source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+			source_lib prefs cli hub
+			hub_find_my_config_id 99999999 "'"$fp"'"
+		'
+	stop_hub_mock_server
+	rm -rf "$tmp"
+	[[ $status -eq 1 ]]
+}

@@ -41,6 +41,43 @@ class HubMockHandler(BaseHTTPRequestHandler):
         if self.path == "/api/auth":
             self._send_json(200, {"publish_auth_required": AUTH_REQUIRED})
             return
+        if self.path.startswith("/api/config/"):
+            config_id = self.path.split("/api/config/", 1)[1].split("?", 1)[0]
+            if not config_id or config_id in ("missing", "cfgnotfound1"):
+                self._send_json(404, {"error": "Config not found"})
+                return
+            if config_id == "cfgbadenv01":
+                self._send_json(
+                    200,
+                    {
+                        "config_id": config_id,
+                        "appid": "42424242",
+                        "env_content": "NOT_A_REAL_LAUNCHLAYER_KEY=1\n",
+                        "published_at": 1704067200000,
+                    },
+                )
+                return
+            if config_id == "cfghuge0001":
+                self._send_json(
+                    200,
+                    {
+                        "config_id": config_id,
+                        "appid": "42424242",
+                        "env_content": "GAMEMODE=1\n" + ("X=1\n" * 20_000),
+                        "published_at": 1704067200000,
+                    },
+                )
+                return
+            self._send_json(
+                200,
+                {
+                    "config_id": config_id,
+                    "appid": "42424242",
+                    "env_content": "GAMEMODE=1\nMANGOHUD=1\n",
+                    "published_at": 1704067200000,
+                },
+            )
+            return
         self._send_json(404, {"error": "not found"})
 
     def do_POST(self) -> None:
@@ -62,7 +99,7 @@ class HubMockHandler(BaseHTTPRequestHandler):
                 if not config_id:
                     self._send_json(400, {"error": "config_id is required"})
                     return
-                if config_id == "missing":
+                if config_id in ("missing", "cfgnotfound1"):
                     self._send_json(404, {"error": "Config not found"})
                     return
                 self._send_json(
@@ -72,14 +109,66 @@ class HubMockHandler(BaseHTTPRequestHandler):
                 return
 
             if self.path == "/api/publish":
+                config_id = body.get("config_id")
+                updated = bool(config_id)
                 self._send_json(
                     200,
-                    {"config_id": "mock-config-id", "machine_id": "mock-machine-id"},
+                    {
+                        "config_id": config_id or "mocknewcfg01",
+                        "machine_id": "mock-machine-id",
+                        "updated": updated,
+                    },
                 )
                 return
 
+        if self.path == "/api/my-config":
+            appid = str(body.get("appid") or "")
+            if appid == "42424242":
+                self._send_json(
+                    200,
+                    {
+                        "config_id": "cfgtest00001",
+                        "published_at": 1704067200000,
+                        "downloads": 3,
+                    },
+                )
+                return
+            self._send_json(200, None)
+            return
+
         if self.path == "/api/recommend":
-            self._send_json(200, {"results": []})
+            self._send_json(
+                200,
+                {
+                    "results": [
+                        {
+                            "config_id": "cfgtest00001",
+                            "similarity": 92,
+                            "machine_label": "test-rig",
+                            "gpu_vendor": "nvidia",
+                            "note": "competitive preset",
+                            "published_at": 1704067200000,
+                        }
+                    ]
+                },
+            )
+            return
+
+        if self.path == "/api/similar-machines":
+            self._send_json(
+                200,
+                {
+                    "results": [
+                        {
+                            "similarity": 95,
+                            "machine_label": "similar-box",
+                            "gpu_vendor": "amd",
+                            "display": "2560x1440",
+                            "profiles": ["arch-linux"],
+                        }
+                    ]
+                },
+            )
             return
 
         self._send_json(404, {"error": "not found"})

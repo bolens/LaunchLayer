@@ -254,3 +254,27 @@ source_lib() {
 		_source_lib_module "$repo" "$module"
 	done
 }
+
+# tui_bats_menu_stub_install — Subshell-safe tui_menu queue (use with _tui_menu_queue array).
+# Call tui_bats_menu_stub_teardown when the test shell exits.
+tui_bats_menu_stub_install() {
+	_tui_menu_idx_file="$(mktemp)"
+	echo 0 > "$_tui_menu_idx_file"
+	# shellcheck disable=SC2329
+	tui_menu() {
+		local idx choice
+		idx="$(<"$_tui_menu_idx_file")"
+		choice="${_tui_menu_queue[$idx]:-Back}"
+		echo $((idx + 1)) > "$_tui_menu_idx_file"
+		printf '%s\n' "$choice"
+	}
+	# shellcheck disable=SC2329
+	tui_menu_anchored() {
+		shift 2
+		tui_menu "$@"
+	}
+}
+
+tui_bats_menu_stub_teardown() {
+	rm -f "${_tui_menu_idx_file:-}"
+}

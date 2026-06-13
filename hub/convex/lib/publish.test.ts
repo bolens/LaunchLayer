@@ -5,6 +5,7 @@ import { sampleFingerprint } from "./fixtures";
 import {
   buildPublishConfigPatch,
   publishHttpStatusForError,
+  validateConfigDeleteTarget,
   validateConfigUpdateTarget,
 } from "./publish";
 
@@ -89,14 +90,65 @@ describe("validateConfigUpdateTarget", () => {
   });
 });
 
+describe("validateConfigDeleteTarget", () => {
+  it("accepts matching fingerprint hash", () => {
+    const config = sampleConfig("sharedConfigs:1", "machines:1", "42424242");
+    const machine = sampleMachine("machines:1", "hash-abc");
+    const result = validateConfigDeleteTarget(config, machine, {
+      fingerprintHash: "hash-abc",
+    });
+    assert.equal(result._id, config._id);
+  });
+
+  it("rejects when fingerprint hash differs", () => {
+    const config = sampleConfig("sharedConfigs:1", "machines:1", "42424242");
+    const machine = sampleMachine("machines:1", "hash-abc");
+    assert.throws(
+      () =>
+        validateConfigDeleteTarget(config, machine, {
+          fingerprintHash: "hash-other",
+        }),
+      /FINGERPRINT_MISMATCH/,
+    );
+  });
+
+  it("rejects missing config", () => {
+    assert.throws(
+      () =>
+        validateConfigDeleteTarget(null, sampleMachine("machines:1", "hash"), {
+          fingerprintHash: "hash",
+        }),
+      /NOT_FOUND/,
+    );
+  });
+});
+
 describe("publishHttpStatusForError", () => {
   it("maps validation errors to HTTP statuses", () => {
+    assert.equal(
+      publishHttpStatusForError("RATE_LIMITED: Too many requests"),
+      429,
+    );
+    assert.equal(
+      publishHttpStatusForError("VALIDATION_ERROR: appid has invalid format"),
+      400,
+    );
     assert.equal(
       publishHttpStatusForError("FINGERPRINT_MISMATCH: nope"),
       409,
     );
     assert.equal(publishHttpStatusForError("APPID_MISMATCH: nope"), 400);
     assert.equal(publishHttpStatusForError("NOT_FOUND: nope"), 404);
+    assert.equal(
+      publishHttpStatusForError(
+        "QUOTA_EXCEEDED: Machine has reached the 500 shared config limit",
+      ),
+      403,
+    );
+    assert.equal(
+      publishHttpStatusForError("MACHINE_MISSING: Config machine record not found"),
+      500,
+    );
   });
 });
 
