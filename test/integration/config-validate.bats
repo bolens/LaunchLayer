@@ -25,30 +25,36 @@ setup() {
 
 @test "dry-run includes config layers" {
 	[[ -f "$REPO_ROOT/examples/games/2357570.env" ]] || skip "2357570.env missing"
-	local fake_steam
+	local fake_steam merged
 	fake_steam="$(fake_steam_root 2357570 "Overwatch")"
-	run env STEAM_ROOT="$fake_steam" LAUNCHLAYER_GAMES_DIR="$REPO_ROOT/examples/games" \
-		LAUNCHLAYER_PROFILES= "$SCRIPT" --dry-run /bin/echo test AppId=2357570
+	merged="$(
+		env STEAM_ROOT="$fake_steam" LAUNCHLAYER_GAMES_DIR="$REPO_ROOT/examples/games" \
+			LAUNCHLAYER_PROFILES= "$SCRIPT" --dry-run /bin/echo test AppId=2357570 2>&1
+	)" || status=$?
+	status=${status:-0}
 	rm -rf "$fake_steam"
 	[[ $status -eq 0 ]] || {
-		printf '# dry-run exit=%s output:\n%s\n' "$status" "$output" >&2
+		printf '# dry-run exit=%s merged output:\n%s\n' "$status" "$merged" >&2
 		return 1
 	}
-	[[ "$output" == *"Config layers"* ]]
+	[[ "$merged" == *"Config layers"* ]]
 }
 
 @test "dry-run verbose includes debug layers" {
 	[[ -f "$REPO_ROOT/examples/games/2357570.env" ]] || skip "2357570.env missing"
-	local fake_steam
+	local fake_steam merged
 	fake_steam="$(fake_steam_root 2357570 "Overwatch")"
-	run env STEAM_ROOT="$fake_steam" LAUNCHLAYER_GAMES_DIR="$REPO_ROOT/examples/games" \
-		LAUNCHLAYER_PROFILES= "$SCRIPT" --verbose --dry-run /bin/echo test AppId=2357570
+	merged="$(
+		env STEAM_ROOT="$fake_steam" LAUNCHLAYER_GAMES_DIR="$REPO_ROOT/examples/games" \
+			LAUNCHLAYER_PROFILES= "$SCRIPT" --verbose --dry-run /bin/echo test AppId=2357570 2>&1
+	)" || status=$?
+	status=${status:-0}
 	rm -rf "$fake_steam"
 	[[ $status -eq 0 ]] || {
-		printf '# dry-run exit=%s output:\n%s\n' "$status" "$output" >&2
+		printf '# dry-run exit=%s merged output:\n%s\n' "$status" "$merged" >&2
 		return 1
 	}
-	[[ "$output" == *"Config layers"* ]]
+	[[ "$merged" == *"Config layers"* ]]
 }
 
 @test "show-config json for Overwatch" {
