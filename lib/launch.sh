@@ -43,6 +43,8 @@ run_game_launch() {
 
 	if [[ "$DRY_RUN" == "1" ]]; then
 		prepare_launch_context "${steam_app_id:-}"
+		warn_missing_tools
+		apply_anticheat_guardrails
 		# shellcheck disable=SC2154  # set by prepare_launch_context / resolve_game_flags
 		debug "appid=${steam_app_id:-unknown} name=${steam_game_name:-unknown} native=$is_native eac=$is_anticheat type=${anticheat_type:-} engine=$game_engine_hint"
 		print_dry_run "$@"

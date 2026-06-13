@@ -46,7 +46,10 @@ filter_installed_vram_hog_units() {
 	for unit in $units; do
 		systemctl --user cat "$unit" >/dev/null 2>&1 && filtered+=("$unit")
 	done
-	((${#filtered[@]} > 0)) && printf '%s' "${filtered[*]}"
+	if ((${#filtered[@]} > 0)); then
+		printf '%s' "${filtered[*]}"
+	fi
+	return 0
 }
 
 # is_multi_ccd_cpu — True when X3D-style CCD selection differs from all online CPUs.
@@ -174,7 +177,7 @@ compute_detected_defaults() {
 	fi
 
 	if [[ "$systemd_user" == 1 && "$deck" != 1 && "$wsl" != 1 ]]; then
-		units="$(filter_installed_vram_hog_units "${VRAM_HOG_UNITS:-hyprwhspr.service app-dev.lizardbyte.app.Sunshine.service}")"
+		units="$(filter_installed_vram_hog_units "${VRAM_HOG_UNITS:-hyprwhspr.service app-dev.lizardbyte.app.Sunshine.service}" || true)"
 		if [[ -n "$units" ]]; then
 			detected_defaults_add VRAM_HOG_UNITS "$units" "Installed VRAM-heavy systemd user units"
 		fi
