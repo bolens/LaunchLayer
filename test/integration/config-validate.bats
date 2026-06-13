@@ -30,7 +30,10 @@ setup() {
 	run env STEAM_ROOT="$fake_steam" LAUNCHLAYER_GAMES_DIR="$REPO_ROOT/examples/games" \
 		LAUNCHLAYER_PROFILES= "$SCRIPT" --dry-run /bin/echo test AppId=2357570
 	rm -rf "$fake_steam"
-	[[ $status -eq 0 ]]
+	[[ $status -eq 0 ]] || {
+		printf '# dry-run exit=%s output:\n%s\n' "$status" "$output" >&2
+		return 1
+	}
 	[[ "$output" == *"Config layers"* ]]
 }
 
@@ -41,7 +44,10 @@ setup() {
 	run env STEAM_ROOT="$fake_steam" LAUNCHLAYER_GAMES_DIR="$REPO_ROOT/examples/games" \
 		LAUNCHLAYER_PROFILES= "$SCRIPT" --verbose --dry-run /bin/echo test AppId=2357570
 	rm -rf "$fake_steam"
-	[[ $status -eq 0 ]]
+	[[ $status -eq 0 ]] || {
+		printf '# dry-run exit=%s output:\n%s\n' "$status" "$output" >&2
+		return 1
+	}
 	[[ "$output" == *"Config layers"* ]]
 }
 
