@@ -13,13 +13,12 @@ export_config() {
 
 	command_required_or_fail tar "Config export" || return 1
 
-	[[ -n "$output" ]] || output="$(_config_bundle_default_output . launchlayer-export)"
-	if [[ -d "$output" ]]; then
-		output="$(_config_bundle_default_output "$output" launchlayer-export)"
+	if [[ "$output" != *.tar.gz ]]; then
+		output="$(_config_bundle_resolve_archive_path "$output" launchlayer-export)" || return 1
 	fi
+	mkdir -p "$(dirname "$output")"
 	output_abs="$(cd "$(dirname "$output")" 2>/dev/null && pwd)/$(basename "$output")" \
 		|| output_abs="$output"
-	mkdir -p "$(dirname "$output_abs")"
 
 	collect_managed_config_files "$include_local" "$include_profiles" files
 	tui_path="$(user_tui_config_path)"
@@ -82,20 +81,12 @@ export_config() {
 	echo "Includes: local=$([[ "$include_local" == "1" ]] && echo yes || echo no) profiles=$([[ "$include_profiles" == "1" ]] && echo yes || echo no) tui=$([[ "$include_tui" == "1" ]] && echo yes || echo no)"
 }
 
-# backup_config — Timestamped export alias (defaults to \$HOME).
+# backup_config — Timestamped export alias (defaults to backup_dir from backup.conf).
 backup_config() {
-	local output=${1:-$HOME} include_local=${2:-1} include_profiles=${3:-1} include_tui=${4:-0} json=${5:-0}
+	local output=${1:-} include_local=${2:-1} include_profiles=${3:-1} include_tui=${4:-0} json=${5:-0}
 	local path
 
-	if [[ -n "$output" && -f "$output" ]]; then
-		echo "Output path is an existing file: $output" >&2
-		return 1
-	fi
-	if [[ -z "$output" || -d "$output" ]]; then
-		path="$(_config_bundle_default_output "${output:-$HOME}" launchlayer-backup)"
-	else
-		path="$output"
-	fi
+	path="$(_config_bundle_resolve_archive_path "$output" launchlayer-backup)" || return 1
 	export_config "$path" "$include_local" "$include_profiles" "$include_tui" "$json"
 }
 # prune_backup_archives — Remove oldest launchlayer-backup-*.tar.gz files beyond --keep.

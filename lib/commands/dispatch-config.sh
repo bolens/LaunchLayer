@@ -107,7 +107,7 @@ dispatch_config_subcommand() {
 			export_config "$ec_output" "$ec_local" "$ec_profiles" "$ec_tui" "$ec_json"
 			;;
 		--backup-config)
-			local bc_output="$HOME" bc_local=1 bc_profiles=1 bc_tui=0 bc_json=0 arg
+			local bc_output="" bc_local=1 bc_profiles=1 bc_tui=0 bc_json=0 arg
 			while [[ $# -gt 0 ]]; do
 				case "$1" in
 					--output) bc_output=${2:-}; shift 2 ;;

@@ -45,6 +45,125 @@ EOF
 	rm -rf "$tmp" "$dest"
 }
 
+@test "export-config defaults output to backup.conf backup_dir" {
+	local tmp backup_dir
+	tmp="$(mktemp -d)"
+	backup_dir="$tmp/export-target"
+	mkdir -p "$tmp/launch.d/presets" "$tmp/launchlayer"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	cat > "$tmp/launchlayer/backup.conf" <<EOF
+backup_dir=$backup_dir
+keep=7
+timer_type=calendar
+on_calendar=*-*-* 03:15:00
+on_boot_sec=15min
+on_unit_active_sec=12h
+randomized_delay_sec=1800
+include_local=1
+include_profiles=1
+include_tui=0
+auto_prune=1
+EOF
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		LAUNCHLAYER_GAMES_DIR="$tmp/games" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --export-config --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *'"file_count"'* ]]
+	[[ "$output" == *"$backup_dir"* ]]
+	[[ "$output" != *'"/launchlayer-export'* ]]
+	ls "$backup_dir"/launchlayer-export-*.tar.gz >/dev/null
+	[[ $(find "$tmp" -maxdepth 1 -name 'launchlayer-export-*.tar.gz' | wc -l) -eq 0 ]]
+	rm -rf "$tmp"
+}
+
+@test "restore-backup --list uses backup.conf backup_dir when --dir omitted" {
+	local tmp backup_dir
+	tmp="$(mktemp -d)"
+	backup_dir="$tmp/conf-backups"
+	mkdir -p "$tmp/launch.d/presets" "$backup_dir" "$tmp/launchlayer"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	cat > "$tmp/launchlayer/backup.conf" <<EOF
+backup_dir=$backup_dir
+keep=7
+timer_type=calendar
+on_calendar=*-*-* 03:15:00
+on_boot_sec=15min
+on_unit_active_sec=12h
+randomized_delay_sec=1800
+include_local=1
+include_profiles=1
+include_tui=0
+auto_prune=1
+EOF
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --backup-config --output "$backup_dir"
+	[[ $status -eq 0 ]]
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --restore-backup --list --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"$backup_dir"* ]]
+	[[ "$output" == *'"count":1'* ]]
+	rm -rf "$tmp"
+}
+
+@test "restore-backup restores from backup.conf dir when --dir omitted" {
+	local tmp backup_dir
+	tmp="$(mktemp -d)"
+	backup_dir="$tmp/conf-backups"
+	mkdir -p "$tmp/launch.d/presets" "$tmp/games" "$tmp/launchlayer"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	cat > "$tmp/games/42424242.env" <<'EOF'
+# Restore Game (Steam AppID 42424242)
+INCLUDE=presets/standard.env
+GAME_EXTRA_ARGS="-from-conf-backup"
+EOF
+	cat > "$tmp/launchlayer/backup.conf" <<EOF
+backup_dir=$backup_dir
+keep=7
+timer_type=calendar
+on_calendar=*-*-* 03:15:00
+on_boot_sec=15min
+on_unit_active_sec=12h
+randomized_delay_sec=1800
+include_local=1
+include_profiles=1
+include_tui=0
+auto_prune=1
+EOF
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		LAUNCHLAYER_GAMES_DIR="$tmp/games" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --backup-config --output "$backup_dir"
+	[[ $status -eq 0 ]]
+
+	echo 'INCLUDE=presets/standard.env' > "$tmp/games/42424242.env"
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		LAUNCHLAYER_GAMES_DIR="$tmp/games" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --restore-backup --appid 42424242 --yes --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *'"applied":1'* ]]
+	[[ "$output" == *"$backup_dir"* || "$output" == *"games/42424242.env"* ]]
+	grep -q 'from-conf-backup' "$tmp/games/42424242.env"
+	rm -rf "$tmp"
+}
+
 @test "import-config merge skips existing files" {
 	local tmp archive
 	tmp="$(mktemp -d)"
@@ -79,6 +198,85 @@ EOF
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"launchlayer-backup"* ]]
 	[[ $(find "$outdir" -maxdepth 1 -name 'launchlayer-backup-*.tar.gz' | wc -l) -eq 1 ]]
+	rm -rf "$tmp"
+}
+
+@test "backup-config defaults output to backup.conf backup_dir" {
+	local tmp backup_dir
+	tmp="$(mktemp -d)"
+	backup_dir="$tmp/conf-backups"
+	mkdir -p "$tmp/launch.d/presets" "$tmp/launchlayer"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	cat > "$tmp/launchlayer/backup.conf" <<EOF
+backup_dir=$backup_dir
+keep=7
+timer_type=calendar
+on_calendar=*-*-* 03:15:00
+on_boot_sec=15min
+on_unit_active_sec=12h
+randomized_delay_sec=1800
+include_local=1
+include_profiles=1
+include_tui=0
+auto_prune=1
+EOF
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --backup-config --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"$backup_dir"* ]]
+	[[ "$output" == *launchlayer-backup-* ]]
+	ls "$backup_dir"/launchlayer-backup-*.tar.gz >/dev/null
+	[[ $(find "$tmp" -maxdepth 1 -name 'launchlayer-backup-*.tar.gz' | wc -l) -eq 0 ]]
+	rm -rf "$tmp"
+}
+
+@test "backup-config --output creates timestamped archive under non-existent dir" {
+	local tmp backup_dir
+	tmp="$(mktemp -d)"
+	backup_dir="$tmp/fresh-backups"
+	mkdir -p "$tmp/launch.d/presets" "$tmp/launchlayer"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	[[ ! -d "$backup_dir" ]]
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --backup-config --output "$backup_dir" --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"$backup_dir"* ]]
+	[[ "$output" == *launchlayer-backup-* ]]
+	[[ "$output" == *.tar.gz* ]]
+	ls "$backup_dir"/launchlayer-backup-*.tar.gz >/dev/null
+	[[ -d "$backup_dir" ]]
+	rm -rf "$tmp"
+}
+
+@test "backup-config allows consecutive backups to same dir in same second" {
+	local tmp outdir
+	tmp="$(mktemp -d)"
+	outdir="$tmp/backups"
+	mkdir -p "$tmp/launch.d/presets" "$outdir"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --backup-config --output "$outdir" --json
+	[[ $status -eq 0 ]]
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --backup-config --output "$outdir" --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *launchlayer-backup-* ]]
+	[[ $(find "$outdir" -maxdepth 1 -name 'launchlayer-backup-*.tar.gz' | wc -l) -ge 1 ]]
 	rm -rf "$tmp"
 }
 

@@ -82,8 +82,10 @@ tui_backup_transfer_menu() {
 
 	case "$action" in
 		"Export to archive")
-			read -r -p "Output path [./launchlayer-export.tar.gz]: " path </dev/tty || return 0
-			[[ -z "$path" ]] && path="./launchlayer-export.tar.gz"
+			local default_export
+			default_export="$(_config_bundle_default_output "$(default_backup_dir)" launchlayer-export)"
+			read -r -p "Output path [$default_export]: " path </dev/tty || return 0
+			[[ -z "$path" ]] && path="$default_export"
 			include_local=0 include_profiles=1 include_tui=0
 			tui_pick_export_includes include_local include_profiles include_tui || return 0
 			tui_run_paged export_config "$path" "$include_local" "$include_profiles" "$include_tui" 0 || true

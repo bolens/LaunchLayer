@@ -57,6 +57,41 @@ teardown() {
 	rm -rf "$tmp"
 }
 
+@test "prune-backups uses backup.conf dir and keep when flags omitted" {
+	local tmp backup_dir i
+	tmp="$(mktemp -d)"
+	backup_dir="$tmp/conf-backups"
+	mkdir -p "$backup_dir" "$tmp/launchlayer"
+	for i in 1 2 3; do
+		echo "backup$i" > "$backup_dir/launchlayer-backup-2026010${i}-12000${i}.tar.gz"
+		sleep 0.01
+	done
+	cat > "$tmp/launchlayer/backup.conf" <<EOF
+backup_dir=$backup_dir
+keep=1
+timer_type=calendar
+on_calendar=*-*-* 03:15:00
+on_boot_sec=15min
+on_unit_active_sec=12h
+randomized_delay_sec=1800
+include_local=1
+include_profiles=1
+include_tui=0
+auto_prune=1
+EOF
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --prune-backups --dry-run
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"$backup_dir"* ]]
+	[[ "$output" == *"keep=1"* || "$output" == *'"keep":1'* ]]
+	[[ "$output" == *"would remove"* ]]
+	[[ $(find "$backup_dir" -maxdepth 1 -name 'launchlayer-backup-*.tar.gz' | wc -l) -eq 3 ]]
+	rm -rf "$tmp"
+}
+
 @test "tui-prefs reset restores repo defaults" {
 	local tmp example
 	tmp="$(mktemp -d)"

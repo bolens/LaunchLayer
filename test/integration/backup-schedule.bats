@@ -286,6 +286,39 @@ EOF
 	rm -rf "$tmp"
 }
 
+@test "run-scheduled-backup creates fresh backup_dir from backup.conf" {
+	local tmp backup_dir
+	tmp="$(mktemp -d)"
+	backup_dir="$tmp/fresh-scheduled-backups"
+	mkdir -p "$tmp/launch.d/presets" "$tmp/launchlayer"
+	echo 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	echo 'MANGOHUD=0' > "$tmp/launch.d/presets/standard.env"
+	[[ ! -d "$backup_dir" ]]
+	cat > "$tmp/launchlayer/backup.conf" <<EOF
+backup_dir=$backup_dir
+keep=7
+auto_prune=0
+timer_type=calendar
+on_calendar=*-*-* 03:15:00
+on_boot_sec=15min
+on_unit_active_sec=12h
+randomized_delay_sec=1800
+include_local=0
+include_profiles=1
+include_tui=0
+EOF
+	run env \
+		LAUNCHLAYER_CONFIG_DIR="$tmp" \
+		XDG_CONFIG_HOME="$tmp" \
+		HOME="$tmp" \
+		"$SCRIPT" --run-scheduled-backup --json
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"$backup_dir"* || "$output" == *'"file_count"'* ]]
+	[[ -d "$backup_dir" ]]
+	ls "$backup_dir"/launchlayer-backup-*.tar.gz >/dev/null
+	rm -rf "$tmp"
+}
+
 @test "backup-prefs show reports prune policy" {
 	local tmp
 	tmp="$(mktemp -d)"

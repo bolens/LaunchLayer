@@ -235,3 +235,286 @@ setup() {
 	[[ $status -eq 0 ]]
 	[[ "$output" == "42424242" ]]
 }
+
+@test "_config_bundle_default_output places archive under non-existent path-like dir" {
+	local tmp dir
+	tmp="$(mktemp -d)"
+	dir="$tmp/custom-backups"
+	[[ ! -d "$dir" ]]
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform cli inspect
+		_config_bundle_default_output "'"$dir"'" launchlayer-export
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "$dir"/launchlayer-export-* ]]
+	[[ "$output" != /launchlayer-export-* ]]
+	[[ "$output" != launchlayer-export-* ]]
+	rm -rf "$tmp"
+}
+
+@test "_config_bundle_default_output uses bare prefix when dir is not path-like" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform cli inspect
+		_config_bundle_default_output myprefix launchlayer-export
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" =~ ^launchlayer-export-[0-9]{8}-[0-9]{6}\.tar\.gz$ ]]
+}
+
+@test "default_backup_dir reads backup_dir from backup.conf" {
+	local home xdg backup_dir
+	home="$(mktemp -d)"
+	xdg="$(mktemp -d)"
+	backup_dir="$home/my-backups"
+	mkdir -p "$xdg/launchlayer"
+	printf '%s\n' "backup_dir=$backup_dir" "keep=7" > "$xdg/launchlayer/backup.conf"
+	run env HOME="$home" XDG_CONFIG_HOME="$xdg" bash -c '
+		unset LAUNCHLAYER_BACKUP_DIR LAUNCHLAYER_BACKUP_KEEP
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform cli inspect prefs
+		default_backup_dir
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "$backup_dir" ]]
+	rm -rf "$home" "$xdg"
+}
+
+@test "default_backup_keep reads keep from backup.conf" {
+	local home xdg
+	home="$(mktemp -d)"
+	xdg="$(mktemp -d)"
+	mkdir -p "$xdg/launchlayer"
+	printf '%s\n' "backup_dir=$home/backups" "keep=12" > "$xdg/launchlayer/backup.conf"
+	run env HOME="$home" XDG_CONFIG_HOME="$xdg" bash -c '
+		unset LAUNCHLAYER_BACKUP_DIR LAUNCHLAYER_BACKUP_KEEP
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform cli inspect prefs
+		default_backup_keep
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "12" ]]
+	rm -rf "$home" "$xdg"
+}
+
+@test "list_backups uses backup.conf dir when argument omitted" {
+	local home xdg backup_dir archive
+	home="$(mktemp -d)"
+	xdg="$(mktemp -d)"
+	backup_dir="$home/conf-backups"
+	mkdir -p "$backup_dir" "$xdg/launchlayer"
+	archive="$backup_dir/launchlayer-backup-20240601-000000.tar.gz"
+	touch -d '2024-06-01 00:00:00' "$archive"
+	printf '%s\n' "backup_dir=$backup_dir" "keep=7" > "$xdg/launchlayer/backup.conf"
+	run env HOME="$home" XDG_CONFIG_HOME="$xdg" bash -c '
+		unset LAUNCHLAYER_BACKUP_DIR LAUNCHLAYER_BACKUP_KEEP
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform cli inspect prefs
+		list_backups "" 1
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"$backup_dir"* ]]
+	[[ "$output" == *'"count":1'* ]]
+	rm -rf "$home" "$xdg"
+}
+
+@test "export_config writes to backup.conf dir before it exists" {
+	local tmp home xdg backup_dir
+	tmp="$(temp_config_dir)"
+	home="$(mktemp -d)"
+	xdg="$(mktemp -d)"
+	backup_dir="$home/fresh-backups"
+	mkdir -p "$xdg/launchlayer"
+	printf '%s\n' "backup_dir=$backup_dir" "keep=7" > "$xdg/launchlayer/backup.conf"
+	[[ ! -d "$backup_dir" ]]
+	run env CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" HOME="$home" XDG_CONFIG_HOME="$xdg" bash -c '
+		unset LAUNCHLAYER_BACKUP_DIR LAUNCHLAYER_BACKUP_KEEP
+		cd "'"$tmp"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform config inspect tools prefs cli
+		export_config "" 0 1 0 1
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"$backup_dir"* ]]
+	[[ "$output" != *'"/launchlayer-export'* ]]
+	ls "$backup_dir"/launchlayer-export-*.tar.gz >/dev/null
+	[[ ! -f "$tmp/launchlayer-export-"*.tar.gz ]]
+	rm -rf "$tmp" "$home" "$xdg"
+}
+
+@test "export_config default output does not land in CONFIG_DIR when cwd is config root" {
+	local tmp home xdg backup_dir
+	tmp="$(temp_config_dir)"
+	home="$(mktemp -d)"
+	xdg="$(mktemp -d)"
+	backup_dir="$home/away-from-config"
+	mkdir -p "$xdg/launchlayer"
+	printf '%s\n' "backup_dir=$backup_dir" "keep=7" > "$xdg/launchlayer/backup.conf"
+	run env CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" HOME="$home" XDG_CONFIG_HOME="$xdg" bash -c '
+		unset LAUNCHLAYER_BACKUP_DIR LAUNCHLAYER_BACKUP_KEEP
+		cd "'"$tmp"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform config inspect tools prefs cli
+		export_config "" 0 1 0 1
+	'
+	[[ $status -eq 0 ]]
+	[[ -d "$backup_dir" ]]
+	[[ $(find "$tmp" -maxdepth 1 -name "launchlayer-export-*.tar.gz" | wc -l) -eq 0 ]]
+	[[ $(find "$backup_dir" -maxdepth 1 -name "launchlayer-export-*.tar.gz" | wc -l) -eq 1 ]]
+	rm -rf "$tmp" "$home" "$xdg"
+}
+
+@test "_config_bundle_resolve_archive_path treats non-existent path-like dir as directory" {
+	local tmp dir
+	tmp="$(mktemp -d)"
+	dir="$tmp/fresh-backups"
+	[[ ! -d "$dir" ]]
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform cli inspect prefs
+		_config_bundle_resolve_archive_path "'"$dir"'" launchlayer-backup
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "$dir"/launchlayer-backup-* ]]
+	[[ "$output" == *.tar.gz ]]
+	rm -rf "$tmp"
+}
+
+@test "_config_bundle_resolve_archive_path preserves explicit tarball file path" {
+	local archive=/tmp/custom-backup-20240101.tar.gz
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform cli inspect prefs
+		_config_bundle_resolve_archive_path "'"$archive"'" launchlayer-backup
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "$archive" ]]
+}
+
+@test "backup_config writes timestamped archive under non-existent output dir" {
+	local tmp home xdg backup_dir
+	tmp="$(temp_config_dir)"
+	home="$(mktemp -d)"
+	xdg="$(mktemp -d)"
+	backup_dir="$home/fresh-backups"
+	mkdir -p "$xdg/launchlayer"
+	printf '%s\n' "backup_dir=$backup_dir" "keep=7" > "$xdg/launchlayer/backup.conf"
+	[[ ! -d "$backup_dir" ]]
+	run env CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" HOME="$home" XDG_CONFIG_HOME="$xdg" bash -c '
+		unset LAUNCHLAYER_BACKUP_DIR LAUNCHLAYER_BACKUP_KEEP
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform config inspect tools prefs cli
+		backup_config "'"$backup_dir"'" 0 1 0 1
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"$backup_dir"* ]]
+	[[ "$output" == *launchlayer-backup-* ]]
+	[[ "$output" == *.tar.gz* ]]
+	ls "$backup_dir"/launchlayer-backup-*.tar.gz >/dev/null
+	[[ -d "$backup_dir" ]]
+	rm -rf "$tmp" "$home" "$xdg"
+}
+
+@test "backup_config defaults to backup.conf dir when output omitted" {
+	local tmp home xdg backup_dir
+	tmp="$(temp_config_dir)"
+	home="$(mktemp -d)"
+	xdg="$(mktemp -d)"
+	backup_dir="$home/conf-backups"
+	mkdir -p "$xdg/launchlayer"
+	printf '%s\n' "backup_dir=$backup_dir" "keep=7" > "$xdg/launchlayer/backup.conf"
+	run env CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" HOME="$home" XDG_CONFIG_HOME="$xdg" bash -c '
+		unset LAUNCHLAYER_BACKUP_DIR LAUNCHLAYER_BACKUP_KEEP
+		cd "'"$home"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform config inspect tools prefs cli
+		backup_config "" 0 1 0 1
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"$backup_dir"* ]]
+	[[ "$output" == *launchlayer-backup-* ]]
+	ls "$backup_dir"/launchlayer-backup-*.tar.gz >/dev/null
+	[[ $(find "$home" -maxdepth 1 -name 'launchlayer-backup-*.tar.gz' | wc -l) -eq 0 ]]
+	rm -rf "$tmp" "$home" "$xdg"
+}
+
+@test "export_config --output resolves non-existent path-like dir to timestamped archive" {
+	local tmp dir
+	tmp="$(temp_config_dir)"
+	dir="$tmp/new-export-dir"
+	[[ ! -d "$dir" ]]
+	run env CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform config inspect tools prefs cli
+		export_config "'"$dir"'" 0 1 0 1
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"$dir"* ]]
+	[[ "$output" == *launchlayer-export-* ]]
+	[[ "$output" == *.tar.gz* ]]
+	ls "$dir"/launchlayer-export-*.tar.gz >/dev/null
+	rm -rf "$tmp"
+}
+
+@test "resolve_restore_archive uses backup.conf dir when both args empty" {
+	local home xdg backup_dir archive
+	home="$(mktemp -d)"
+	xdg="$(mktemp -d)"
+	backup_dir="$home/conf-backups"
+	mkdir -p "$backup_dir" "$xdg/launchlayer"
+	archive="$backup_dir/launchlayer-backup-20240601-000000.tar.gz"
+	touch -d '2024-06-01 00:00:00' "$archive"
+	printf '%s\n' "backup_dir=$backup_dir" "keep=7" > "$xdg/launchlayer/backup.conf"
+	run env HOME="$home" XDG_CONFIG_HOME="$xdg" bash -c '
+		unset LAUNCHLAYER_BACKUP_DIR LAUNCHLAYER_BACKUP_KEEP
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform cli inspect prefs
+		resolve_restore_archive "" ""
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "$archive" ]]
+	rm -rf "$home" "$xdg"
+}
+
+@test "default_backup_dir expands tilde paths from backup.conf" {
+	local home xdg expected
+	home="$(mktemp -d)"
+	xdg="$(mktemp -d)"
+	expected="$home/custom-backups"
+	mkdir -p "$xdg/launchlayer"
+	printf '%s\n' "backup_dir=~/custom-backups" "keep=7" > "$xdg/launchlayer/backup.conf"
+	run env HOME="$home" XDG_CONFIG_HOME="$xdg" bash -c '
+		unset LAUNCHLAYER_BACKUP_DIR LAUNCHLAYER_BACKUP_KEEP
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform cli inspect prefs
+		default_backup_dir
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "$expected" ]]
+	rm -rf "$home" "$xdg"
+}
+
+@test "default_backup_dir prefers LAUNCHLAYER_BACKUP_DIR over backup.conf" {
+	local home xdg env_dir conf_dir
+	home="$(mktemp -d)"
+	xdg="$(mktemp -d)"
+	env_dir="$home/env-backups"
+	conf_dir="$home/conf-backups"
+	mkdir -p "$xdg/launchlayer"
+	printf '%s\n' "backup_dir=$conf_dir" "keep=7" > "$xdg/launchlayer/backup.conf"
+	run env HOME="$home" XDG_CONFIG_HOME="$xdg" LAUNCHLAYER_BACKUP_DIR="$env_dir" bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform cli inspect prefs
+		default_backup_dir
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "$env_dir" ]]
+	[[ "$output" != "$conf_dir" ]]
+	rm -rf "$home" "$xdg"
+}

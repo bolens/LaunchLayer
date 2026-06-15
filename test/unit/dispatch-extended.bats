@@ -55,17 +55,25 @@ _dispatch_shell() {
 }
 
 @test "dispatch_config_subcommand export-config writes archive with default output" {
-	local tmp out
+	local tmp home xdg backup_dir
 	tmp="$(temp_config_dir)"
-	out="$tmp/launch.d/../launchlayer-export-"*.tar.gz
-	run env CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" bash -c '
+	home="$(mktemp -d)"
+	xdg="$(mktemp -d)"
+	backup_dir="$home/custom-backups"
+	mkdir -p "$xdg/launchlayer"
+	printf '%s\n' "backup_dir=$backup_dir" "keep=7" > "$xdg/launchlayer/backup.conf"
+	run env CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" HOME="$home" XDG_CONFIG_HOME="$xdg" bash -c '
+		unset LAUNCHLAYER_BACKUP_DIR LAUNCHLAYER_BACKUP_KEEP
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
-		source_lib commands platform config inspect tools
+		source_lib commands platform config inspect tools prefs cli
 		dispatch_config_subcommand --export-config --json
 	'
 	[[ $status -eq 0 ]]
 	[[ "$output" == *'"file_count"'* ]]
-	rm -rf "$tmp"
+	[[ "$output" == *"$backup_dir"* ]]
+	[[ "$output" == *launchlayer-export-* ]]
+	ls "$backup_dir"/launchlayer-export-*.tar.gz >/dev/null
+	rm -rf "$tmp" "$home" "$xdg"
 }
 
 @test "dispatch_tui_subcommand quick toggles flip requires appid and line" {

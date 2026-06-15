@@ -76,9 +76,9 @@ $(cli_bold "Games & config")
   --prune-uninstalled [--dry-run] [--yes] [--json]
                                     Remove per-game .env for uninstalled games
   --export-config [--output PATH] [--include-local] [--no-profiles] [--include-tui] [--json]
-                                    Pack launch.d + games configs into a tarball
+                                    Pack launch.d + games configs (default: backup_dir from backup.conf)
   --backup-config [--output DIR|PATH] [--exclude-local] [--no-profiles] [--include-tui] [--json]
-                                    Timestamped export (default: ~/launchlayer-backup-*.tar.gz)
+                                    Timestamped backup (default: backup_dir from backup.conf)
   --import-config ARCHIVE [--dry-run] [--yes] [--merge|--replace] [--exclude-local]
                           [--no-profiles] [--include-tui] [--json]
                                     Restore configs from export/backup tarball

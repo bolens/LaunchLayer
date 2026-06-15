@@ -20,8 +20,8 @@ _backup_prefs_expand_path() {
 	local path=$1
 	case "$path" in
 		"~") printf '%s\n' "$HOME" ;;
-		"~"/*) printf '%s/%s\n' "$HOME" "${path#~/}" ;;
-		\$HOME/*) printf '%s/%s\n' "$HOME" "${path#\$HOME/}" ;;
+		"~"/*) printf '%s/%s\n' "$HOME" "${path:2}" ;;
+		\$HOME/*) printf '%s/%s\n' "$HOME" "${path:6}" ;;
 		*) printf '%s\n' "$path" ;;
 	esac
 }

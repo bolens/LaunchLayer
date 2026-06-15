@@ -57,6 +57,26 @@ _dispatch_shell() {
 	[[ "$output" == *"backup:"* ]]
 }
 
+@test "handle_subcommand prune-backups reads backup.conf when --dir omitted" {
+	local home xdg backup_dir
+	home="$(mktemp -d)"
+	xdg="$(mktemp -d)"
+	backup_dir="$home/conf-backups"
+	mkdir -p "$xdg/launchlayer"
+	printf '%s\n' "backup_dir=$backup_dir" "keep=6" > "$xdg/launchlayer/backup.conf"
+	run env HOME="$home" XDG_CONFIG_HOME="$xdg" bash -c '
+		unset LAUNCHLAYER_BACKUP_DIR LAUNCHLAYER_BACKUP_KEEP
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib commands cli platform config inspect prefs
+		prune_backup_archives() { printf "prune:%s\n" "$*"; }
+		handle_subcommand --prune-backups --keep 2 --dry-run
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"prune:$backup_dir 2 1 0"* ]]
+	rm -rf "$home" "$xdg"
+}
+
 @test "handle_subcommand routes hub-search through hub dispatch" {
 	run _dispatch_shell '
 		source_lib hub prefs platform hardware cli tools

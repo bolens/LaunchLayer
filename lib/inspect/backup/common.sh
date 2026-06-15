@@ -20,11 +20,27 @@ config_bundle_sha256() {
 _config_bundle_default_output() {
 	local dir=${1:-.} prefix=${2:-launchlayer-export} ts
 	ts="$(date -u +%Y%m%d-%H%M%S)"
-	if [[ -d "$dir" ]]; then
+	# Path-like targets (e.g. backup_dir from backup.conf) may not exist yet on first export.
+	if [[ -d "$dir" || "$dir" == */* ]]; then
 		printf '%s/%s-%s.tar.gz' "$dir" "$prefix" "$ts"
 	else
 		printf '%s-%s.tar.gz' "$prefix" "$ts"
 	fi
+}
+
+# _config_bundle_resolve_archive_path — Resolve OUTPUT (empty, dir, or file) to a tarball path.
+_config_bundle_resolve_archive_path() {
+	local output=${1:-} prefix=${2:-launchlayer-export}
+	if [[ -n "$output" && -f "$output" ]]; then
+		echo "Output path is an existing file: $output" >&2
+		return 1
+	fi
+	[[ -z "$output" ]] && output="$(default_backup_dir)"
+	if [[ -d "$output" || ( "$output" == */* && "$output" != *.tar.gz ) ]]; then
+		_config_bundle_default_output "$output" "$prefix"
+		return 0
+	fi
+	printf '%s\n' "$output"
 }
 
 # _write_config_bundle_manifest — Write manifest.json into a staging directory.

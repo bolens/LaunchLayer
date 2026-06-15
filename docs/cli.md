@@ -80,8 +80,8 @@ Place before subcommands:
 
 | Command | Description |
 |---------|-------------|
-| `--export-config [--output PATH] [--include-local] [--no-profiles] [--include-tui] [--json]` | Export config bundle (timestamped `.tar.gz` by default) |
-| `--backup-config [--output DIR\|PATH] [--exclude-local] [--no-profiles] [--include-tui] [--json]` | Backup alias with backup-dir defaults |
+| `--export-config [--output PATH] [--include-local] [--no-profiles] [--include-tui] [--json]` | Export config bundle (default: timestamped `launchlayer-export-*.tar.gz` in `backup_dir` from `backup.conf`, else `~/launchlayer-backups`) |
+| `--backup-config [--output DIR\|PATH] [--exclude-local] [--no-profiles] [--include-tui] [--json]` | Scheduled-style backup (default: timestamped `launchlayer-backup-*.tar.gz` in `backup_dir` from `backup.conf`, else `~/launchlayer-backups`; `DIR` may not exist yet) |
 | `--import-config ARCHIVE [--yes] [--merge\|--replace] [--exclude-local] [--no-profiles] [--include-tui] [--json]` | Restore bundle (dry-run by default; pass `--yes` to apply) |
 | `--restore-backup [ARCHIVE\|DIR] [--dir PATH] [--list] [--appid APPID\|NAME] [--yes] [--merge\|--replace] …` | Restore from latest or chosen backup archive (replace by default) |
 | `--prune-backups [--dir PATH] [--keep N] [--dry-run] [--json]` | Remove old backup archives |
