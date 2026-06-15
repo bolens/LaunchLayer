@@ -32,6 +32,62 @@ setup() {
 	[[ "$output" == skipped ]]
 }
 
+@test "launch_wrapper_available game-performance requires game-performance binary" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		command_available() { [[ "$1" == cpupower ]]; }
+		optional_tool_installed game-performance && echo perf-installed || echo perf-missing
+		launch_wrapper_available game-performance && echo wrapper-yes || echo wrapper-no
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"perf-installed"* ]]
+	[[ "$output" == *"wrapper-no"* ]]
+}
+
+@test "launch_wrapper_available gamemoderun matches optional_tool_installed" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		optional_tool_installed() { [[ "$1" == gamemoderun ]]; }
+		launch_wrapper_available gamemoderun && echo yes || echo no
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == yes ]]
+}
+
+@test "launch_wrapper_available uses command_available for custom wrappers" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		command_available() { [[ "$1" == dlss-swapper ]]; }
+		launch_wrapper_available dlss-swapper && echo yes || echo no
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == yes ]]
+}
+
+@test "append_launch_wrappers uses launch_wrapper_available for known tools" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export LAUNCH_WRAPPERS_BEFORE="gamemoderun"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform runtime
+		optional_tool_installed() { [[ "$1" == gamemoderun ]]; }
+		launch=()
+		append_launch_wrappers
+		printf "%s\n" "${launch[@]}"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == gamemoderun ]]
+}
+
 @test "optional_tool_installed accepts cpupower as game-performance fallback" {
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"

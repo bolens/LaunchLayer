@@ -12,7 +12,7 @@ setup() {
 	echo 'NOT_A_REAL_KEY=1' > "$tmp/launch.d/presets/bad.env"
 	run env CONFIG_DIR="$tmp" VALIDATION_FILE="$tmp/launch.d/presets/bad.env" bash -c '
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
-		source_lib platform steam keys config inspect
+		source_lib platform steam keys config runtime inspect
 		validate_single_config_file "$VALIDATION_FILE" 2>&1
 	'
 	[[ $status -ne 0 ]]
@@ -29,7 +29,7 @@ FORCE_PROTON=1
 EOF
 	run env CONFIG_DIR="$tmp" VALIDATION_FILE="$tmp/launch.d/local.env" bash -c '
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
-		source_lib platform steam keys config inspect
+		source_lib platform steam keys config runtime inspect
 		validate_single_config_file "$VALIDATION_FILE" 2>&1
 	'
 	[[ $status -ne 0 ]]
@@ -43,11 +43,45 @@ EOF
 	echo 'INCLUDE=missing-preset.env' > "$tmp/launch.d/local.env"
 	run env CONFIG_DIR="$tmp" VALIDATION_FILE="$tmp/launch.d/local.env" bash -c '
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
-		source_lib platform steam keys config inspect
+		source_lib platform steam keys config runtime inspect
 		validate_single_config_file "$VALIDATION_FILE" 2>&1
 	'
 	[[ $status -ne 0 ]]
 	[[ "$output" == *"INCLUDE target missing: missing-preset.env"* ]]
+	rm -rf "$tmp"
+}
+
+@test "validate_single_config_file flags duplicate gamemoderun in same file" {
+	local tmp
+	tmp="$(temp_config_dir)"
+	cat > "$tmp/launch.d/local.env" <<'EOF'
+GAMEMODE=1
+LAUNCH_WRAPPERS_BEFORE=gamemoderun
+EOF
+	run env CONFIG_DIR="$tmp" VALIDATION_FILE="$tmp/launch.d/local.env" bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform steam keys config runtime inspect
+		validate_single_config_file "$VALIDATION_FILE" 2>&1
+	'
+	[[ $status -ne 0 ]]
+	[[ "$output" == *"LAUNCH_WRAPPERS includes gamemoderun while GAMEMODE=1"* ]]
+	rm -rf "$tmp"
+}
+
+@test "validate_resolved_launch_wrappers flags layered wrapper overlap" {
+	local tmp
+	tmp="$(temp_config_dir)"
+	mkdir -p "$tmp/games"
+	printf '%s\n' 'GAMEMODE=1' > "$tmp/launch.d/default.env"
+	printf '%s\n' 'LAUNCH_WRAPPERS_BEFORE=gamemoderun' > "$tmp/games/42424242.env"
+	run env CONFIG_DIR="$tmp" LAUNCHLAYER_GAMES_DIR="$tmp/games" bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform steam keys config runtime inspect
+		_validate_resolved_launch_wrappers_for_appid 42424242 "$CONFIG_DIR/games/42424242.env" 2>&1
+	'
+	[[ $status -ne 0 ]]
+	[[ "$output" == *"resolved: LAUNCH_WRAPPERS includes gamemoderun while GAMEMODE=1"* ]]
+	[[ "$output" == *"resolved: duplicate gamemoderun"* ]]
 	rm -rf "$tmp"
 }
 
@@ -57,7 +91,7 @@ EOF
 	echo 'GAMEMODE=1' > "$tmp/launch.d/local.env"
 	run env CONFIG_DIR="$tmp" VALIDATION_FILE="$tmp/launch.d/local.env" bash -c '
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
-		source_lib platform steam keys config inspect
+		source_lib platform steam keys config runtime inspect
 		validate_single_config_file "$VALIDATION_FILE" 2>&1
 	'
 	[[ $status -eq 0 ]]

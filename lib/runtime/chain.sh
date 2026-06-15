@@ -8,7 +8,7 @@ LAUNCHLAYER_RUNTIME_CHAIN_LOADED=1
 append_launch_wrappers_from() {
 	local wrappers=$1 wrapper
 	for wrapper in $wrappers; do
-		if command_available "$wrapper"; then
+		if launch_wrapper_available "$wrapper"; then
 			launch+=("$wrapper")
 		else
 			debug "launch wrapper skipped (not installed): $wrapper"
@@ -59,7 +59,7 @@ build_launch_chain() {
 	elif [[ "${DISABLE_CPU_AFFINITY:-0}" != "1" ]]; then
 		debug "taskset unavailable — continuing without CPU affinity wrapper"
 	fi
-	if [[ "${GAME_PERFORMANCE:-1}" == "1" ]] && command_available game-performance; then
+	if [[ "${GAME_PERFORMANCE:-1}" == "1" ]] && launch_wrapper_available game-performance; then
 		launch+=(game-performance)
 	fi
 	append_launch_wrappers_after_performance
@@ -102,6 +102,56 @@ build_launch_chain() {
 	debug "launch chain: ${launch[*]}"
 }
 
+# launch_wrapper_config_conflict_errors — Flag LAUNCH_WRAPPERS* overlapping built-in features.
+launch_wrapper_config_conflict_errors() {
+	local wrapper
+	local -a errors=()
+
+	for wrapper in ${LAUNCH_WRAPPERS_BEFORE:-} ${LAUNCH_WRAPPERS:-}; do
+		case "$wrapper" in
+			gamemoderun)
+				[[ "${GAMEMODE:-0}" == "1" ]] \
+					&& errors+=("LAUNCH_WRAPPERS includes gamemoderun while GAMEMODE=1")
+				;;
+			gamescope)
+				[[ "${GAMESCOPE:-0}" == "1" ]] \
+					&& errors+=("LAUNCH_WRAPPERS includes gamescope while GAMESCOPE=1")
+				;;
+			mangohud)
+				[[ "${MANGOHUD:-0}" == "1" ]] \
+					&& errors+=("LAUNCH_WRAPPERS includes mangohud while MANGOHUD=1")
+				;;
+			game-performance)
+				[[ "${GAME_PERFORMANCE:-1}" == "1" ]] \
+					&& errors+=("LAUNCH_WRAPPERS includes game-performance while GAME_PERFORMANCE=1")
+				;;
+		esac
+	done
+
+	if ((${#errors[@]})); then
+		printf '%s\n' "${errors[@]}"
+	fi
+}
+
+# warn_launch_chain_issues — Warn on config/chain wrapper conflicts; return 1 when any exist.
+warn_launch_chain_issues() {
+	local line had_issue=0
+
+	while IFS= read -r line; do
+		[[ -n "$line" ]] || continue
+		warn "launch chain: $line"
+		had_issue=1
+	done < <(launch_wrapper_config_conflict_errors)
+
+	while IFS= read -r line; do
+		[[ -n "$line" ]] || continue
+		warn "launch chain: $line"
+		had_issue=1
+	done < <(launch_chain_duplicate_wrapper_errors)
+
+	(( !had_issue ))
+}
+
 # launch_chain_uses_mangohud — True when the resolved chain enables MangoHUD.
 launch_chain_uses_mangohud() {
 	local item
@@ -109,4 +159,44 @@ launch_chain_uses_mangohud() {
 		[[ "$item" == mangohud || "$item" == --mangoapp ]] && return 0
 	done
 	return 1
+}
+
+# launch_chain_count_token — Count exact token matches in launch[].
+launch_chain_count_token() {
+	local token=$1 item count=0
+	for item in "${launch[@]}"; do
+		[[ "$item" == "$token" ]] && ((count++))
+	done
+	printf '%s' "$count"
+}
+
+# launch_chain_duplicate_wrapper_errors — One line per duplicate/conflict; empty when ok.
+launch_chain_duplicate_wrapper_errors() {
+	local wrapper item count=0
+	local -a errors=()
+	local has_mangohud=0 has_mangoapp=0
+
+	for wrapper in gamemoderun game-performance gamescope mangohud; do
+		count="$(launch_chain_count_token "$wrapper")"
+		if (( count > 1 )); then
+			errors+=("duplicate $wrapper in launch chain (count=$count)")
+		fi
+	done
+
+	for item in "${launch[@]}"; do
+		[[ "$item" == mangohud ]] && has_mangohud=1
+		[[ "$item" == --mangoapp ]] && has_mangoapp=1
+	done
+	if (( has_mangohud && has_mangoapp )); then
+		errors+=("mangohud wrapper and gamescope --mangoapp both present")
+	fi
+
+	if ((${#errors[@]})); then
+		printf '%s\n' "${errors[@]}"
+	fi
+}
+
+# launch_chain_has_duplicate_wrappers — True when launch_chain_duplicate_wrapper_errors is non-empty.
+launch_chain_has_duplicate_wrappers() {
+	[[ -n "$(launch_chain_duplicate_wrapper_errors)" ]]
 }

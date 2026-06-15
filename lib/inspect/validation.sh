@@ -1,5 +1,90 @@
 # shellcheck shell=bash
 # lib/inspect/validation.sh
+
+# _validate_file_wrapper_flag_overlaps — Same-file LAUNCH_WRAPPERS* vs built-in feature flags.
+_validate_file_wrapper_flag_overlaps() {
+	local file=$1
+	local line_num=0 line key value
+	local file_gamemode=0 file_gamescope=0 file_mangohud=0 file_game_perf=1
+	local wrappers_before="" wrappers="" msg issues=0
+	local -a msgs=()
+
+	[[ -f "$file" ]] || return 0
+
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		((line_num++)) || true
+		line="${line%%#*}"
+		line="${line#"${line%%[![:space:]]*}"}"
+		line="${line%"${line##*[![:space:]]}"}"
+		[[ -z "$line" ]] || [[ "$line" =~ ^INCLUDE= ]] && continue
+		[[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]] || continue
+		key="${BASH_REMATCH[1]}"
+		value="${BASH_REMATCH[2]}"
+		value="${value#\"}"; value="${value%\"}"
+		case "$key" in
+			GAMEMODE) [[ "$value" == "1" ]] && file_gamemode=1 ;;
+			GAMESCOPE) [[ "$value" == "1" ]] && file_gamescope=1 ;;
+			MANGOHUD) [[ "$value" == "1" ]] && file_mangohud=1 ;;
+			GAME_PERFORMANCE) [[ "$value" == "0" ]] && file_game_perf=0 ;;
+			LAUNCH_WRAPPERS_BEFORE) wrappers_before="$value" ;;
+			LAUNCH_WRAPPERS) wrappers="$value" ;;
+		esac
+	done < "$file"
+
+	while IFS= read -r msg; do
+		[[ -n "$msg" ]] || continue
+		msgs+=("$msg")
+	done < <(
+		GAMEMODE=$file_gamemode GAMESCOPE=$file_gamescope MANGOHUD=$file_mangohud GAME_PERFORMANCE=$file_game_perf \
+			LAUNCH_WRAPPERS_BEFORE="$wrappers_before" LAUNCH_WRAPPERS="$wrappers" \
+			launch_wrapper_config_conflict_errors
+	)
+
+	for msg in "${msgs[@]}"; do
+		echo "$file: $msg"
+		((issues++)) || true
+	done
+
+	return "$issues"
+}
+
+# _validate_resolved_launch_wrappers_for_appid — Layered config + simulated launch chain checks.
+_validate_resolved_launch_wrappers_for_appid() {
+	local appid=$1 file=$2
+	local line issues=0 saved_is_native
+
+	[[ "$appid" =~ ^[0-9]+$ ]] || return 0
+
+	reset_config_state
+	steam_app_id="$appid"
+	load_launch_config
+	apply_defaults
+	parse_game_extra_args
+
+	while IFS= read -r line; do
+		[[ -n "$line" ]] || continue
+		echo "$file: resolved: $line"
+		((issues++)) || true
+	done < <(launch_wrapper_config_conflict_errors)
+
+	saved_is_native=$is_native
+	optional_tool_installed() { return 0; }
+	command_available() { return 0; }
+	default_online_cpus() { echo 0-3; }
+	is_native=$saved_is_native
+	launch=()
+	apply_proton_env
+	build_launch_chain
+
+	while IFS= read -r line; do
+		[[ -n "$line" ]] || continue
+		echo "$file: resolved: $line"
+		((issues++)) || true
+	done < <(launch_chain_duplicate_wrapper_errors)
+
+	return "$issues"
+}
+
 # validate_single_config_file — Lint one .env file; print issues to stdout.
 validate_single_config_file() {
 	local file=$1
@@ -42,7 +127,7 @@ validate_single_config_file() {
 			LAUNCH_WRAPPERS|LAUNCH_WRAPPERS_BEFORE)
 				local wrapper
 				for wrapper in $value; do
-					command_available "$wrapper" || {
+					launch_wrapper_available "$wrapper" || {
 						local hint=""
 						hint="$(tool_install_hint "$wrapper" 2>/dev/null || true)"
 						echo "$file:$line_num: wrapper not found: $wrapper${hint:+ — $hint}"
@@ -69,6 +154,8 @@ validate_single_config_file() {
 		echo "$file: conflicting FORCE_NATIVE=1 and FORCE_PROTON=1"
 		((issues++)) || true
 	fi
+
+	_validate_file_wrapper_flag_overlaps "$file" || issues=$((issues + $?))
 
 	return "$issues"
 }
@@ -170,6 +257,8 @@ validate_config() {
 					[[ -n "${validated_appids[$v_appid]+x}" ]] && continue
 					validated_appids["$v_appid"]=1
 					validate_single_config_file "$file" || issues=$((issues + $?))
+					_validate_resolved_launch_wrappers_for_appid "$v_appid" "$file" \
+						|| issues=$((issues + $?))
 				done
 				;;
 			default|presets|local)
@@ -200,6 +289,8 @@ validate_config() {
 					return 1
 				fi
 				validate_single_config_file "$file" || issues=$((issues + $?))
+				_validate_resolved_launch_wrappers_for_appid "$t" "$file" \
+					|| issues=$((issues + $?))
 				;;
 		esac
 	}

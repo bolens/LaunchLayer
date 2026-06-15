@@ -156,6 +156,10 @@ apply_proton_env() {
 	export DXVK_ASYNC=${DXVK_ASYNC:-1}
 	apply_unset_vars
 
+	if [[ "${MANGOHUD:-0}" == "1" && "${DXVK_HUD:-0}" != "0" ]]; then
+		warn "MANGOHUD=1 with DXVK_HUD=${DXVK_HUD} may show duplicate overlays — unset DXVK_HUD or disable MangoHUD"
+	fi
+
 	if [[ "${MANGOHUD_LOG:-0}" == "1" ]]; then
 		export MANGOHUD_LOG=1
 	fi

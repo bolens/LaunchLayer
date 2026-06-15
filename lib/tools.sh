@@ -115,6 +115,23 @@ optional_tool_installed() {
 	esac
 }
 
+# launch_wrapper_available — True when a LAUNCH_WRAPPERS* entry can be executed.
+# Mirrors build_launch_chain availability rules for known launch tools.
+launch_wrapper_available() {
+	local wrapper=$1
+	case "$wrapper" in
+		game-performance)
+			command_available game-performance
+			;;
+		gamemoderun|gamescope|mangohud|taskset)
+			optional_tool_installed "$wrapper"
+			;;
+		*)
+			command_available "$wrapper"
+			;;
+	esac
+}
+
 # tool_packages_data_file — Shipped TSV mapping logical tools to distro packages.
 tool_packages_data_file() {
 	printf '%s/tool-packages.tsv' "$(launchlayer_share_dir)"
@@ -306,7 +323,7 @@ warn_enabled_missing_tools() {
 		warn "VRAM_HOGS=1 but systemd user session is unavailable and VRAM_HOG_PIDS is unset — hogs will not be paused"
 	fi
 	for wrapper in ${LAUNCH_WRAPPERS_BEFORE:-} ${LAUNCH_WRAPPERS:-}; do
-		command_available "$wrapper" && continue
+		launch_wrapper_available "$wrapper" && continue
 		hint="$(tool_install_hint "$wrapper" 2>/dev/null || true)"
 		warn "LAUNCH_WRAPPERS expects '$wrapper' but it is not installed${hint:+ — $hint}"
 	done

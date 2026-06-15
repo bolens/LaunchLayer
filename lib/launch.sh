@@ -24,6 +24,7 @@ prepare_launch_context() {
 	parse_game_extra_args
 	apply_proton_env
 	build_launch_chain
+	warn_launch_chain_issues
 }
 
 # run_game_launch — Full launch pipeline for Steam's %command% argv.
@@ -42,7 +43,10 @@ run_game_launch() {
 	detect_steam_app_id "$@"
 
 	if [[ "$DRY_RUN" == "1" ]]; then
-		prepare_launch_context "${steam_app_id:-}"
+		prepare_launch_context "${steam_app_id:-}" || {
+			echo "Dry run aborted: fix duplicate launch wrappers above." >&2
+			exit 1
+		}
 		warn_missing_tools
 		apply_anticheat_guardrails
 		debug "appid=${steam_app_id:-unknown} name=${steam_game_name:-unknown} native=$is_native eac=$is_anticheat type=${anticheat_type:-} engine=$game_engine_hint"
@@ -92,6 +96,7 @@ run_game_launch() {
 	apply_nvidia_power_mode
 	apply_proton_env
 	build_launch_chain
+	warn_launch_chain_issues || true
 
 	run_pre_launch_cmd
 

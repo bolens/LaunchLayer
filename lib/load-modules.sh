@@ -56,6 +56,7 @@ launchlayer_source_backup() {
 
 # launchlayer_source_inspect — Config inspection, validation, backup bundles.
 launchlayer_source_inspect() {
+	[[ -n "${LAUNCHLAYER_TOOLS_LOADED:-}" ]] || source "$LIB_DIR/tools.sh"
 	# shellcheck source=keys.sh
 	source "$LIB_DIR/keys.sh"
 	# shellcheck source=inspect/show.sh
@@ -171,6 +172,7 @@ launchlayer_source_commands_hub() {
 
 # launchlayer_source_runtime — Launch hooks, env tuning, wrapper chain, logging.
 launchlayer_source_runtime() {
+	[[ -n "${LAUNCHLAYER_TOOLS_LOADED:-}" ]] || source "$LIB_DIR/tools.sh"
 	# shellcheck source=runtime/summary.sh
 	source "$LIB_DIR/runtime/summary.sh"
 	# shellcheck source=runtime/tuning.sh

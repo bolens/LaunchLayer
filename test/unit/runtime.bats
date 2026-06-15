@@ -230,6 +230,19 @@ setup() {
 	[[ "$output" == *"postlaunch-marker"* ]]
 }
 
+@test "apply_proton_env warns when MANGOHUD and DXVK_HUD are both enabled" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export is_native=0 MANGOHUD=1 DXVK_HUD=fps
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime
+		apply_proton_env 2>&1
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"duplicate overlays"* ]]
+	[[ "$output" == *"DXVK_HUD=fps"* ]]
+}
+
 @test "print_dry_run shows launch chain and config layers" {
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"
