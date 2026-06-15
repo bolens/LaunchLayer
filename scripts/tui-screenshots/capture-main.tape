@@ -3,7 +3,7 @@ Source scripts/tui-screenshots/settings.tape
 Output docs/assets/tui-main-menu.png
 
 Hide
-Type "cd /mnt/games/config && clear"
+Type "clear"
 Enter
 Show
 

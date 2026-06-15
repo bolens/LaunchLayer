@@ -92,5 +92,21 @@ build_launch_chain() {
 		debug "mangohud unavailable — continuing without MangoHUD wrapper"
 	fi
 
+	# --mangoapp already integrates MangoHUD; exporting MANGOHUD=1 would inject a
+	# second overlay via the Vulkan/OpenGL layer path.
+	if [[ "$use_mangoapp" == "1" ]]; then
+		unset MANGOHUD
+		debug "MANGOHUD unset — gamescope --mangoapp handles the overlay"
+	fi
+
 	debug "launch chain: ${launch[*]}"
+}
+
+# launch_chain_uses_mangohud — True when the resolved chain enables MangoHUD.
+launch_chain_uses_mangohud() {
+	local item
+	for item in "${launch[@]}"; do
+		[[ "$item" == mangohud || "$item" == --mangoapp ]] && return 0
+	done
+	return 1
 }

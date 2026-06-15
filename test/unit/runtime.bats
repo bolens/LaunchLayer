@@ -268,6 +268,28 @@ setup() {
 	[[ "$output" == $'wrapper-a\nwrapper-b' ]]
 }
 
+@test "build_launch_chain unsets MANGOHUD when gamescope uses --mangoapp" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export is_native=0 GAMESCOPE=1 GAMESCOPE_W=1920 GAMESCOPE_H=1080 GAMESCOPE_R=120
+		export GAMESCOPE_ADAPTIVE_SYNC=0 BENCHMARK=0 MANGOHUD=1 MANGOHUD_CONFIG=fps
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform runtime
+		optional_tool_installed() { [[ "$1" == gamescope ]]; }
+		command_available() { return 1; }
+		launch=()
+		build_launch_chain
+		printf "mangohud_env:%s\n" "${MANGOHUD-unset}"
+		printf "config:%s\n" "${MANGOHUD_CONFIG:-unset}"
+		printf "chain:%s\n" "${launch[*]}"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"mangohud_env:unset"* ]]
+	[[ "$output" == *"config:fps"* ]]
+	[[ "$output" == *"--mangoapp"* ]]
+	[[ "$output" != *"mangohud"* || "$output" == *"--mangoapp"* ]]
+}
+
 @test "build_launch_chain adds gamescope flags when enabled" {
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"

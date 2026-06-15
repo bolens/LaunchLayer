@@ -113,7 +113,7 @@ This installs shell completions, adds `~/.local/bin/launchlayer`, prints your St
 3. **Paste into Steam** — copy the printed string into each game’s **Launch Options** (same string for every title):
 
 ```
-"/home/you/launchlayer/launchlayer" %command%
+"$HOME/launchlayer/launchlayer" %command%
 ```
 
 See [Integrating with Steam launch options](#integrating-with-steam-launch-options) for UI paths, Flatpak notes, and verification.
@@ -157,13 +157,13 @@ Run onboarding (recommended) or print the string alone:
 Example output:
 
 ```
-"/mnt/games/config/launchlayer" %command%
+"$HOME/launchlayer/launchlayer" %command%
 ```
 
 | Approach | Launch string | Notes |
 |----------|---------------|-------|
-| **Absolute path** (recommended) | `"/mnt/games/config/launchlayer" %command%` | Most reliable—Steam’s environment often has a minimal `PATH` |
-| **Symlink** (after `--setup --symlink`) | `"/home/you/.local/bin/launchlayer" %command%` | Use the full path to the symlink (`realpath ~/.local/bin/launchlayer`); bare `launchlayer` usually fails in Steam |
+| **Absolute path** (recommended) | `"$HOME/launchlayer/launchlayer" %command%` | Most reliable—Steam’s environment often has a minimal `PATH`; `--print-launch-option` prints your real path |
+| **Symlink** (after `--setup --symlink`) | `"$HOME/.local/bin/launchlayer" %command%` | Use the full path to the symlink (`realpath ~/.local/bin/launchlayer`); bare `launchlayer` usually fails in Steam |
 
 Rules:
 
@@ -179,7 +179,7 @@ Rules:
 1. Open **Steam** → **Library**
 2. Right-click the game → **Properties**
 3. In **General**, find **Launch Options**
-4. Paste your launch string, e.g. `"/mnt/games/config/launchlayer" %command%`
+4. Paste your launch string, e.g. `"$HOME/launchlayer/launchlayer" %command%`
 5. Close Properties and launch the game normally
 
 <details>
@@ -194,10 +194,10 @@ On Deck: **Library** → select game → **gear icon** → **Properties** → **
 If Steam is installed via Flatpak, the sandbox must read your LaunchLayer install:
 
 - Script under `$HOME` (e.g. `~/launchlayer/…`) → usually works as-is
-- Script outside `$HOME` (e.g. `/mnt/games/config`) → grant filesystem access:
+- Script outside `$HOME` (e.g. `/path/to/launchlayer`) → grant filesystem access:
 
 ```bash
-flatpak override --user com.valvesoftware.Steam --filesystem=/mnt/games/config
+flatpak override --user com.valvesoftware.Steam --filesystem=/path/to/launchlayer
 ```
 
 Check access and get a tailored hint:

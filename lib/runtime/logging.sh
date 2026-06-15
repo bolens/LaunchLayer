@@ -31,7 +31,7 @@ log_launch_event() {
 		"${BENCHMARK:-0}" \
 		"${GAMESCOPE:-0}" \
 		"${VRAM_HOGS:-0}" \
-		"${MANGOHUD:-0}" \
+		"$(launch_chain_uses_mangohud && echo 1 || echo 0)" \
 		"${X3D_CPUS:-$(default_online_cpus)}" \
 		"$duration" \
 		"${exit_code:-}" \

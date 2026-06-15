@@ -1,6 +1,6 @@
 # zsh completion for launchlayer
 # Install: add completions/ to fpath before compinit, e.g. in ~/.zshrc:
-#   fpath=(/mnt/games/config/completions $fpath)
+#   fpath=(~/launchlayer/share/launchlayer/completions $fpath)
 #   autoload -Uz compinit && compinit
 
 _launchlayer() {
