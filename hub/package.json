@@ -27,15 +27,15 @@
     "convex": "^1.42.1"
   },
   "devDependencies": {
-    "@convex-dev/eslint-plugin": "^1.2.1",
+    "@convex-dev/eslint-plugin": "^2.0.0",
     "@edge-runtime/vm": "^5.0.0",
-    "@eslint/js": "^9.39.2",
-    "@types/node": "^25.9.3",
-    "convex-test": "^0.0.53",
-    "eslint": "^9.39.2",
-    "tsx": "^4.19.4",
-    "typescript": "^5.7.0",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.1.1",
+    "convex-test": "^0.0.54",
+    "eslint": "^10.7.0",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2",
     "typescript-eslint": "^8.57.0",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.10"
   }
 }
