@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration test-hub test-all lint lint-hub shellcheck check-hub-git check tui-screenshots
+.PHONY: test test-unit test-integration test-hub test-all lint lint-hub shellcheck check-hub-git check check-hub check-all tui-screenshots
 
 SHELL := /bin/bash
 BATS ?= bats
@@ -30,7 +30,12 @@ lint-hub:
 check-hub-git:
 	bash scripts/check-staged-hub-secrets.sh
 
+# Shell gate (matches CI shell suite). Hub is separate — see check-hub / check-all.
 check: shellcheck check-hub-git test
+
+check-hub: lint-hub test-hub
+
+check-all: check check-hub
 
 tui-screenshots:
 	bash scripts/tui-screenshots/regenerate.sh
