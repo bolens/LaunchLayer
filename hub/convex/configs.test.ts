@@ -16,7 +16,7 @@ describe("publishConfig", () => {
     expect(result.updated).toBe(false);
     expect(result.machine_id).toBeTruthy();
 
-    const stored = await t.run(async (ctx) => ctx.db.get(result.config_id));
+    const stored = await t.run(async (ctx) => ctx.db.get("sharedConfigs", result.config_id));
     expect(stored).toMatchObject({
       appid: "42424242",
       gameName: "Test Game",
@@ -41,7 +41,7 @@ describe("publishConfig", () => {
     expect(updated.updated).toBe(true);
     expect(updated.config_id).toEqual(created.config_id);
 
-    const stored = await t.run(async (ctx) => ctx.db.get(updated.config_id));
+    const stored = await t.run(async (ctx) => ctx.db.get("sharedConfigs", updated.config_id));
     expect(stored?.note).toBe("second");
     expect(stored?.gameName).toBe("Updated Game");
   });
@@ -124,7 +124,7 @@ describe("recordDownload", () => {
       identifier,
     });
 
-    const config = await t.run(async (ctx) => ctx.db.get(published.config_id));
+    const config = await t.run(async (ctx) => ctx.db.get("sharedConfigs", published.config_id));
     expect(config?.downloads).toBe(1);
 
     const dedupRows = await t.run(async (ctx) =>
@@ -155,7 +155,7 @@ describe("deleteConfig", () => {
       deleted_machine: true,
     });
 
-    const deleted = await t.run(async (ctx) => ctx.db.get(published.config_id));
+    const deleted = await t.run(async (ctx) => ctx.db.get("sharedConfigs", published.config_id));
     expect(deleted).toBeNull();
   });
 
@@ -187,7 +187,7 @@ describe("deleteConfig", () => {
     expect(result?.deleted_machine).toBe(false);
 
     const machine = await t.run(async (ctx) => {
-      const config = await ctx.db.get(first.config_id);
+      const config = await ctx.db.get("sharedConfigs", first.config_id);
       return config;
     });
     expect(machine).toBeNull();

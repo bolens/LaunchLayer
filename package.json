@@ -1,10 +1,14 @@
 {
   "name": "launchlayer",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "packageManager": "pnpm@10.16.1",
   "scripts": {
-    "dev": "pnpm --dir hub dev",
-    "test:hub": "pnpm --dir hub test",
-    "convex:deploy": "pnpm --dir hub convex:deploy"
+    "dev": "bash scripts/hub-pm.sh run dev",
+    "test:hub": "bash scripts/hub-pm.sh run test",
+    "lint:hub": "bash scripts/hub-pm.sh run lint",
+    "convex:deploy": "bash scripts/hub-pm.sh run convex:deploy"
   }
 }

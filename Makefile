@@ -1,18 +1,31 @@
-.PHONY: test lint check shellcheck check-hub-git tui-screenshots
+.PHONY: test test-unit test-integration test-hub test-all lint lint-hub shellcheck check-hub-git check tui-screenshots
 
 SHELL := /bin/bash
 BATS ?= bats
+HUB_PM := bash scripts/hub-pm.sh
+# Parallel across bats files when GNU parallel (or rush) is available.
+# Keep tests within a file serial — several suites share setup state.
+BATS_JOBS ?= $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
+BATS_PARALLEL := $(shell if command -v parallel >/dev/null 2>&1 || command -v rush >/dev/null 2>&1; then echo --jobs $(BATS_JOBS) --no-parallelize-within-files; fi)
 
-test:
-	$(BATS) test/integration/*.bats test/unit/*.bats
+test: test-integration test-unit
+
+test-unit:
+	$(BATS) $(BATS_PARALLEL) test/unit
+
+test-integration:
+	$(BATS) $(BATS_PARALLEL) test/integration
 
 test-hub:
-	cd hub && pnpm test
+	$(HUB_PM) test
 
 test-all: test test-hub
 
 lint shellcheck:
 	shellcheck -x -P lib -a --severity=warning launchlayer test/helpers.bash scripts/*.sh
+
+lint-hub:
+	$(HUB_PM) lint
 
 check-hub-git:
 	bash scripts/check-staged-hub-secrets.sh

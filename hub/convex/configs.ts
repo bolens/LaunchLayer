@@ -64,7 +64,7 @@ async function recordConfigHistory(
   const excess = history.length - MAX_CONFIG_HISTORY;
   if (excess > 0) {
     for (const row of history.slice(0, excess)) {
-      await ctx.db.delete(row._id);
+      await ctx.db.delete("sharedConfigsHistory", row._id);
     }
   }
 }
@@ -116,16 +116,16 @@ export const publishConfig = internalMutation({
     );
 
     if (args.configId) {
-      const config = await ctx.db.get(args.configId);
+      const config = await ctx.db.get("sharedConfigs", args.configId);
       const machine = config
-        ? await ctx.db.get(config.machineId)
+        ? await ctx.db.get("machines", config.machineId)
         : null;
       const target = validateConfigUpdateTarget(config, machine, {
         fingerprintHash: args.fingerprintHash,
         appid: args.appid,
       });
 
-      await ctx.db.patch(target._id, content);
+      await ctx.db.patch("sharedConfigs", target._id, content);
       await recordConfigHistory(ctx, target._id, content);
       return {
         config_id: target._id,
@@ -142,7 +142,7 @@ export const publishConfig = internalMutation({
       .unique();
 
     if (existing) {
-      await ctx.db.patch(existing._id, content);
+      await ctx.db.patch("sharedConfigs", existing._id, content);
       await recordConfigHistory(ctx, existing._id, content);
       return {
         config_id: existing._id,
@@ -259,7 +259,7 @@ export const recommendConfigs = internalQuery({
 
     const scored = await Promise.all(
       bounded.map(async (config) => {
-        const machine = await ctx.db.get(config.machineId);
+        const machine = await ctx.db.get("machines", config.machineId);
         if (!machine) {
           return null;
         }
@@ -305,7 +305,7 @@ export const getConfig = internalQuery({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    const config = await ctx.db.get(args.configId);
+    const config = await ctx.db.get("sharedConfigs", args.configId);
     if (!config) {
       return null;
     }
@@ -330,7 +330,7 @@ export const recordDownload = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const config = await ctx.db.get(args.configId);
+    const config = await ctx.db.get("sharedConfigs", args.configId);
     if (!config) {
       throw new Error("Config not found");
     }
@@ -352,7 +352,7 @@ export const recordDownload = internalMutation({
       identifier: args.identifier,
       recordedAt: Date.now(),
     });
-    await ctx.db.patch(args.configId, {
+    await ctx.db.patch("sharedConfigs", args.configId, {
       downloads: nextDownloads,
     });
     return null;
@@ -377,21 +377,21 @@ export const deleteConfig = internalMutation({
       fingerprintHash: args.fingerprintHash,
     });
 
-    const config = await ctx.db.get(args.configId);
-    const machine = config ? await ctx.db.get(config.machineId) : null;
+    const config = await ctx.db.get("sharedConfigs", args.configId);
+    const machine = config ? await ctx.db.get("machines", config.machineId) : null;
     validateConfigDeleteTarget(config, machine, {
       fingerprintHash: args.fingerprintHash,
     });
 
     const machineId = config!.machineId;
-    await ctx.db.delete(args.configId);
+    await ctx.db.delete("sharedConfigs", args.configId);
 
     const history = await ctx.db
       .query("sharedConfigsHistory")
       .withIndex("by_config_id", (q) => q.eq("configId", args.configId))
       .collect();
     for (const h of history) {
-      await ctx.db.delete(h._id);
+      await ctx.db.delete("sharedConfigsHistory", h._id);
     }
 
     const remaining = await ctx.db
@@ -401,7 +401,7 @@ export const deleteConfig = internalMutation({
 
     let deletedMachine = false;
     if (remaining === null) {
-      await ctx.db.delete(machineId);
+      await ctx.db.delete("machines", machineId);
       deletedMachine = true;
     }
 
@@ -466,11 +466,11 @@ export const getHistoricalConfig = internalQuery({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    const history = await ctx.db.get(args.historyId);
+    const history = await ctx.db.get("sharedConfigsHistory", args.historyId);
     if (!history) {
       return null;
     }
-    const config = await ctx.db.get(history.configId);
+    const config = await ctx.db.get("sharedConfigs", history.configId);
     if (!config) {
       return null;
     }

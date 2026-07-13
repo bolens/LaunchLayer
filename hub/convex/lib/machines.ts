@@ -39,7 +39,7 @@ export async function upsertMachineRecord(
 
   const now = Date.now();
   if (existing) {
-    await ctx.db.patch(existing._id, {
+    await ctx.db.patch("machines", existing._id, {
       fingerprint: args.fingerprint,
       machineLabel: args.machineLabel ?? existing.machineLabel,
       updatedAt: now,
