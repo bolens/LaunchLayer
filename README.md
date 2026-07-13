@@ -429,10 +429,12 @@ BENCHMARK=1       DEBUG=1
 # Features (0/1 unless noted)
 GAMEMODE  MANGOHUD  MANGOHUD_CONFIG  MANGOHUD_LOG
 GAMESCOPE  GAMESCOPE_W  GAMESCOPE_H  GAMESCOPE_R
-GAMESCOPE_ADAPTIVE_SYNC  GAMESCOPE_FSR  GAMESCOPE_FSR_SHARPNESS
+GAMESCOPE_ADAPTIVE_SYNC  GAMESCOPE_FSR  GAMESCOPE_FSR_SHARPNESS  GAMESCOPE_HDR
 VRAM_HOGS  LAUNCH_WATCHDOG  NETWORK_TUNE  PIPEWIRE_LOW_LATENCY
 GPU_POWER_CHECK  NVIDIA_POWER_MODE  GAME_PERFORMANCE
-DISABLE_CPU_AFFINITY  CONCURRENT_LAUNCH_GUARD
+DISABLE_CPU_AFFINITY  CPU_AFFINITY_RANGE  CONCURRENT_LAUNCH_GUARD
+DISABLE_NIC_EEE  DISABLE_WIFI_POWER_SAVE  DISK_TUNE
+MALLOC_ALLOCATOR  ENABLE_HDR  OVERRIDE_PROTON
 
 # Preflight thresholds
 SHADER_CACHE_CHECK  SHADER_CACHE_MAX_GB  SHADER_CACHE_TRIM
@@ -441,7 +443,7 @@ VRAM_PREFLIGHT_MIN_MB  DISK_PREFLIGHT_MIN_GB  GPU_VRAM_PROCESS_MIN_MB
 VM_MAX_MAP_COUNT_MIN  VM_MAX_MAP_COUNT_FIX
 
 # Proton / GPU (passed through when set)
-PROTON_*  DXVK_*  VKD3D_*  __GL_*  __VK_*
+PROTON_*  DXVK_*  VKD3D_*  __GL_*  __VK_*  SDL_*  MESA_*  RADV_*  AMD_*  INTEL_*
 ```
 
 ### Display detection
@@ -500,7 +502,9 @@ cp share/launchlayer/templates/hub.conf.example ~/.config/launchlayer/hub.conf
 
 **Hub CLI commands:** [docs/cli.md § Community hub](docs/cli.md#community-hub)
 
-The TUI exposes the same flows under **Community hub** (main menu) and **[Hub] Community configs** (per-game actions).
+Also useful without the hub: `--suggest-config APPID|NAME [--apply]` ranks ProtonDB reports for this machine and can write allowlisted knobs into `games/<AppID>.env` ([docs/cli.md § Games and config](docs/cli.md#games-and-config)).
+
+The TUI exposes hub flows under **Community hub** (main menu) and **[Hub] Community configs** (per-game actions), including viewing history and applying a historical version.
 
 Deploy or develop the backend from `hub/` (requires [Corepack](https://nodejs.org/api/corepack.html) + pnpm):
 
@@ -535,6 +539,25 @@ sysctl -n vm.max_map_count   # expect 2147483642
 > ⓘ Remove `/etc/sysctl.d/99-proton-vm.conf` if present—it is superseded by `elasticsearch.conf`.
 
 Set `VM_MAX_MAP_COUNT_FIX=1` in config to raise the value at launch when passwordless `sudo` is available.
+
+### Passwordless sudo for runtime tuning (optional)
+
+Certain settings (`NETWORK_TUNE=1`, `VM_MAX_MAP_COUNT_FIX=1`, `DISK_TUNE=1`, and Wi‑Fi power-save disable) require root to query or modify hardware/kernel state. To allow LaunchLayer to apply these at game startup without a password prompt:
+
+1. Create a sudoers override configuration file:
+   ```bash
+   sudo visudo -f /etc/sudoers.d/launchlayer
+   ```
+2. Add a rule (replace `username` with your Linux user). Verify absolute paths with `which ip ethtool sysctl iw iwconfig tee`:
+   ```sudoers
+   username ALL=(ALL) NOPASSWD: /usr/sbin/ip, /usr/bin/ethtool, /usr/bin/sysctl, /usr/bin/iw, /usr/sbin/iwconfig, /usr/bin/tee
+   ```
+
+   - `ip` / `ethtool` / `sysctl` — bring NIC up, ring buffers, EEE, TCP low-latency, `vm.max_map_count`
+   - `iw` / `iwconfig` — disable Wi‑Fi power save when `DISABLE_WIFI_POWER_SAVE=1`
+   - `tee` — write I/O scheduler under `/sys/block/<dev>/queue/scheduler` when `DISK_TUNE=1` (LaunchLayer validates the path before calling `tee`)
+
+   Prefer the narrowest paths that exist on your distro (`/usr/sbin/ip` vs `/bin/ip`, etc.).
 
 ### Workstation setup (optional)
 
@@ -623,10 +646,12 @@ The script degrades gracefully when tools are missing. Run `--doctor` or `--dete
 | `mangohud` | Overlay |
 | `taskset` | Pin to X3D V-Cache CCD |
 | `nvidia-smi`, `nvidia-settings` | VRAM/power checks |
-| `ethtool` | `NETWORK_TUNE` |
+| `ethtool` | `NETWORK_TUNE` (ring buffers, EEE) |
+| `iw` / `iwconfig` | Wi‑Fi power-save disable under `NETWORK_TUNE` |
+| `tee` | `DISK_TUNE` scheduler writes (with passwordless sudo) |
 | `pw-metadata` | `PIPEWIRE_LOW_LATENCY` |
 | `curl` | Community hub HTTP client |
-| `jq` or `python3` | Parse hub apply responses |
+| `jq` or `python3` | Hub apply / ProtonDB suggest |
 | systemd user session | `VRAM_HOGS` unit pause/resume |
 
 ### Anticheat and native detection

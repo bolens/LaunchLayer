@@ -88,6 +88,8 @@ tui_hub_recommend_for_appid() {
 	action="$(tui_menu "Config $config_id" \
 		"Preview apply (dry-run)" \
 		"Apply to $name" \
+		"View history" \
+		"Apply historical version" \
 		"Back")" || return 0
 
 	case "$action" in
@@ -98,8 +100,61 @@ tui_hub_recommend_for_appid() {
 			tui_confirm "Apply hub config $config_id to $name?" || return 0
 			tui_run_capture "Applying shared config…" hub_apply_config "$config_id" || true
 			;;
+		"View history")
+			tui_run_paged hub_history_config "$config_id" || true
+			;;
+		"Apply historical version")
+			tui_hub_apply_historical "$config_id" "$name" || true
+			;;
 		*) ;;
 	esac
+}
+
+# tui_hub_apply_historical — Pick a history id for config_id and apply it.
+tui_hub_apply_historical() {
+	local config_id=$1 name=$2
+	local response history_id choice line
+	local -a labels=() ids=()
+
+	command_required_or_fail curl "Hub history" || return 1
+	hub_require_url || return 1
+	response="$(hub_curl_json GET "/api/config/${config_id}/history")" || return 1
+
+	if command -v jq >/dev/null 2>&1; then
+		mapfile -t ids < <(printf '%s' "$response" | jq -r '.[].history_id // empty' 2>/dev/null)
+		mapfile -t labels < <(printf '%s' "$response" | jq -r '.[] | "\(.history_id)  \((.published_at // 0) / 1000 | strftime("%Y-%m-%d %H:%M"))  \(.note // "-")"' 2>/dev/null)
+	else
+		while IFS=$'\t' read -r history_id line; do
+			[[ -n "$history_id" ]] || continue
+			ids+=("$history_id")
+			labels+=("$line")
+		done < <(HUB_JSON_RESPONSE=$response python3 -c '
+import json, os
+from datetime import datetime, timezone
+data = json.loads(os.environ["HUB_JSON_RESPONSE"])
+for row in data:
+    hid = row.get("history_id", "")
+    if not hid:
+        continue
+    pub = row.get("published_at", 0)
+    dt = datetime.fromtimestamp(pub / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
+    note = row.get("note") or "-"
+    print(f"{hid}\t{hid}  {dt}  {note}")
+')
+	fi
+
+	((${#ids[@]})) || {
+		echo "No history entries found for config ${config_id}."
+		return 0
+	}
+
+	choice="$(tui_menu "Historical version for $config_id" "${labels[@]}" "Back")" || return 0
+	[[ "$choice" == "Back" || -z "$choice" ]] && return 0
+	history_id="${choice%% *}"
+	[[ -n "$history_id" ]] || return 0
+
+	tui_confirm "Apply historical config $history_id to $name?" || return 0
+	tui_run_capture "Applying historical config…" hub_apply_config "$history_id" --history || true
 }
 
 # tui_hub_recommend_menu — Pick a game then browse recommendations.

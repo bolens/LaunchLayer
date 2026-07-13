@@ -1,0 +1,40 @@
+# Reusable shell suite — called from ci.yml when shell paths change.
+name: CI / Shell
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
+        with:
+          packages: shellcheck
+          version: 1.0
+
+      - name: Shellcheck
+        run: make shellcheck
+
+  bats:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
+        with:
+          packages: bats python3
+          version: 1.0
+
+      - name: Prepare vm.max_map_count for doctor tests
+        run: sudo sysctl -w vm.max_map_count=2147483642
+
+      - name: Bats
+        run: make test

@@ -12,7 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "convex": "^1.41.0"
+    "convex": "^1.42.1"
   },
   "devDependencies": {
     "@edge-runtime/vm": "^5.0.0",

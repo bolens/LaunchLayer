@@ -235,3 +235,79 @@ describe("similarMachines", () => {
     expect(results[0]?.gpu_vendor).toBe(args.fingerprint.gpu_vendor);
   });
 });
+
+describe("configHistory", () => {
+  it("records history on publish and update, and cleans up on delete", async () => {
+    const t = convexTest(schema, modules);
+    const firstArgs = await buildPublishArgs({ appid: "12345", note: "v1" });
+
+    // 1. Initial Publish
+    const firstRes = await t.mutation(internal.configs.publishConfig, firstArgs);
+    const configId = firstRes.config_id;
+
+    let history = await t.query(internal.configs.getConfigHistory, { configId });
+    expect(history).toHaveLength(1);
+    expect(history[0]?.note).toBe("v1");
+    expect(history[0]?.env_content).toBe(firstArgs.envContent);
+
+    // 2. Update Config
+    const secondArgs = await buildPublishArgs({
+      appid: "12345",
+      note: "v2",
+      envContent: "GAMEMODE=2\n",
+    });
+    await t.mutation(internal.configs.publishConfig, secondArgs);
+
+    history = await t.query(internal.configs.getConfigHistory, { configId });
+    expect(history).toHaveLength(2);
+    // getConfigHistory sorts by publishedAt descending, so the newest (v2) is first
+    expect(history[0]?.note).toBe("v2");
+    expect(history[0]?.env_content).toBe("GAMEMODE=2\n");
+    expect(history[1]?.note).toBe("v1");
+    expect(history[1]?.env_content).toBe(firstArgs.envContent);
+
+    // 3. Get specific historical config
+    const historyId = history[1]?.history_id;
+    const historicalDoc = await t.query(internal.configs.getHistoricalConfig, { historyId });
+    expect(historicalDoc).toMatchObject({
+      history_id: historyId,
+      config_id: configId,
+      appid: "12345",
+      note: "v1",
+      env_content: firstArgs.envContent,
+    });
+
+    // 4. Delete config cleans up history
+    await t.mutation(internal.configs.deleteConfig, {
+      configId,
+      fingerprintHash: firstArgs.fingerprintHash,
+    });
+
+    const deletedHistory = await t.query(internal.configs.getConfigHistory, { configId });
+    expect(deletedHistory).toHaveLength(0);
+
+    const deletedHistDoc = await t.query(internal.configs.getHistoricalConfig, { historyId });
+    expect(deletedHistDoc).toBeNull();
+  });
+
+  it("trims history to MAX_CONFIG_HISTORY snapshots", async () => {
+    const t = convexTest(schema, modules);
+    const { MAX_CONFIG_HISTORY } = await import("./configs");
+    const firstArgs = await buildPublishArgs({ appid: "99999", note: "seed" });
+    const firstRes = await t.mutation(internal.configs.publishConfig, firstArgs);
+    const configId = firstRes.config_id;
+
+    for (let i = 0; i < MAX_CONFIG_HISTORY + 5; i++) {
+      const args = await buildPublishArgs({
+        appid: "99999",
+        note: `v${i}`,
+        envContent: `GAMEMODE=${i}\n`,
+      });
+      await t.mutation(internal.configs.publishConfig, args);
+    }
+
+    const history = await t.query(internal.configs.getConfigHistory, { configId });
+    expect(history.length).toBe(MAX_CONFIG_HISTORY);
+    expect(history[0]?.note).toBe(`v${MAX_CONFIG_HISTORY + 4}`);
+  });
+});

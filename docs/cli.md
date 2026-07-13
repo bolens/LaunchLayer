@@ -57,6 +57,7 @@ Place before subcommands:
 | `--edit-appid APPID\|NAME` | Open/create per-game config in `$EDITOR` |
 | `--paths APPID\|NAME [--json]` | Shader cache, compatdata, install paths |
 | `--validate-config [APPID\|NAME\|all] [--json]` | Lint `.env` files |
+| `--suggest-config APPID\|NAME [--apply]` | Suggest optimizations from ProtonDB reports |
 | `--scan-anticheat [--update-list]` | Find EAC/BattlEye vs known list |
 | `--scan-detections` | Audit heuristic vs list mismatches |
 
@@ -102,7 +103,8 @@ Optional — local launches do not need the hub. Requires `curl` for publish/del
 | `--hub-delete CONFIG_ID [--yes] [--json]` | Delete a shared config (publish token when enforced) |
 | `--hub-recommend APPID\|NAME [--limit N] [--json]` | Configs from similar machines |
 | `--hub-search [--limit N] [--json]` | Machines most like yours |
-| `--hub-apply CONFIG_ID [--dry-run] [--json]` | Download and write a shared config |
+| `--hub-apply CONFIG_ID [--history] [--dry-run] [--json]` | Download and write a shared config (or a historical version with `--history`) |
+| `--hub-history CONFIG_ID [--json]` | List publication history for a shared config |
 | `--hub-prefs [show\|reset\|set] [--json]` | Edit `hub.conf` without the TUI |
 
 TUI equivalents: **Community hub** (main menu) and **[Hub] Community configs** (per-game actions). Bulk preset changes: **`--bulk-set-include`** or **Games → Bulk change INCLUDE preset**.

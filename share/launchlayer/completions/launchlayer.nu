@@ -73,11 +73,13 @@ def "nu-complete launchlayer" [spans: list<string>] {
         { value: "--hub-recommend", description: "Recommend configs from similar machines" }
         { value: "--hub-search", description: "List machines similar to this one" }
         { value: "--hub-apply", description: "Apply a shared hub config by id" }
+        { value: "--hub-history", description: "List publication history of a shared config" }
         { value: "--hub-prefs", description: "Manage hub preferences" }
         { value: "--paths", description: "Shader cache, compatdata, install paths" }
         { value: "--show-config", description: "Show resolved config for an AppID" }
         { value: "--edit-appid", description: "Open per-game config in $EDITOR" }
         { value: "--validate-config", description: "Lint .env config files" }
+        { value: "--suggest-config", description: "Suggest optimizations using ProtonDB comments" }
         { value: "--scan-anticheat", description: "Scan for EAC/BattlEye titles" }
         { value: "--scan-detections", description: "Audit detection heuristics" }
         { value: "--cache-report", description: "Report shader/compatdata cache sizes" }
@@ -177,7 +179,17 @@ def "nu-complete launchlayer" [spans: list<string>] {
             launchlayer-suggestions ["--limit" "--json"]
         }
         "--hub-apply" => {
-            launchlayer-suggestions ["--dry-run" "--json"]
+            launchlayer-suggestions ["--dry-run" "--json" "--history"]
+        }
+        "--hub-history" => {
+            launchlayer-suggestions ["--json"]
+        }
+        "--suggest-config" => {
+            if ($spans | length) == 2 {
+                launchlayer-appids $script | each {|id| { value: $id } }
+            } else {
+                launchlayer-suggestions ["--apply"]
+            }
         }
         "--hub-delete" => {
             launchlayer-suggestions ["--yes" "--json"]

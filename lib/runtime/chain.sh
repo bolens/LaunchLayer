@@ -55,7 +55,7 @@ build_launch_chain() {
 	fi
 
 	if [[ "${DISABLE_CPU_AFFINITY:-0}" != "1" ]] && optional_tool_installed taskset; then
-		launch+=(taskset -c "${X3D_CPUS:-$(default_online_cpus)}")
+		launch+=(taskset -c "${CPU_AFFINITY_RANGE:-${X3D_CPUS:-$(default_online_cpus)}}")
 	elif [[ "${DISABLE_CPU_AFFINITY:-0}" != "1" ]]; then
 		debug "taskset unavailable — continuing without CPU affinity wrapper"
 	fi
@@ -75,6 +75,7 @@ build_launch_chain() {
 		[[ "${GAMESCOPE_ADAPTIVE_SYNC:-0}" == "1" ]] && launch+=(--adaptive-sync)
 		[[ "${GAMESCOPE_EXPOSE_WAYLAND:-0}" == "1" ]] && launch+=(--expose-wayland)
 		[[ "${GAMESCOPE_FSR:-0}" == "1" ]] && launch+=(--fsr-sharpness "${GAMESCOPE_FSR_SHARPNESS:-5}")
+		[[ "${GAMESCOPE_HDR:-0}" == "1" ]] && launch+=(--hdr-enabled)
 		# --mangoapp integrates MangoHUD inside gamescope (avoids double-wrapping).
 		if [[ "${BENCHMARK:-0}" != "1" && "${MANGOHUD:-0}" == "1" ]]; then
 			launch+=(--mangoapp)

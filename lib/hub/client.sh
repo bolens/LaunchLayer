@@ -55,14 +55,14 @@ hub_format_published_at() {
 # hub_jq_recommend_cli_filter — jq program for CLI recommend listings.
 hub_jq_recommend_cli_filter() {
 	cat <<'JQ'
-.results[]? | (.published_at / 1000 | strftime("%Y-%m-%d")) as $updated | "\(.similarity)%  \(.machine_label // .gpu_vendor)  updated \($updated)  \(.note // "")  id=\(.config_id)"
+.results[]? | ((.published_at // 0) / 1000 | strftime("%Y-%m-%d")) as $updated | "\(.similarity)%  \(.machine_label // .gpu_vendor)  updated \($updated)  \(.note // "")  id=\(.config_id)"
 JQ
 }
 
 # hub_jq_recommend_picker_filter — jq program for TUI picker rows (config_id TAB label).
 hub_jq_recommend_picker_filter() {
 	cat <<'JQ'
-.results[]? | (.published_at / 1000 | strftime("%Y-%m-%d")) as $updated | "\(.config_id)\t\(.similarity)% match · \(.machine_label // .gpu_vendor) · updated \($updated) · \(.note // "-")"
+.results[]? | ((.published_at // 0) / 1000 | strftime("%Y-%m-%d")) as $updated | "\(.config_id)\t\(.similarity)% match · \(.machine_label // .gpu_vendor // "unknown") · updated \($updated) · \(.note // "-")"
 JQ
 }
 

@@ -85,4 +85,48 @@ describe("hub HTTP routes", () => {
     const body = await response.json();
     expect(body.code).toBe("VALIDATION_ERROR");
   });
+
+  it("can fetch config history list and a specific historical config", async () => {
+    const t = convexTest(schema, modules);
+    const args = await buildPublishArgs({ appid: "271590", note: "version 1" });
+    const published = await t.mutation(internal.configs.publishConfig, args);
+
+    // Update config to generate a second history record
+    const updateArgs = await buildPublishArgs({ appid: "271590", note: "version 2" });
+    await t.mutation(internal.configs.publishConfig, updateArgs);
+
+    // 1. Fetch history list via HTTP GET /api/config/<configId>/history
+    const historyRes = await t.fetch(`/api/config/${published.config_id}/history`);
+    expect(historyRes.status).toBe(200);
+    const historyList = await historyRes.json();
+    expect(historyList).toHaveLength(2);
+    expect(historyList[0].note).toBe("version 2");
+    expect(historyList[1].note).toBe("version 1");
+
+    // 2. Fetch specific historical version via HTTP GET /api/config-history/<historyId>
+    const historyId = historyList[1].history_id;
+    const historyDocRes = await t.fetch(`/api/config-history/${historyId}`);
+    expect(historyDocRes.status).toBe(200);
+    const historyDoc = await historyDocRes.json();
+    expect(historyDoc).toMatchObject({
+      history_id: historyId,
+      config_id: published.config_id,
+      appid: "271590",
+      note: "version 1",
+    });
+    expect(typeof historyDoc.appid).toBe("string");
+    expect(historyDoc.appid).toMatch(/^\d+$/);
+  });
+
+  it("returns 404 for history of a missing config", async () => {
+    const t = convexTest(schema, modules);
+    const args = await buildPublishArgs({ appid: "11111", note: "temp" });
+    const published = await t.mutation(internal.configs.publishConfig, args);
+    await t.mutation(internal.configs.deleteConfig, {
+      configId: published.config_id,
+      fingerprintHash: args.fingerprintHash,
+    });
+    const historyRes = await t.fetch(`/api/config/${published.config_id}/history`);
+    expect(historyRes.status).toBe(404);
+  });
 });

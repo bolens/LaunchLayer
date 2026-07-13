@@ -31,6 +31,9 @@ dispatch_hub_subcommand() {
 		--hub-apply)
 			hub_apply_config "$@"
 			;;
+		--hub-history)
+			hub_history_config "$@"
+			;;
 		--hub-search)
 			hub_search_machines "$@"
 			;;

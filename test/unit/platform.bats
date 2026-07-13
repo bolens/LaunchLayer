@@ -85,3 +85,19 @@ setup() {
 		[[ "$output" == linux-no ]]
 	fi
 }
+
+@test "resolve_proton_path resolves explicit proton paths" {
+	local tmp
+	tmp="$(mktemp -d)/proton"
+	touch "$tmp"
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		resolve_proton_path "'"$tmp"'"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "$tmp" ]]
+	rm -rf "$(dirname "$tmp")"
+}
+

@@ -93,6 +93,7 @@ $(cli_bold "Games & config")
   --show-config APPID|NAME [--json]   Resolved config layers + launch chain
   --edit-appid APPID|NAME             Open/create per-game config in \$EDITOR
   --validate-config [APPID|all] [--json]  Lint .env files
+  --suggest-config APPID|NAME [--apply]   Suggest optimizations using ProtonDB comments
   --scan-anticheat [--update-list]  Find EAC/BattlEye vs anticheat-appids.txt
   --scan-detections                 Audit heuristic vs list mismatches
 
@@ -108,8 +109,9 @@ $(cli_bold "Community hub") $(cli_dim "(requires hub.conf — see share/launchla
   --hub-recommend APPID|NAME [--limit N] [--json]
                                     Configs from machines similar to yours
   --hub-search [--limit N] [--json] List machines most similar to this one
-  --hub-apply CONFIG_ID [--dry-run] [--json]
-                                    Download and apply a shared hub config
+  --hub-apply CONFIG_ID [--history] [--dry-run] [--json]
+                                    Download and apply a shared hub config (or historical version)
+  --hub-history CONFIG_ID [--json]  List Community config publication history
   --hub-prefs [show|reset|set] [args...] [--json]
                                     Manage hub preferences (template: share/launchlayer/templates/hub.conf.example)
                                     User file: ~/.config/launchlayer/hub.conf

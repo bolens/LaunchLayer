@@ -1,5 +1,10 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  type MutationCtx,
+} from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import {
   detectionValidator,
   fingerprintValidator,
@@ -12,6 +17,7 @@ import {
   buildPublishConfigPatch,
   validateConfigDeleteTarget,
   validateConfigUpdateTarget,
+  type PublishConfigPatch,
 } from "./lib/publish";
 import { resolveDownloadIncrement } from "./lib/download_dedup";
 import {
@@ -27,6 +33,41 @@ import {
   validatePublishSubmission,
   validateRecommendRequest,
 } from "./lib/validation";
+
+/** Cap retained history snapshots per shared config. */
+export const MAX_CONFIG_HISTORY = 25;
+
+async function recordConfigHistory(
+  ctx: MutationCtx,
+  configId: Id<"sharedConfigs">,
+  content: PublishConfigPatch,
+): Promise<void> {
+  await ctx.db.insert("sharedConfigsHistory", {
+    configId,
+    envContent: content.envContent,
+    settings: content.settings,
+    preset: content.preset,
+    note: content.note,
+    detection: content.detection,
+    launchlayerVersion: content.launchlayerVersion,
+    publishedAt: content.publishedAt,
+  });
+
+  const history = await ctx.db
+    .query("sharedConfigsHistory")
+    .withIndex("by_config_id_and_published_at", (q) =>
+      q.eq("configId", configId),
+    )
+    .order("asc")
+    .collect();
+
+  const excess = history.length - MAX_CONFIG_HISTORY;
+  if (excess > 0) {
+    for (const row of history.slice(0, excess)) {
+      await ctx.db.delete(row._id);
+    }
+  }
+}
 
 export const publishConfig = internalMutation({
   args: {
@@ -85,6 +126,7 @@ export const publishConfig = internalMutation({
       });
 
       await ctx.db.patch(target._id, content);
+      await recordConfigHistory(ctx, target._id, content);
       return {
         config_id: target._id,
         machine_id: machineId,
@@ -101,6 +143,7 @@ export const publishConfig = internalMutation({
 
     if (existing) {
       await ctx.db.patch(existing._id, content);
+      await recordConfigHistory(ctx, existing._id, content);
       return {
         config_id: existing._id,
         machine_id: machineId,
@@ -129,6 +172,8 @@ export const publishConfig = internalMutation({
       publishedAt: content.publishedAt,
       downloads: 0,
     });
+
+    await recordConfigHistory(ctx, configId, content);
 
     return { config_id: configId, machine_id: machineId, updated: false };
   },
@@ -341,6 +386,14 @@ export const deleteConfig = internalMutation({
     const machineId = config!.machineId;
     await ctx.db.delete(args.configId);
 
+    const history = await ctx.db
+      .query("sharedConfigsHistory")
+      .withIndex("by_config_id", (q) => q.eq("configId", args.configId))
+      .collect();
+    for (const h of history) {
+      await ctx.db.delete(h._id);
+    }
+
     const remaining = await ctx.db
       .query("sharedConfigs")
       .withIndex("by_machine_and_appid", (q) => q.eq("machineId", machineId))
@@ -355,6 +408,83 @@ export const deleteConfig = internalMutation({
     return {
       deleted_config_id: args.configId,
       deleted_machine: deletedMachine,
+    };
+  },
+});
+
+export const getConfigHistory = internalQuery({
+  args: { configId: v.id("sharedConfigs") },
+  returns: v.array(
+    v.object({
+      history_id: v.id("sharedConfigsHistory"),
+      env_content: v.string(),
+      settings: v.array(settingValidator),
+      preset: v.optional(v.string()),
+      note: v.optional(v.string()),
+      detection: detectionValidator,
+      launchlayer_version: v.optional(v.string()),
+      published_at: v.number(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const history = await ctx.db
+      .query("sharedConfigsHistory")
+      .withIndex("by_config_id_and_published_at", (q) =>
+        q.eq("configId", args.configId),
+      )
+      .order("desc")
+      .take(MAX_CONFIG_HISTORY);
+
+    return history.map((h) => ({
+      history_id: h._id,
+      env_content: h.envContent,
+      settings: h.settings,
+      preset: h.preset,
+      note: h.note,
+      detection: h.detection,
+      launchlayer_version: h.launchlayerVersion,
+      published_at: h.publishedAt,
+    }));
+  },
+});
+
+export const getHistoricalConfig = internalQuery({
+  args: { historyId: v.id("sharedConfigsHistory") },
+  returns: v.union(
+    v.object({
+      history_id: v.id("sharedConfigsHistory"),
+      config_id: v.id("sharedConfigs"),
+      appid: v.string(),
+      env_content: v.string(),
+      settings: v.array(settingValidator),
+      preset: v.optional(v.string()),
+      note: v.optional(v.string()),
+      detection: detectionValidator,
+      launchlayer_version: v.optional(v.string()),
+      published_at: v.number(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const history = await ctx.db.get(args.historyId);
+    if (!history) {
+      return null;
+    }
+    const config = await ctx.db.get(history.configId);
+    if (!config) {
+      return null;
+    }
+    return {
+      history_id: history._id,
+      config_id: history.configId,
+      appid: config.appid,
+      env_content: history.envContent,
+      settings: history.settings,
+      preset: history.preset,
+      note: history.note,
+      detection: history.detection,
+      launchlayer_version: history.launchlayerVersion,
+      published_at: history.publishedAt,
     };
   },
 });

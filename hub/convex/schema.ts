@@ -93,6 +93,19 @@ export default defineSchema({
     .index("by_appid", ["appid"])
     .index("by_machine_and_appid", ["machineId", "appid"]),
 
+  sharedConfigsHistory: defineTable({
+    configId: v.id("sharedConfigs"),
+    envContent: v.string(),
+    settings: v.array(settingValidator),
+    preset: v.optional(v.string()),
+    note: v.optional(v.string()),
+    detection: detectionValidator,
+    launchlayerVersion: v.optional(v.string()),
+    publishedAt: v.number(),
+  })
+    .index("by_config_id", ["configId"])
+    .index("by_config_id_and_published_at", ["configId", "publishedAt"]),
+
   rateLimitBuckets: defineTable({
     bucketKey: v.string(),
     windowStart: v.number(),

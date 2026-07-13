@@ -12,13 +12,14 @@ hub_validate_downloaded_env() {
 
 # hub_apply_config — Download and merge a shared config by hub config id.
 hub_apply_config() {
-	local config_id="" dry_run=0 json=0 arg
+	local config_id="" dry_run=0 json=0 arg is_history=0
 	local response env_content path appid published_at tmp_env
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 			--dry-run) dry_run=1; shift ;;
 			--json) json=1; shift ;;
+			--history) is_history=1; shift ;;
 			*)
 				[[ -z "$config_id" ]] && config_id=$1
 				shift
@@ -27,7 +28,7 @@ hub_apply_config() {
 	done
 
 	[[ -n "$config_id" ]] || {
-		echo "Usage: launchlayer --hub-apply CONFIG_ID [--dry-run] [--json]" >&2
+		echo "Usage: launchlayer --hub-apply CONFIG_ID [--history] [--dry-run] [--json]" >&2
 		return 1
 	}
 	hub_validate_config_id "$config_id" || return 1
@@ -35,7 +36,11 @@ hub_apply_config() {
 	command_required_or_fail curl "Hub apply" || return 1
 	hub_require_url || return 1
 
-	response="$(hub_curl_json GET "/api/config/${config_id}")" || return 1
+	if [[ "$is_history" == "1" ]]; then
+		response="$(hub_curl_json GET "/api/config-history/${config_id}")" || return 1
+	else
+		response="$(hub_curl_json GET "/api/config/${config_id}")" || return 1
+	fi
 
 	if ! command -v jq >/dev/null 2>&1 && ! command -v python3 >/dev/null 2>&1; then
 		echo "hub-apply requires jq or python3 to parse the hub response" >&2

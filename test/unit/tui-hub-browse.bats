@@ -81,3 +81,51 @@ _tui_hub_browse_shell() {
 	[[ $status -eq 0 ]]
 	[[ "$output" == "args:42424242 20" ]]
 }
+
+@test "tui_hub_recommend_for_appid select View history menu option calls hub_history_config" {
+	run _tui_hub_browse_shell '
+		_test_history_action() {
+			_tui_menu_queue=("cfgtest00001" "View history")
+			tui_spinner_capture() {
+				printf "%s" "{\"results\":[{\"config_id\":\"cfgtest00001\",\"similarity\":90,\"published_at\":1704067200000,\"gpu_vendor\":\"amd\",\"note\":\"v1\"}]}"
+				return 0
+			}
+			HISTORY_ARGS=()
+			hub_history_config() { HISTORY_ARGS=("$@"); return 0; }
+			tui_run_paged() { "$@"; return 0; }
+			tui_hub_recommend_for_appid 42424242 10
+			printf "history_args:%s\n" "${HISTORY_ARGS[*]}"
+		}
+		_test_history_action
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"history_args:cfgtest00001"* ]]
+}
+
+@test "tui_hub_recommend_for_appid select Apply historical version calls hub_apply_config --history" {
+	run _tui_hub_browse_shell '
+		_test_hist_apply() {
+			_tui_menu_queue=("cfgtest00001" "Apply historical version" "hist00000001  2024-01-01  note")
+			tui_spinner_capture() {
+				printf "%s" "{\"results\":[{\"config_id\":\"cfgtest00001\",\"similarity\":90,\"published_at\":1704067200000,\"gpu_vendor\":\"amd\",\"note\":\"v1\"}]}"
+				return 0
+			}
+			APPLY_ARGS=()
+			hub_apply_config() { APPLY_ARGS=("$@"); return 0; }
+			hub_curl_json() {
+				printf "%s" "[{\"history_id\":\"hist00000001\",\"published_at\":1704067200000,\"note\":\"note\"}]"
+				return 0
+			}
+			command_required_or_fail() { return 0; }
+			hub_require_url() { return 0; }
+			tui_confirm() { return 0; }
+			tui_run_capture() { shift; "$@"; return 0; }
+			tui_run_paged() { "$@"; return 0; }
+			tui_hub_recommend_for_appid 42424242 10
+			printf "apply_args:%s\n" "${APPLY_ARGS[*]}"
+		}
+		_test_hist_apply
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"apply_args:hist00000001 --history"* ]]
+}

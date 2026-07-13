@@ -272,6 +272,14 @@ apply_defaults() {
 	: "${GPU_VRAM_PROCESS_MIN_MB:=0}"
 	: "${DISABLE_CPU_AFFINITY:=0}"
 	: "${GAME_PERFORMANCE:=1}"
+	: "${CPU_AFFINITY_RANGE:=}"
+	: "${DISABLE_NIC_EEE:=1}"
+	: "${DISABLE_WIFI_POWER_SAVE:=1}"
+	: "${MALLOC_ALLOCATOR:=}"
+	: "${ENABLE_HDR:=}"
+	: "${GAMESCOPE_HDR:=0}"
+	: "${DISK_TUNE:=0}"
+	: "${OVERRIDE_PROTON:=}"
 }
 
 # config_file_display_name — Parse game name from scaffold header, or fall back to AppID.

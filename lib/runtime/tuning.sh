@@ -4,20 +4,23 @@
 [[ -n "${LAUNCHLAYER_RUNTIME_TUNING_LOADED:-}" ]] && return 0
 LAUNCHLAYER_RUNTIME_TUNING_LOADED=1
 
-# apply_network_tuning — Low-latency NIC settings (requires passwordless sudo).
 apply_network_tuning() {
 	[[ "${NETWORK_TUNE:-0}" == "1" ]] || return 0
-	require_tool_or_skip ethtool "NETWORK_TUNE=1 skipped" || return 0
-	sudo -n true 2>/dev/null || {
+	local has_sudo=1
+	sudo -n true 2>/dev/null || has_sudo=0
+
+	if (( has_sudo == 0 )); then
 		warn "NETWORK_TUNE=1 skipped: sudo requires a password"
 		return 0
-	}
+	fi
+
 	local nic="${GAME_NIC:-}"
 	[[ -n "$nic" ]] || nic="$(detect_default_nic 2>/dev/null || true)"
 	[[ -n "$nic" ]] || {
 		warn "NETWORK_TUNE=1 skipped: no default NIC detected"
 		return 0
 	}
+
 	if ! command_available ip; then
 		warn "NETWORK_TUNE=1 skipped: ip is not installed$(tool_warn_suffix ip)"
 		return 0
@@ -26,16 +29,37 @@ apply_network_tuning() {
 		warn "NETWORK_TUNE=1 skipped: NIC '$nic' not found"
 		return 0
 	}
-	local max_rx=256 max_tx=256 ethtool_out
-	if ethtool_out=$(ethtool -g "$nic" 2>/dev/null); then
-		max_rx=$(printf '%s\n' "$ethtool_out" | awk '/^RX:/{print $2; exit}')
-		max_tx=$(printf '%s\n' "$ethtool_out" | awk '/^TX:/{print $2; exit}')
+
+	if command_available ethtool; then
+		local max_rx=256 max_tx=256 ethtool_out
+		if ethtool_out=$(ethtool -g "$nic" 2>/dev/null); then
+			max_rx=$(printf '%s\n' "$ethtool_out" | awk '/^RX:/{print $2; exit}')
+			max_tx=$(printf '%s\n' "$ethtool_out" | awk '/^TX:/{print $2; exit}')
+		fi
+		sudo -n ip link set "$nic" up 2>/dev/null || true
+		sudo -n ethtool -G "$nic" rx "$max_rx" tx "$max_tx" 2>/dev/null || true
+		sudo -n sysctl -w net.ipv4.tcp_low_latency=1 >/dev/null 2>&1 || true
+		sudo -n ethtool -C "$nic" adaptive-rx off adaptive-tx off 2>/dev/null || true
+		sudo -n ethtool -C "$nic" rx-usecs 0 rx-frames 1 2>/dev/null || true
+
+		if [[ "${DISABLE_NIC_EEE:-1}" == "1" ]]; then
+			sudo -n ethtool --set-eee "$nic" eee off >/dev/null 2>&1 || true
+			debug "disabled energy efficient ethernet (EEE) on $nic"
+		fi
+	else
+		warn "NETWORK_TUNE=1: ethtool is not installed$(tool_warn_suffix ethtool) — skipping ethtool ring buffer & adaptive moderation tuning"
 	fi
-	sudo -n ip link set "$nic" up 2>/dev/null || true
-	sudo -n ethtool -G "$nic" rx "$max_rx" tx "$max_tx" 2>/dev/null || true
-	sudo -n sysctl -w net.ipv4.tcp_low_latency=1 >/dev/null 2>&1 || true
-	sudo -n ethtool -C "$nic" adaptive-rx off adaptive-tx off 2>/dev/null || true
-	sudo -n ethtool -C "$nic" rx-usecs 0 rx-frames 1 2>/dev/null || true
+
+	if [[ "${DISABLE_WIFI_POWER_SAVE:-1}" == "1" ]] && [[ "$(detect_nic_type "$nic" 2>/dev/null)" == "wireless" ]]; then
+		if command_available iw; then
+			sudo -n iw dev "$nic" set power_save off >/dev/null 2>&1 || true
+			debug "disabled wifi power saving on $nic (via iw)"
+		elif command_available iwconfig; then
+			sudo -n iwconfig "$nic" power off >/dev/null 2>&1 || true
+			debug "disabled wifi power saving on $nic (via iwconfig)"
+		fi
+	fi
+
 	debug "network tuning applied on $nic"
 }
 
@@ -169,3 +193,175 @@ apply_proton_env() {
 warn_missing_tools() {
 	warn_enabled_missing_tools
 }
+
+# find_malloc_library — Search common paths for jemalloc or mimalloc libraries.
+find_malloc_library() {
+	local type=$1
+	local paths=()
+	if [[ -n "${MALLOC_LIBRARY_SEARCH_ROOT:-}" ]]; then
+		paths+=(
+			"${MALLOC_LIBRARY_SEARCH_ROOT}/lib${type}.so"
+			"${MALLOC_LIBRARY_SEARCH_ROOT}/lib${type}.so.2"
+		)
+	fi
+	paths+=(
+		"/usr/lib/lib${type}.so"
+		"/usr/lib/x86_64-linux-gnu/lib${type}.so"
+		"/usr/lib/x86_64-linux-gnu/lib${type}.so.2"
+		"/usr/lib/i386-linux-gnu/lib${type}.so"
+		"/usr/lib32/lib${type}.so"
+		"/usr/local/lib/lib${type}.so"
+	)
+	local path
+	for path in "${paths[@]}"; do
+		if [[ -f "$path" ]]; then
+			echo "$path"
+			return 0
+		fi
+	done
+	if command -v ldconfig >/dev/null 2>&1; then
+		if ldconfig -p 2>/dev/null | grep -q "lib${type}.so"; then
+			echo "lib${type}.so"
+			return 0
+		fi
+	fi
+	return 1
+}
+
+# apply_malloc_allocator — Preload high-performance malloc implementations.
+apply_malloc_allocator() {
+	[[ -n "${MALLOC_ALLOCATOR:-}" ]] || return 0
+	local lib_path
+	if lib_path="$(find_malloc_library "$MALLOC_ALLOCATOR" 2>/dev/null)"; then
+		export LD_PRELOAD="${lib_path}${LD_PRELOAD:+:$LD_PRELOAD}"
+		debug "preloaded $MALLOC_ALLOCATOR allocator via $lib_path"
+	else
+		warn "MALLOC_ALLOCATOR=${MALLOC_ALLOCATOR} failed: library not found"
+	fi
+}
+
+# detect_hdr_support — Return 1 if any active display supports HDR, 0 otherwise.
+detect_hdr_support() {
+	if command_available kscreen-doctor; then
+		if kscreen-doctor -o 2>/dev/null | grep -i "HDR" | grep -q -iv "incapable"; then
+			echo 1
+			return 0
+		fi
+	fi
+	local edid
+	for edid in /sys/class/drm/card*-*/edid; do
+		[[ -f "$edid" ]] || continue
+		if command_available edid-decode; then
+			if edid-decode "$edid" 2>/dev/null | grep -qi "HDR Static Metadata"; then
+				echo 1
+				return 0
+			fi
+		fi
+	done
+	echo 0
+}
+
+# apply_hdr_tuning — Set environment variables and enable gamescope HDR.
+apply_hdr_tuning() {
+	local hdr_support=0
+	if [[ "${ENABLE_HDR:-}" == "1" ]]; then
+		hdr_support=1
+	elif [[ -z "${ENABLE_HDR:-}" ]]; then
+		hdr_support="$(detect_hdr_support)"
+	fi
+
+	if (( hdr_support == 1 )); then
+		export DXVK_HDR=1
+		export ENABLE_HDR_WSI=1
+		GAMESCOPE_HDR=1
+		debug "HDR support enabled (DXVK_HDR=1 ENABLE_HDR_WSI=1)"
+	fi
+}
+
+# resolve_block_device_name — Map a device node (or partition) to a /sys/block name.
+resolve_block_device_name() {
+	local dev_path=$1
+	local sysfs_block="${LAUNCHLAYER_SYSFS_BLOCK:-/sys/block}"
+	local sysfs_class_block="${LAUNCHLAYER_SYSFS_CLASS_BLOCK:-/sys/class/block}"
+	local dev_name pk parent
+	[[ -n "$dev_path" ]] || return 1
+	dev_path="$(readlink -f "$dev_path" 2>/dev/null || true)"
+	[[ -n "$dev_path" ]] || return 1
+	dev_name="$(basename "$dev_path")"
+
+	# Prefer lsblk parent disk for partitions (nvme0n1p2 → nvme0n1, sda1 → sda).
+	if command -v lsblk >/dev/null 2>&1; then
+		pk="$(lsblk -ndo PKNAME "$dev_path" 2>/dev/null | head -1 | tr -d '[:space:]')"
+		if [[ -n "$pk" && -d "$sysfs_block/$pk" ]]; then
+			echo "$pk"
+			return 0
+		fi
+	fi
+
+	# sysfs: partitions expose .../partition and parent is the whole disk.
+	if [[ -e "$sysfs_class_block/$dev_name/partition" ]]; then
+		parent="$(basename "$(readlink -f "$sysfs_class_block/$dev_name/..")")"
+		if [[ -n "$parent" && -d "$sysfs_block/$parent" ]]; then
+			echo "$parent"
+			return 0
+		fi
+	fi
+
+	if [[ -d "$sysfs_block/$dev_name" ]]; then
+		echo "$dev_name"
+		return 0
+	fi
+	return 1
+}
+
+# apply_disk_tuning — Optimize Linux block device I/O scheduler.
+apply_disk_tuning() {
+	[[ "${DISK_TUNE:-0}" == "1" ]] || return 0
+	sudo -n true 2>/dev/null || {
+		warn "DISK_TUNE=1 skipped: sudo requires a password"
+		return 0
+	}
+
+	local tune_path="."
+	if [[ -n "${steam_app_id:-}" ]]; then
+		tune_path="$(get_game_dir_for_appid "$steam_app_id" 2>/dev/null || true)"
+		[[ -n "$tune_path" ]] || tune_path="."
+	fi
+
+	local dev_path dev_name rot_file scheduler_file schedulers target_sched
+	dev_path="$(df -P "$tune_path" 2>/dev/null | awk 'NR==2 {print $1}')"
+	[[ -n "$dev_path" ]] || return 0
+	dev_name="$(resolve_block_device_name "$dev_path" 2>/dev/null || true)"
+	[[ -n "$dev_name" ]] || {
+		debug "disk tuning skipped: could not resolve block device for $dev_path"
+		return 0
+	}
+
+	rot_file="${LAUNCHLAYER_SYSFS_BLOCK:-/sys/block}/$dev_name/queue/rotational"
+	scheduler_file="${LAUNCHLAYER_SYSFS_BLOCK:-/sys/block}/$dev_name/queue/scheduler"
+
+	# Only write to validated sysfs scheduler nodes (keeps sudo tee scoped).
+	[[ "$scheduler_file" =~ (^|/)sys/block/[A-Za-z0-9._+-]+/queue/scheduler$ ]] || return 0
+	[[ -f "$rot_file" && -f "$scheduler_file" ]] || return 0
+
+	if [[ "$(<"$rot_file")" == "1" ]]; then
+		target_sched="bfq"
+	else
+		target_sched="none"
+	fi
+
+	schedulers="$(cat "$scheduler_file")"
+	if [[ "$schedulers" == *"$target_sched"* ]]; then
+		sudo -n tee "$scheduler_file" >/dev/null <<<"$target_sched" 2>/dev/null && \
+			debug "disk tuning: set I/O scheduler of $dev_name to $target_sched"
+	else
+		if [[ "$target_sched" == "none" ]] && [[ "$schedulers" == *"kyber"* ]]; then
+			sudo -n tee "$scheduler_file" >/dev/null <<<"kyber" 2>/dev/null && \
+				debug "disk tuning: set I/O scheduler of $dev_name to kyber"
+		elif [[ "$schedulers" == *"mq-deadline"* ]]; then
+			sudo -n tee "$scheduler_file" >/dev/null <<<"mq-deadline" 2>/dev/null && \
+				debug "disk tuning: set I/O scheduler of $dev_name to mq-deadline"
+		fi
+	fi
+}
+

@@ -326,7 +326,11 @@ apply_auto_hardware_defaults() {
 	fi
 
 	if [[ -z "${X3D_CPUS:-}" ]]; then
-		X3D_CPUS="$(detect_x3d_cpus)"
+		if [[ "$(detect_cpu_vendor 2>/dev/null || true)" == "intel" ]]; then
+			X3D_CPUS="$(detect_intel_p_cores)"
+		else
+			X3D_CPUS="$(detect_x3d_cpus)"
+		fi
 		export X3D_CPUS
 	fi
 

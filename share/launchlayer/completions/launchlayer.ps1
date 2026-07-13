@@ -31,8 +31,8 @@ function Get-LaunchlayerCompletions {
         '--prune-uninstalled', '--export-config', '--backup-config', '--import-config',
         '--prune-backups', '--run-scheduled-backup', '--backup-timer', '--backup-prefs',
         '--tui-prefs', '--hub-fingerprint', '--hub-publish', '--hub-update', '--hub-delete', '--hub-recommend', '--hub-search',
-        '--hub-apply', '--hub-prefs', '--show-config', '--edit-appid', '--paths', '--validate-config',
-        '--scan-anticheat', '--scan-detections', '--cache-report', '--launch-stats',
+        '--hub-apply', '--hub-history', '--hub-prefs', '--show-config', '--edit-appid', '--paths', '--validate-config',
+        '--suggest-config', '--scan-anticheat', '--scan-detections', '--cache-report', '--launch-stats',
         '--dry-run', '--help', '-h', '--version', '-V', '--tui'
     )
 
@@ -42,8 +42,8 @@ function Get-LaunchlayerCompletions {
 
     $subcmd = $Tokens[1]
     switch ($subcmd) {
-        { $_ -in @('--status', '--show-config', '--edit-appid', '--launch-stats', '--paths') } {
-            return (Get-LaunchlayerAppIds -ScriptPath $ScriptPath) + @('--json')
+        { $_ -in @('--status', '--show-config', '--edit-appid', '--launch-stats', '--paths', '--suggest-config') } {
+            return (Get-LaunchlayerAppIds -ScriptPath $ScriptPath) + @('--json', '--apply')
         }
         '--init-appid' {
             if ($Tokens.Count -eq 2) {
@@ -119,7 +119,13 @@ function Get-LaunchlayerCompletions {
             return @('--limit', '--json')
         }
         '--hub-apply' {
-            return @('--dry-run', '--json')
+            return @('--history', '--dry-run', '--json')
+        }
+        '--hub-history' {
+            return @('--json')
+        }
+        '--suggest-config' {
+            return (Get-LaunchlayerAppIds -ScriptPath $ScriptPath) + @('--apply')
         }
         '--hub-delete' {
             return @('--yes', '--json')

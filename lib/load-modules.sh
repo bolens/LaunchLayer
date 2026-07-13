@@ -168,6 +168,8 @@ launchlayer_source_commands_hub() {
 	source "$LIB_DIR/commands/hub/recommend.sh"
 	# shellcheck source=commands/hub/apply.sh
 	source "$LIB_DIR/commands/hub/apply.sh"
+	# shellcheck source=commands/hub/history.sh
+	source "$LIB_DIR/commands/hub/history.sh"
 }
 
 # launchlayer_source_runtime — Launch hooks, env tuning, wrapper chain, logging.

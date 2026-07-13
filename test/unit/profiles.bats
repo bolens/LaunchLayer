@@ -61,3 +61,94 @@ setup() {
 	[[ $status -eq 0 ]]
 	[[ "$output" == "alpha" ]]
 }
+
+@test "detect_cpu_vendor detects amd from /proc/cpuinfo" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		grep() {
+			if [[ "$4" == "/proc/cpuinfo" && "$2" == "-i" && "$3" == "authenticamd" ]]; then return 0; fi
+			return 1
+		}
+		detect_cpu_vendor
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "amd" ]]
+}
+
+@test "detect_cpu_vendor detects intel from /proc/cpuinfo" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		grep() {
+			if [[ "$4" == "/proc/cpuinfo" && "$2" == "-i" && "$3" == "genuineintel" ]]; then return 0; fi
+			return 1
+		}
+		detect_cpu_vendor
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "intel" ]]
+}
+
+@test "detect_nic_type classifies lo as loopback and honors LAUNCHLAYER_SYSFS_NET" {
+	local sysfs
+	sysfs="$(mktemp -d)"
+	mkdir -p "$sysfs/wlan0/wireless"
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export LAUNCHLAYER_SYSFS_NET="'"$sysfs"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		detect_nic_type lo
+		echo ---
+		detect_nic_type wlan0
+		echo ---
+		detect_nic_type eth0
+	'
+	rm -rf "$sysfs"
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"loopback"* ]]
+	[[ "$output" == *"wireless"* ]]
+	[[ "$output" == *"wired"* ]]
+}
+
+@test "detect_handheld_profile maps product names" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		printf "%s\n" \
+			"$(detect_handheld_profile "ASUS ROG Ally RC71L")" \
+			"$(detect_handheld_profile "Jupiter")" \
+			"$(detect_handheld_profile "Legion Go 83E1")" \
+			"$(detect_handheld_profile "Desktop PC")" \
+			"$(detect_handheld_profile "Lenovo Legion 5")" \
+			"$(detect_handheld_profile "ROG Strix Ally")"
+	'
+	[[ $status -eq 0 ]]
+	[[ "${lines[0]}" == "rog-ally" ]]
+	[[ "${lines[1]}" == "steam-deck" ]]
+	[[ "${lines[2]}" == "legion-go" ]]
+	[[ "${lines[3]}" == "" ]]
+	[[ "${lines[4]}" == "" ]]  # Legion laptop must not match legion-go
+	[[ "${lines[5]}" == "" ]]  # Ally substring alone is not enough without "rog ally"
+}
+
+@test "gpu profile env files load KEY=VALUE without export prefix" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform config
+		unset AMD_VULKAN_ICD mesa_glthread __GL_THREADED_OPTIMIZATIONS 2>/dev/null || true
+		load_env_file "'"$BATS_TEST_DIRNAME"'/../../launch.d/profiles/amd-gpu.env" 1
+		load_env_file "'"$BATS_TEST_DIRNAME"'/../../launch.d/profiles/nvidia-desktop.env" 1
+		printf "amd=%s mesa=%s gl=%s\n" "${AMD_VULKAN_ICD:-}" "${mesa_glthread:-}" "${__GL_THREADED_OPTIMIZATIONS:-}"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"amd=RADV"* ]]
+	[[ "$output" == *"mesa=true"* ]]
+	[[ "$output" == *"gl=1"* ]]
+}
+

@@ -47,7 +47,7 @@ print_dry_run() {
 	print_effective_config_summary
 	echo
 	echo "Environment (selected):"
-	env | grep -E '^(PROTON_|DXVK_|VKD3D_|__GL_|__VK_|MANGOHUD|GAMESCOPE_)' | sort || true
+	env | grep -E '^(PROTON_|DXVK_|VKD3D_|__GL_|__VK_|MANGOHUD|GAMESCOPE_|LD_PRELOAD|ENABLE_HDR)' | sort || true
 	echo
 	echo "Launch chain:"
 	printf '  %q' "${launch[@]}" "$@" "${game_extra_argv[@]}"

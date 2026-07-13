@@ -78,3 +78,19 @@ _dispatch_config_shell() {
 	[[ $status -eq 0 ]]
 	[[ "$output" == "write:1 1" ]]
 }
+
+@test "dispatch_config_subcommand suggest-config delegates appid and arguments to python" {
+	run _dispatch_config_shell '
+		source_lib platform config detected-defaults
+		python3() {
+			echo "python3 called with: $*"
+		}
+		export -f python3
+		dispatch_config_subcommand --suggest-config 1091500 --apply
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"python3 called with: "* ]]
+	[[ "$output" == *"1091500"* ]]
+	[[ "$output" == *"1"* ]]
+}
+

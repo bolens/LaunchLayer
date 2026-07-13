@@ -27,6 +27,8 @@ profile_list_contains() {
 }
 
 # detect_default_profiles — Space-separated auto-selected profile names (layered).
+# Names without a matching launch.d/profiles/<name>.env file are fingerprint /
+# layering markers only (load_profile_config silently skips missing files).
 detect_default_profiles() {
 	local -a profiles=()
 	local -a seen_profiles=()
@@ -49,12 +51,36 @@ detect_default_profiles() {
 	os_profile="$(detect_os_profile 2>/dev/null || true)"
 	[[ -n "$os_profile" ]] && profiles+=("$os_profile")
 	has_systemd_user || profiles+=(non-systemd)
+
+	local handheld
+	handheld="$(detect_handheld_profile 2>/dev/null || true)"
+	if [[ -n "$handheld" ]]; then
+		profiles+=("$handheld" "handheld")
+	fi
+
+	local cpu_vendor
+	cpu_vendor="$(detect_cpu_vendor)"
+	case "$cpu_vendor" in
+		amd) profiles+=(amd-cpu) ;;
+		intel) profiles+=(intel-cpu) ;;
+	esac
+
 	vendor="$(detect_gpu_vendor)"
 	case "$vendor" in
 		amd) profiles+=(amd-gpu) ;;
 		intel) profiles+=(intel-gpu) ;;
 		nvidia) profiles+=(nvidia-desktop) ;;
 	esac
+
+	local nic_type nic_driver
+	nic_type="$(detect_nic_type 2>/dev/null || true)"
+	if [[ "$nic_type" == "wired" || "$nic_type" == "wireless" ]]; then
+		profiles+=("nic-$nic_type")
+	fi
+	nic_driver="$(detect_nic_driver 2>/dev/null || true)"
+	if [[ -n "$nic_driver" && "$nic_driver" != "unknown" ]]; then
+		profiles+=("nic-$nic_driver")
+	fi
 
 	for p in "${profiles[@]}"; do
 		profile_list_contains "${seen_profiles[*]}" "$p" && continue

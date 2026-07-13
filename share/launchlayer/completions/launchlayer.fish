@@ -66,11 +66,13 @@ function __launchlayer_register
     complete -c $cmd -n __launchlayer_no_subcommand -a '--hub-recommend' -d 'Recommend configs from similar machines'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--hub-search' -d 'List machines similar to this one'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--hub-apply' -d 'Apply a shared hub config by id'
+    complete -c $cmd -n __launchlayer_no_subcommand -a '--hub-history' -d 'List publication history of a shared config'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--hub-prefs' -d 'Manage hub preferences'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--paths' -d 'Shader cache, compatdata, install paths'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--show-config' -d 'Show resolved config for an AppID'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--edit-appid' -d 'Open per-game config in EDITOR'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--validate-config' -d 'Lint .env config files'
+    complete -c $cmd -n __launchlayer_no_subcommand -a '--suggest-config' -d 'Suggest optimizations using ProtonDB comments'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--scan-anticheat' -d 'Scan for EAC/BattlEye titles'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--scan-detections' -d 'Audit detection heuristics'
     complete -c $cmd -n __launchlayer_no_subcommand -a '--cache-report' -d 'Report shader/compatdata cache sizes'
@@ -81,7 +83,7 @@ function __launchlayer_register
     complete -c $cmd -n __launchlayer_no_subcommand -a --version -d 'Show version'
     complete -c $cmd -n __launchlayer_no_subcommand -a -V -d 'Show version'
 
-    set -l appid_subcmds --status --show-config --edit-appid --launch-stats --paths
+    set -l appid_subcmds --status --show-config --edit-appid --launch-stats --paths --suggest-config
     for subcmd in $appid_subcmds
         complete -c $cmd \
             -n "__fish_seen_subcommand_from $subcmd; and not __fish_seen_subcommand_from --help -h" \
@@ -99,6 +101,10 @@ function __launchlayer_register
     complete -c $cmd \
         -n '__fish_seen_subcommand_from --validate-config; and not __fish_seen_subcommand_from --help -h' \
         -a 'all default presets (__launchlayer_appids)'
+
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --suggest-config; and not __fish_seen_subcommand_from --help -h' \
+        -a '--apply' -d 'Apply suggestions to game config'
 
     complete -c $cmd \
         -n '__fish_seen_subcommand_from --init-unconfigured' \
@@ -355,6 +361,13 @@ function __launchlayer_register
         -a '--dry-run' -d 'Preview without writing files'
     complete -c $cmd \
         -n '__fish_seen_subcommand_from --hub-apply' \
+        -a '--json' -d 'JSON output'
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-apply' \
+        -a '--history' -d 'Fetch and apply historical configuration'
+
+    complete -c $cmd \
+        -n '__fish_seen_subcommand_from --hub-history' \
         -a '--json' -d 'JSON output'
 
     complete -c $cmd \

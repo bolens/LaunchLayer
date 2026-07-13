@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /hub
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      hub-production:
+        dependency-type: production
+      hub-development:
+        dependency-type: development
