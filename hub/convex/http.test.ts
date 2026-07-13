@@ -53,7 +53,7 @@ describe("hub HTTP routes", () => {
     });
     expect(second.status).toBe(200);
 
-    const config = await t.run(async (ctx) => ctx.db.get(published.config_id));
+    const config = await t.run(async (ctx) => ctx.db.get("sharedConfigs", published.config_id));
     expect(config?.downloads).toBe(1);
   });
 

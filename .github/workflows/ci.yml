@@ -19,6 +19,7 @@ jobs:
     outputs:
       shell: ${{ steps.filter.outputs.shell }}
       hub: ${{ steps.filter.outputs.hub }}
+      workflows: ${{ steps.filter.outputs.workflows }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -40,11 +41,16 @@ jobs:
             hub:
               - 'hub/**'
               - 'package.json'
-              - 'pnpm-lock.yaml'
+              - '.node-version'
+              - 'scripts/hub-pm.sh'
               - '.github/workflows/ci-hub.yml'
               - '.github/workflows/ci.yml'
+            workflows:
+              - '.github/workflows/**'
 
   actionlint:
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -85,20 +91,21 @@ jobs:
           set -euo pipefail
           shell_needed='${{ needs.changes.outputs.shell }}'
           hub_needed='${{ needs.changes.outputs.hub }}'
+          workflows_needed='${{ needs.changes.outputs.workflows }}'
           shell_result='${{ needs.shell.result }}'
           hub_result='${{ needs.hub.result }}'
           changes_result='${{ needs.changes.result }}'
           actionlint_result='${{ needs.actionlint.result }}'
 
-          echo "changes=$changes_result actionlint=$actionlint_result shell_needed=$shell_needed shell=$shell_result hub_needed=$hub_needed hub=$hub_result"
+          echo "changes=$changes_result actionlint_needed=$workflows_needed actionlint=$actionlint_result shell_needed=$shell_needed shell=$shell_result hub_needed=$hub_needed hub=$hub_result"
 
           if [[ "$changes_result" != "success" ]]; then
             echo "changes job did not succeed"
             exit 1
           fi
 
-          if [[ "$actionlint_result" != "success" ]]; then
-            echo "actionlint did not succeed: $actionlint_result"
+          if [[ "$workflows_needed" == "true" && "$actionlint_result" != "success" ]]; then
+            echo "actionlint required but result was: $actionlint_result"
             exit 1
           fi
 

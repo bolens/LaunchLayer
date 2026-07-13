@@ -154,14 +154,22 @@ ProtonDB suggestions (client-side, no hub required):
 
 The interactive TUI exposes the same flows under **Community hub** (main menu) and **[Hub] Community configs** (per-game actions).
 
-Deploy the hub backend from `hub/`:
+Deploy the hub backend from `hub/` (Node **22+**, pnpm via `packageManager`). Prefer [Vite+](https://viteplus.dev/) (`vp`) when available; otherwise enable [Corepack](https://nodejs.org/api/corepack.html) and use pnpm. Repo helpers: `scripts/hub-pm.sh`, `make test-hub`, `make lint-hub`.
 
 ```bash
-corepack enable
 cd hub
+# With Vite+ (preferred):
+vp install
+vp run dev              # development (convex dev)
+vp run lint             # ESLint + tsc
+vp run convex:deploy    # production only
+
+# Without Vite+ (Corepack + pnpm):
+corepack enable
 pnpm install
-pnpm dev          # development (convex dev)
-pnpm run convex:deploy # production only (or: npx convex deploy)
+pnpm dev
+pnpm run lint
+pnpm run convex:deploy
 ```
 
 Point `hub_url` at the Convex HTTP actions URL.
@@ -208,7 +216,11 @@ Override once: `LAUNCHLAYER_HUB_FINGERPRINT_LEVEL=detailed` or `--hub-fingerprin
 ## Tests
 
 ```bash
-make test           # bats test/integration/*.bats test/unit/*.bats + hub TS tests
-make check          # shellcheck + check-hub-git + bats
-make check-hub-git  # scripts/check-staged-hub-secrets.sh
+make test              # bats test/integration + test/unit (parallel when GNU parallel is installed)
+make test-unit         # bats test/unit
+make test-integration  # bats test/integration
+make check             # shellcheck + check-hub-git + bats
+make check-hub-git     # scripts/check-staged-hub-secrets.sh
 ```
+
+CI runs shellcheck, unit bats, and integration bats in parallel; hub lint and hub test are also parallel. `pnpm audit` is a weekly workflow (`.github/workflows/hub-audit.yml`), not part of the PR gate.

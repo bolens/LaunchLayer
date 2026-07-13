@@ -33,7 +33,7 @@ export const enforceRateLimit = internalMutation({
 
     if (!existing || existing.windowStart !== windowStart) {
       if (existing) {
-        await ctx.db.patch(existing._id, { windowStart, count: 1 });
+        await ctx.db.patch("rateLimitBuckets", existing._id, { windowStart, count: 1 });
       } else {
         await ctx.db.insert("rateLimitBuckets", {
           bucketKey,
@@ -48,7 +48,7 @@ export const enforceRateLimit = internalMutation({
       rateLimitExceededError();
     }
 
-    await ctx.db.patch(existing._id, { count: existing.count + 1 });
+    await ctx.db.patch("rateLimitBuckets", existing._id, { count: existing.count + 1 });
     return null;
   },
 });

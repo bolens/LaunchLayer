@@ -506,14 +506,22 @@ Also useful without the hub: `--suggest-config APPID|NAME [--apply]` ranks Proto
 
 The TUI exposes hub flows under **Community hub** (main menu) and **[Hub] Community configs** (per-game actions), including viewing history and applying a historical version.
 
-Deploy or develop the backend from `hub/` (requires [Corepack](https://nodejs.org/api/corepack.html) + pnpm):
+Deploy or develop the backend from `hub/` (Node **22+**, pnpm pinned via `packageManager`). Prefer [Vite+](https://viteplus.dev/) (`vp`) when available — it resolves the pinned pnpm. Otherwise enable [Corepack](https://nodejs.org/api/corepack.html) and call pnpm directly. From the repo root you can also use `bash scripts/hub-pm.sh …` / `make test-hub` / `make lint-hub`.
 
 ```bash
 cd hub
+# With Vite+ (preferred):
+vp install
+vp run dev              # development — runs convex dev
+vp run lint             # ESLint + tsc
+vp run convex:deploy    # production only
+
+# Without Vite+ (Corepack + pnpm):
 corepack enable
 pnpm install
-pnpm dev      # development — runs convex dev
-pnpm run convex:deploy   # production only (or: npx convex deploy)
+pnpm dev
+pnpm run lint
+pnpm run convex:deploy
 ```
 
 Point `hub_url` in `hub.conf` at your deployment’s HTTP actions URL (e.g. `https://your-deployment.convex.site`).
@@ -596,7 +604,7 @@ launch.d/                # ≡ shipped layers: default.env, profiles/, presets/,
   native-appids.txt      # known native Linux AppIDs
 lib/                     # ⚙ core modules (config, launch, hardware, tui, …)
   hub/                   # ◉ community hub client (fingerprint, HTTP)
-hub/                     # ◉ optional Convex backend (pnpm)
+hub/                     # ◉ optional Convex backend (vp / pnpm)
 share/launchlayer/       # ▣ templates, sysctl, systemd units, completions
 examples/games/          # ◆ tracked example per-game configs
 scripts/
@@ -665,17 +673,21 @@ The script degrades gracefully when tools are missing. Run `--doctor` or `--dete
 ## Testing
 
 ```bash
-make test           # bats integration + unit tests
-make check          # shellcheck + check-hub-git + bats
-make check-hub-git  # fail if hub secrets are staged
+make test              # bats integration + unit (parallel when GNU parallel is installed)
+make test-unit         # bats test/unit only
+make test-integration  # bats test/integration only
+make check             # shellcheck + check-hub-git + bats
+make check-hub-git     # fail if hub secrets are staged
 ```
 
 Or directly:
 
 ```bash
-bats test/
+bats --jobs "$(nproc)" --no-parallelize-within-files test/unit test/integration
 shellcheck -x -P lib -a --severity=warning launchlayer test/helpers.bash scripts/*.sh
 ```
+
+Hub dependency audits run weekly via `.github/workflows/hub-audit.yml` (or `workflow_dispatch`), not on every PR.
 
 ---
 
