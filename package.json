@@ -1,10 +1,10 @@
 {
   "name": "launchlayer",
   "private": true,
+  "description": "Scripts-only root shim — install and run hub tooling from hub/ (or via scripts/hub-pm.sh).",
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "pnpm@10.16.1",
   "scripts": {
     "dev": "bash scripts/hub-pm.sh run dev",
     "test:hub": "bash scripts/hub-pm.sh run test",

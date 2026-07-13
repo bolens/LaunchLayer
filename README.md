@@ -506,7 +506,7 @@ Also useful without the hub: `--suggest-config APPID|NAME [--apply]` ranks Proto
 
 The TUI exposes hub flows under **Community hub** (main menu) and **[Hub] Community configs** (per-game actions), including viewing history and applying a historical version.
 
-Deploy or develop the backend from `hub/` (Node **22+**, pnpm pinned via `packageManager`). Prefer [Vite+](https://viteplus.dev/) (`vp`) when available — it resolves the pinned pnpm. Otherwise enable [Corepack](https://nodejs.org/api/corepack.html) and call pnpm directly. From the repo root you can also use `bash scripts/hub-pm.sh …` / `make test-hub` / `make lint-hub`.
+Deploy or develop the backend from `hub/` (Node **22+**, pnpm pinned via `hub/package.json` `packageManager`). The repo root `package.json` is a scripts-only shim (no lockfile) — always install inside `hub/`. Prefer [Vite+](https://viteplus.dev/) (`vp`) when available — it resolves the pinned pnpm. Otherwise enable [Corepack](https://nodejs.org/api/corepack.html) and call pnpm directly. From the repo root you can also use `bash scripts/hub-pm.sh …` / `make test-hub` / `make lint-hub`.
 
 ```bash
 cd hub
@@ -676,8 +676,13 @@ The script degrades gracefully when tools are missing. Run `--doctor` or `--dete
 make test              # bats integration + unit (parallel when GNU parallel is installed)
 make test-unit         # bats test/unit only
 make test-integration  # bats test/integration only
-make check             # shellcheck + check-hub-git + bats
+make check             # shellcheck + check-hub-git + bats (shell gate)
 make check-hub-git     # fail if hub secrets are staged
+make test-hub          # hub unit + convex tests (via scripts/hub-pm.sh)
+make lint-hub          # hub ESLint + tsc
+make check-hub         # lint-hub + test-hub
+make test-all          # shell bats + test-hub
+make check-all         # check + check-hub (full local gate matching CI)
 ```
 
 Or directly:
@@ -685,6 +690,9 @@ Or directly:
 ```bash
 bats --jobs "$(nproc)" --no-parallelize-within-files test/unit test/integration
 shellcheck -x -P lib -a --severity=warning launchlayer test/helpers.bash scripts/*.sh
+bash scripts/hub-pm.sh install   # once, from repo root (or cd hub && pnpm install)
+bash scripts/hub-pm.sh lint
+bash scripts/hub-pm.sh test
 ```
 
 Hub dependency audits run weekly via `.github/workflows/hub-audit.yml` (or `workflow_dispatch`), not on every PR.
@@ -718,8 +726,9 @@ This project is [CC BY-NC-SA 4.0](LICENSE). Commercial use requires separate per
 Issues and pull requests are welcome at [github.com/bolens/LaunchLayer](https://github.com/bolens/LaunchLayer).
 
 ```bash
-make check    # shellcheck + hub secret guard + bats
-make test     # bats only
+make check      # shellcheck + hub secret guard + bats
+make check-all  # check + hub lint/test (needs hub/node_modules)
+make test       # bats only
 ```
 
 - Deep module reference: [docs/architecture.md](docs/architecture.md)

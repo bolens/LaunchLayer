@@ -154,7 +154,7 @@ ProtonDB suggestions (client-side, no hub required):
 
 The interactive TUI exposes the same flows under **Community hub** (main menu) and **[Hub] Community configs** (per-game actions).
 
-Deploy the hub backend from `hub/` (Node **22+**, pnpm via `packageManager`). Prefer [Vite+](https://viteplus.dev/) (`vp`) when available; otherwise enable [Corepack](https://nodejs.org/api/corepack.html) and use pnpm. Repo helpers: `scripts/hub-pm.sh`, `make test-hub`, `make lint-hub`.
+Deploy the hub backend from `hub/` (Node **22+**, pnpm via `hub/package.json` `packageManager`). The repo root `package.json` is a scripts-only shim with no lockfile — install inside `hub/`. Prefer [Vite+](https://viteplus.dev/) (`vp`) when available; otherwise enable [Corepack](https://nodejs.org/api/corepack.html) and use pnpm. Repo helpers: `scripts/hub-pm.sh`, `make test-hub`, `make lint-hub`.
 
 ```bash
 cd hub
@@ -219,8 +219,13 @@ Override once: `LAUNCHLAYER_HUB_FINGERPRINT_LEVEL=detailed` or `--hub-fingerprin
 make test              # bats test/integration + test/unit (parallel when GNU parallel is installed)
 make test-unit         # bats test/unit
 make test-integration  # bats test/integration
-make check             # shellcheck + check-hub-git + bats
+make check             # shellcheck + check-hub-git + bats (shell gate)
 make check-hub-git     # scripts/check-staged-hub-secrets.sh
+make test-hub          # hub unit + convex tests (via scripts/hub-pm.sh)
+make lint-hub          # hub ESLint + tsc
+make check-hub         # lint-hub + test-hub
+make test-all          # shell bats + test-hub
+make check-all         # check + check-hub
 ```
 
-CI runs shellcheck, unit bats, and integration bats in parallel; hub lint and hub test are also parallel. `pnpm audit` is a weekly workflow (`.github/workflows/hub-audit.yml`), not part of the PR gate.
+CI runs shellcheck, unit bats, and integration bats in parallel; hub lint and hub test are also parallel (both via `scripts/hub-pm.sh`). `pnpm audit` is a weekly workflow (`.github/workflows/hub-audit.yml`), not part of the PR gate.
