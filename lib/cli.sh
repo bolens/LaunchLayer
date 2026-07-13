@@ -52,6 +52,7 @@ LAUNCHLAYER_SUBCOMMANDS=(
 	--edit-appid
 	--paths
 	--validate-config
+	--suggest-config
 	--scan-anticheat
 	--scan-detections
 	--hub-fingerprint
@@ -60,6 +61,7 @@ LAUNCHLAYER_SUBCOMMANDS=(
 	--hub-delete
 	--hub-recommend
 	--hub-apply
+	--hub-history
 	--hub-search
 	--hub-prefs
 	--cache-report

@@ -102,8 +102,10 @@ Each leaf file uses a load guard (`LAUNCHLAYER_*_LOADED`) so tests can load indi
 4. Preflight (skipped when `BENCHMARK=1`)
 5. Tool warnings + anticheat guardrails
 6. Pause VRAM hogs + exit trap (when enabled)
-7. Runtime tuning (network, PipeWire, CPU perf, NVIDIA, Proton env)
+7. Runtime tuning (network, PipeWire, CPU perf, NVIDIA, Proton env, disk/HDR/malloc)
 8. `build_launch_chain` → exec with pre/post hooks → log
+
+Dry-run (`--dry-run`) loads the same config path and applies env-only tuners (HDR, malloc, Proton override) so the printed chain matches a live launch; host-mutating steps (network/disk sysfs) are skipped.
 
 Wrapper order (`lib/runtime/chain.sh`): `LAUNCH_WRAPPERS_BEFORE` → `gamemoderun` → `taskset` → `game-performance` → `LAUNCH_WRAPPERS` → `gamescope` (optional `--mangoapp`) → `mangohud`.
 
@@ -142,8 +144,13 @@ CLI commands:
 | `--hub-delete CONFIG_ID [--yes]` | Delete a shared config (requires publish token) |
 | `--hub-recommend APPID\|NAME [--limit N]` | Configs from similar machines |
 | `--hub-search [--limit N]` | Machines most like yours |
-| `--hub-apply CONFIG_ID [--dry-run]` | Download and write a shared config |
+| `--hub-apply CONFIG_ID [--history] [--dry-run]` | Download and write a shared config (or historical version) |
+| `--hub-history CONFIG_ID` | List publication history for a shared config |
 | `--hub-prefs [show\|reset\|set]` | Edit `hub.conf` (url, token, label, fingerprint level) |
+
+ProtonDB suggestions (client-side, no hub required):
+
+| `--suggest-config APPID\|NAME [--apply]` | Rank ProtonDB reports for this machine and optionally write allowlisted knobs |
 
 The interactive TUI exposes the same flows under **Community hub** (main menu) and **[Hub] Community configs** (per-game actions).
 

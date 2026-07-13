@@ -41,11 +41,13 @@ _launchlayer() {
 		'--hub-recommend:recommend configs from similar machines'
 		'--hub-search:list machines similar to this one'
 		'--hub-apply:apply a shared hub config by id'
+		'--hub-history:list publication history of a shared config'
 		'--hub-prefs:manage hub preferences'
 		'--paths:shader cache, compatdata, and install paths'
 		'--show-config:show resolved config for an AppID'
 		'--edit-appid:open per-game config in $EDITOR'
 		'--validate-config:lint .env config files'
+		'--suggest-config:suggest optimizations using ProtonDB comments'
 		'--scan-anticheat:scan for EAC/BattlEye titles'
 		'--scan-detections:audit detection heuristics'
 		'--cache-report:report shader/compatdata cache sizes'
@@ -105,6 +107,15 @@ _launchlayer() {
 							| sed -n 's/.*"appid":"\([0-9]*\)".*/\1/p'
 					)}")
 					_arguments '*:target:(all default presets $appids)'
+					;;
+				--suggest-config)
+					appids=("${(@f)$(
+						"$script" --list-games --json 2>/dev/null \
+							| sed -n 's/.*"appid":"\([0-9]*\)".*/\1/p'
+					)}")
+					_arguments \
+						'1:appid:($appids)' \
+						'(--apply)*--apply[apply suggestions to game config]'
 					;;
 				--init-unconfigured)
 					_arguments \
@@ -239,7 +250,13 @@ _launchlayer() {
 				--hub-apply)
 					_arguments \
 						'1:config_id:' \
+						'(--history)*--history[apply a historical config version]' \
 						'(--dry-run)*--dry-run[preview without writing files]' \
+						'(--json)*--json[JSON output]'
+					;;
+				--hub-history)
+					_arguments \
+						'1:config_id:' \
 						'(--json)*--json[JSON output]'
 					;;
 				--hub-delete)

@@ -23,9 +23,9 @@ _launchlayer_settings() {
 		--doctor --setup --install-systemd --sysctl --completions --list-games --init-appid
 		--init-unconfigured --prune-uninstalled --export-config --backup-config --import-config
 		--restore-backup --prune-backups --run-scheduled-backup --backup-timer --backup-prefs --tui-prefs
-		--hub-fingerprint --hub-publish --hub-update --hub-delete --hub-recommend --hub-search --hub-apply --hub-prefs
+		--hub-fingerprint --hub-publish --hub-update --hub-delete --hub-recommend --hub-search --hub-apply --hub-history --hub-prefs
 		--bulk-set-include
-		--show-config --edit-appid --paths --validate-config
+		--show-config --edit-appid --paths --validate-config --suggest-config
 		--scan-anticheat --scan-detections --cache-report --launch-stats --dry-run
 		--help -h --version -V --tui
 	"
@@ -141,7 +141,10 @@ _launchlayer_settings() {
 			COMPREPLY=( $(compgen -W "--limit --json" -- "$cur") )
 			;;
 		--hub-apply)
-			COMPREPLY=( $(compgen -W "--dry-run --json" -- "$cur") )
+			COMPREPLY=( $(compgen -W "--history --dry-run --json" -- "$cur") )
+			;;
+		--hub-history)
+			COMPREPLY=( $(compgen -W "--json" -- "$cur") )
 			;;
 		--hub-delete)
 			COMPREPLY=( $(compgen -W "--yes --json" -- "$cur") )
@@ -159,6 +162,11 @@ _launchlayer_settings() {
 			local appids
 			appids="$(_launchlayer_appids "$script")"
 			COMPREPLY=( $(compgen -W "$appids all default presets --json" -- "$cur") )
+			;;
+		--suggest-config)
+			local appids
+			appids="$(_launchlayer_appids "$script")"
+			COMPREPLY=( $(compgen -W "$appids --apply" -- "$cur") )
 			;;
 		--completions)
 			COMPREPLY=( $(compgen -W "status enable disable print --shell --json bash zsh fish nu pwsh osh all" -- "$cur") )

@@ -47,3 +47,70 @@ detect_steam_root() {
 	# Fall back to the conventional native path even if libraries are empty.
 	printf '%s\n' "${HOME}/.local/share/Steam"
 }
+
+# resolve_proton_path — Resolve version name to absolute proton script path.
+resolve_proton_path() {
+	local version=$1
+	local path
+
+	if [[ "$version" == */proton && -f "$version" ]]; then
+		echo "$version"
+		return 0
+	fi
+
+	if [[ -n "${STEAM_ROOT:-}" ]]; then
+		path="${STEAM_ROOT}/compatibilitytools.d/${version}/proton"
+		if [[ -f "$path" ]]; then
+			echo "$path"
+			return 0
+		fi
+		path="${STEAM_ROOT}/steamapps/common/${version}/proton"
+		if [[ -f "$path" ]]; then
+			echo "$path"
+			return 0
+		fi
+	fi
+
+	local fallback_roots=(
+		"${HOME}/.local/share/Steam"
+		"${HOME}/.steam/root"
+		"${HOME}/.steam/steam"
+	)
+	local root
+	for root in "${fallback_roots[@]}"; do
+		path="${root}/compatibilitytools.d/${version}/proton"
+		if [[ -f "$path" ]]; then
+			echo "$path"
+			return 0
+		fi
+		path="${root}/steamapps/common/${version}/proton"
+		if [[ -f "$path" ]]; then
+			echo "$path"
+			return 0
+		fi
+	done
+	return 1
+}
+
+# apply_override_proton — Rewrite */proton entries in an argv array (nameref).
+apply_override_proton() {
+	local -n _argv=$1
+	[[ -n "${OVERRIDE_PROTON:-}" ]] || return 0
+	local resolved_proton
+	if ! resolved_proton="$(resolve_proton_path "$OVERRIDE_PROTON" 2>/dev/null)"; then
+		warn "OVERRIDE_PROTON=${OVERRIDE_PROTON} failed: compatibility layer not found"
+		return 0
+	fi
+	local -a modified_args=()
+	local arg
+	for arg in "${_argv[@]}"; do
+		if [[ "$arg" == */proton ]]; then
+			modified_args+=("$resolved_proton")
+			debug "overridden Proton path: $resolved_proton"
+		else
+			modified_args+=("$arg")
+		fi
+	done
+	_argv=("${modified_args[@]}")
+}
+

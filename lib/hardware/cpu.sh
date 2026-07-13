@@ -104,3 +104,13 @@ detect_x3d_cpus() {
 	printf '%s %s\n' "$max_l3" "$cpu_count" > "$X3D_CPUS_META_FILE"
 	echo "$result"
 }
+
+# detect_intel_p_cores — Read sysfs for Intel P-cores if hybrid CPU.
+detect_intel_p_cores() {
+	if [[ -f /sys/devices/cpu_core/cpus ]]; then
+		cat /sys/devices/cpu_core/cpus
+	else
+		default_online_cpus
+	fi
+}
+

@@ -23,6 +23,8 @@ prepare_launch_context() {
 	apply_auto_hardware_defaults
 	parse_game_extra_args
 	apply_proton_env
+	apply_hdr_tuning
+	apply_malloc_allocator
 	build_launch_chain
 	warn_launch_chain_issues
 }
@@ -38,6 +40,7 @@ prepare_launch_context() {
 #   6. Exec the final command (or print dry-run output)
 run_game_launch() {
 	local exit_code=0 duration=0 needs_vram_cleanup=0
+	local -a launch_args=("$@")
 
 	steam_app_id=""
 	detect_steam_app_id "$@"
@@ -47,10 +50,11 @@ run_game_launch() {
 			echo "Dry run aborted: fix duplicate launch wrappers above." >&2
 			exit 1
 		}
+		apply_override_proton launch_args
 		warn_missing_tools
 		apply_anticheat_guardrails
 		debug "appid=${steam_app_id:-unknown} name=${steam_game_name:-unknown} native=$is_native eac=$is_anticheat type=${anticheat_type:-} engine=$game_engine_hint"
-		print_dry_run "$@"
+		print_dry_run "${launch_args[@]}"
 		exit 0
 	fi
 
@@ -63,6 +67,7 @@ run_game_launch() {
 	resolve_game_flags
 	apply_auto_hardware_defaults
 	parse_game_extra_args
+	apply_override_proton launch_args
 
 	debug "appid=${steam_app_id:-unknown} name=${steam_game_name:-unknown} native=$is_native eac=$is_anticheat type=${anticheat_type:-} engine=$game_engine_hint"
 
@@ -95,12 +100,15 @@ run_game_launch() {
 	apply_cpu_performance
 	apply_nvidia_power_mode
 	apply_proton_env
+	apply_disk_tuning
+	apply_hdr_tuning
+	apply_malloc_allocator
 	build_launch_chain
 	warn_launch_chain_issues || true
 
 	run_pre_launch_cmd
 
-	launch+=("$@")
+	launch+=("${launch_args[@]}")
 	[[ ${#game_extra_argv[@]} -gt 0 ]] && launch+=("${game_extra_argv[@]}")
 
 	echo $$ > "$ACTIVE_LAUNCH_PID_FILE"

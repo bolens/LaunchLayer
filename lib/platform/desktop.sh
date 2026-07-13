@@ -129,6 +129,37 @@ detect_default_nic() {
 		[[ -n "$nic" ]] && echo "$nic"
 	fi
 }
+
+# detect_nic_driver — Best-effort driver name for a NIC (default NIC when unset).
+detect_nic_driver() {
+	local nic="${1:-}"
+	local sysfs_net="${LAUNCHLAYER_SYSFS_NET:-/sys/class/net}"
+	[[ -n "$nic" ]] || nic="$(detect_default_nic 2>/dev/null || true)"
+	[[ -n "$nic" ]] || { echo "unknown"; return 0; }
+	if [[ -d "$sysfs_net/$nic/device/driver" ]]; then
+		basename "$(readlink -f "$sysfs_net/$nic/device/driver")"
+	elif command -v ethtool >/dev/null 2>&1; then
+		ethtool -i "$nic" 2>/dev/null | awk '/^driver:/{print $2; exit}' || echo "unknown"
+	else
+		echo "unknown"
+	fi
+}
+
+# detect_nic_type — wired, wireless, or loopback for a NIC (default NIC when unset).
+detect_nic_type() {
+	local nic="${1:-}"
+	local sysfs_net="${LAUNCHLAYER_SYSFS_NET:-/sys/class/net}"
+	[[ -n "$nic" ]] || nic="$(detect_default_nic 2>/dev/null || true)"
+	[[ -n "$nic" ]] || { echo "unknown"; return 0; }
+	if [[ -d "$sysfs_net/$nic/wireless" || -d "$sysfs_net/$nic/phy80211" ]]; then
+		echo "wireless"
+	elif [[ "$nic" == "lo" ]]; then
+		echo "loopback"
+	else
+		echo "wired"
+	fi
+}
+
 # detect_audio_server — Return pipewire, pulse, jack, or unknown.
 detect_audio_server() {
 	if process_running pipewire || command -v pw-metadata >/dev/null 2>&1; then

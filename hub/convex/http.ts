@@ -206,15 +206,56 @@ http.route({
 });
 
 http.route({
+  pathPrefix: "/api/config-history/",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const url = new URL(request.url);
+      const historyId = url.pathname.replace(/^\/api\/config-history\//, "").split("?")[0] ?? "";
+      validateConfigId(historyId);
+      await enforceRouteRateLimit(ctx, request, "getConfig");
+
+      const typedHistoryId = historyId as Id<"sharedConfigsHistory">;
+      const history = await ctx.runQuery(internal.configs.getHistoricalConfig, {
+        historyId: typedHistoryId,
+      });
+      if (!history) {
+        return jsonResponse({ error: "Historical config not found" }, 404);
+      }
+      return jsonResponse(history);
+    } catch (error) {
+      return errorResponse(error, "Historical config fetch failed");
+    }
+  }),
+});
+
+http.route({
   pathPrefix: "/api/config/",
   method: "GET",
   handler: httpAction(async (ctx, request) => {
     try {
       const url = new URL(request.url);
-      const configId = url.pathname.replace(/^\/api\/config\//, "").split("?")[0] ?? "";
+      const remainingPath = url.pathname.replace(/^\/api\/config\//, "").split("?")[0] ?? "";
+      const parts = remainingPath.split("/");
+      const configId = parts[0] ?? "";
       validateConfigId(configId);
-      await enforceRouteRateLimit(ctx, request, "getConfig");
 
+      if (parts[1] === "history") {
+        await enforceRouteRateLimit(ctx, request, "getConfig");
+        const typedConfigId = configId as Id<"sharedConfigs">;
+        const config = await ctx.runQuery(internal.configs.getConfig, {
+          configId: typedConfigId,
+        });
+        if (!config) {
+          return jsonResponse({ error: "Config not found" }, 404);
+        }
+        const history = await ctx.runQuery(internal.configs.getConfigHistory, {
+          configId: typedConfigId,
+        });
+        return jsonResponse(history);
+      }
+
+      await enforceRouteRateLimit(ctx, request, "getConfig");
       const typedConfigId = configId as Id<"sharedConfigs">;
       const config = await ctx.runQuery(internal.configs.getConfig, {
         configId: typedConfigId,

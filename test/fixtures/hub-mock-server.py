@@ -41,8 +41,45 @@ class HubMockHandler(BaseHTTPRequestHandler):
         if self.path == "/api/auth":
             self._send_json(200, {"publish_auth_required": AUTH_REQUIRED})
             return
+        if self.path.startswith("/api/config-history/"):
+            history_id = self.path.split("/api/config-history/", 1)[1].split("?", 1)[0]
+            if not history_id or history_id in ("missing", "histnotfound"):
+                self._send_json(404, {"error": "Historical config not found"})
+                return
+            self._send_json(
+                200,
+                {
+                    "history_id": history_id,
+                    "config_id": "cfgtest00001",
+                    "appid": "42424242",
+                    "env_content": "GAMEMODE=1\nMANGOHUD=1\nDEBUG=1\n",
+                    "published_at": 1704067200000,
+                },
+            )
+            return
         if self.path.startswith("/api/config/"):
-            config_id = self.path.split("/api/config/", 1)[1].split("?", 1)[0]
+            config_id_path = self.path.split("/api/config/", 1)[1].split("?", 1)[0]
+            if config_id_path.endswith("/history"):
+                config_id = config_id_path.split("/history", 1)[0]
+                if not config_id or config_id in ("missing", "cfgnotfound1"):
+                    self._send_json(404, {"error": "Config not found"})
+                    return
+                self._send_json(
+                    200,
+                    [
+                        {
+                            "history_id": "hist00000001",
+                            "config_id": config_id,
+                            "env_content": "GAMEMODE=1\nMANGOHUD=1\n",
+                            "preset": "standard",
+                            "launchlayer_version": "1.0.0",
+                            "note": "v1 note",
+                            "published_at": 1704067200000,
+                        }
+                    ]
+                )
+                return
+            config_id = config_id_path
             if not config_id or config_id in ("missing", "cfgnotfound1"):
                 self._send_json(404, {"error": "Config not found"})
                 return

@@ -2,52 +2,114 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      shell: ${{ steps.filter.outputs.shell }}
+      hub: ${{ steps.filter.outputs.hub }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Install test dependencies
+      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        id: filter
+        with:
+          filters: |
+            shell:
+              - 'lib/**'
+              - 'launchlayer'
+              - 'launch.d/**'
+              - 'scripts/**'
+              - 'share/**'
+              - 'test/**'
+              - 'Makefile'
+              - '.shellcheckrc'
+              - '.github/workflows/ci-shell.yml'
+              - '.github/workflows/ci.yml'
+            hub:
+              - 'hub/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - '.github/workflows/ci-hub.yml'
+              - '.github/workflows/ci.yml'
+
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Download actionlint
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
         run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck bats python3
+          set -euo pipefail
+          bash <(curl --proto '=https' --tlsv1.2 -fsSL \
+            "https://raw.githubusercontent.com/rhysd/actionlint/v${ACTIONLINT_VERSION}/scripts/download-actionlint.bash") \
+            "${ACTIONLINT_VERSION}"
 
-      - name: Shellcheck
-        run: make shellcheck
+      - name: Run actionlint
+        run: ./actionlint -color
 
-      - name: Prepare vm.max_map_count for doctor tests
-        run: sudo sysctl -w vm.max_map_count=2147483642
-
-      - name: Bats
-        run: make test
+  shell:
+    needs: changes
+    if: needs.changes.outputs.shell == 'true'
+    uses: ./.github/workflows/ci-shell.yml
 
   hub:
+    needs: changes
+    if: needs.changes.outputs.hub == 'true'
+    uses: ./.github/workflows/ci-hub.yml
+
+  # Always runs. Require this job name ("ci") in branch protection.
+  # Succeeds when path-filtered suites are skipped; fails if a needed suite failed.
+  ci:
+    needs: [changes, actionlint, shell, hub]
+    if: always()
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: hub
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
+      - name: Aggregate path-filtered results
+        run: |
+          set -euo pipefail
+          shell_needed='${{ needs.changes.outputs.shell }}'
+          hub_needed='${{ needs.changes.outputs.hub }}'
+          shell_result='${{ needs.shell.result }}'
+          hub_result='${{ needs.hub.result }}'
+          changes_result='${{ needs.changes.result }}'
+          actionlint_result='${{ needs.actionlint.result }}'
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
-          package-manager-cache: false
+          echo "changes=$changes_result actionlint=$actionlint_result shell_needed=$shell_needed shell=$shell_result hub_needed=$hub_needed hub=$hub_result"
 
-      - name: Enable Corepack (pnpm)
-        run: corepack enable && corepack prepare pnpm@10.16.1 --activate
+          if [[ "$changes_result" != "success" ]]; then
+            echo "changes job did not succeed"
+            exit 1
+          fi
 
-      - name: Install hub dependencies
-        run: pnpm install --frozen-lockfile
+          if [[ "$actionlint_result" != "success" ]]; then
+            echo "actionlint did not succeed: $actionlint_result"
+            exit 1
+          fi
 
-      - name: Audit hub dependencies
-        run: pnpm audit --audit-level=high
+          if [[ "$shell_needed" == "true" && "$shell_result" != "success" ]]; then
+            echo "shell suite required but result was: $shell_result"
+            exit 1
+          fi
 
-      - name: Typecheck hub Convex functions
-        run: pnpm exec tsc -p convex/tsconfig.json
+          if [[ "$hub_needed" == "true" && "$hub_result" != "success" ]]; then
+            echo "hub suite required but result was: $hub_result"
+            exit 1
+          fi
+
+          echo "CI gate green"

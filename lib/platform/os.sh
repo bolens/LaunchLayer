@@ -136,6 +136,58 @@ default_online_cpus() {
 	fi
 }
 
+# detect_cpu_vendor — AMD or Intel cpu vendor.
+detect_cpu_vendor() {
+	if [[ -f /proc/cpuinfo ]]; then
+		if grep -q -i "authenticamd" /proc/cpuinfo; then
+			echo "amd"
+		elif grep -q -i "genuineintel" /proc/cpuinfo; then
+			echo "intel"
+		else
+			echo "unknown"
+		fi
+	else
+		local vendor=""
+		if command -v sysctl >/dev/null 2>&1; then
+			vendor="$(sysctl -n hw.model 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+			if [[ "$vendor" == *amd* || "$vendor" == *ryzen* ]]; then
+				echo "amd"
+				return 0
+			elif [[ "$vendor" == *intel* ]]; then
+				echo "intel"
+				return 0
+			fi
+		fi
+		echo "unknown"
+	fi
+}
+
+# detect_handheld_profile — Auto-detect specific gaming handheld models.
+# Optional $1 overrides DMI product_name (for tests).
+detect_handheld_profile() {
+	local product="${1:-}"
+	if [[ -z "$product" ]]; then
+		if [[ -f /sys/class/dmi/id/product_name ]]; then
+			product="$(< /sys/class/dmi/id/product_name)"
+		elif [[ -f /sys/devices/virtual/dmi/id/product_name ]]; then
+			product="$(< /sys/devices/virtual/dmi/id/product_name)"
+		fi
+	fi
+	product="${product,,}"
+	# Prefer model codes / full product strings over broad substrings like "legion" or "ally".
+	if [[ "$product" == *rc71l* || "$product" == *rc72l* || "$product" == *"rog ally"* || "$product" == *rogally* ]]; then
+		echo "rog-ally"
+	elif [[ "$product" == *83e1* || "$product" == *"legion go"* ]]; then
+		echo "legion-go"
+	elif [[ "$product" == *"msi claw"* || "$product" == *msiclaw* ]]; then
+		echo "msi-claw"
+	elif [[ "$product" == *jupiter* || "$product" == *galileo* || "$product" == *"steam deck"* ]]; then
+		echo "steam-deck"
+	else
+		echo ""
+	fi
+}
+
 # is_wsl2 — True when running under Windows Subsystem for Linux.
 is_wsl2() {
 	is_linux || return 1
