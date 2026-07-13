@@ -131,6 +131,7 @@ detect_default_nic() {
 }
 
 # detect_nic_driver — Best-effort driver name for a NIC (default NIC when unset).
+# shellcheck disable=SC2120 # optional $1 used by callers/tests; production often omits it
 detect_nic_driver() {
 	local nic="${1:-}"
 	local sysfs_net="${LAUNCHLAYER_SYSFS_NET:-/sys/class/net}"

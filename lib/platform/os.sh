@@ -164,6 +164,7 @@ detect_cpu_vendor() {
 
 # detect_handheld_profile — Auto-detect specific gaming handheld models.
 # Optional $1 overrides DMI product_name (for tests).
+# shellcheck disable=SC2120 # optional $1 used by unit tests; production callers omit it
 detect_handheld_profile() {
 	local product="${1:-}"
 	if [[ -z "$product" ]]; then
