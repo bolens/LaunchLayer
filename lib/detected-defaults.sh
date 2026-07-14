@@ -183,6 +183,10 @@ compute_detected_defaults() {
 		fi
 	fi
 
+	if [[ "$deck" != 1 && "$wsl" != 1 ]]; then
+		detected_defaults_add SHADER_CACHE_BOOST 1 "Raise vendor shader cache size limits"
+	fi
+
 	if is_wayland_session && [[ "$desktop" != gamescope ]]; then
 		detected_defaults_add GAMESCOPE_EXPOSE_WAYLAND 0 "Wayland desktop session ($desktop)"
 	fi

@@ -18,6 +18,49 @@ setup() {
 	[[ "$output" == all-known ]]
 }
 
+@test "known_config_key and summary registry include DLSS_SWAPPER" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys
+		known_config_key DLSS_SWAPPER || { echo missing-known; exit 1; }
+		printf "%s\n" "${LAUNCHLAYER_SUMMARY_KEYS[@]}" | grep -qx DLSS_SWAPPER || {
+			echo missing-summary
+			exit 1
+		}
+		echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
+@test "known_config_key and summary registry include upscaler and shader-boost keys" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys
+		for key in SHADER_CACHE_BOOST SHADER_CACHE_BOOST_GB \
+			PROTON_DLSS_UPGRADE PROTON_DLSS_INDICATOR \
+			PROTON_FSR4_UPGRADE PROTON_FSR4_RDNA3_UPGRADE PROTON_FSR4_INDICATOR \
+			PROTON_XESS_UPGRADE PROTON_NVIDIA_LIBS PROTON_NVIDIA_LIBS_NO_32BIT; do
+			known_config_key "$key" || { echo "missing-known:$key"; exit 1; }
+		done
+		for key in SHADER_CACHE_BOOST PROTON_DLSS_UPGRADE PROTON_FSR4_UPGRADE PROTON_XESS_UPGRADE; do
+			printf "%s\n" "${LAUNCHLAYER_SUMMARY_KEYS[@]}" | grep -qx "$key" || {
+				echo "missing-summary:$key"
+				exit 1
+			}
+		done
+		printf "%s\n" "${LAUNCHLAYER_CONFIG_KEYS[@]}" | grep -qx SHADER_CACHE_BOOST_GB || {
+			echo missing-config-gb
+			exit 1
+		}
+		echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
 @test "known_config_key accepts proton and wine prefixes" {
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"

@@ -41,9 +41,10 @@ parse_game_extra_args() {
 #
 # Typical chain:
 #   [wrappers_before] → gamemoderun → taskset → game-performance
-#   → [wrappers] → [gamescope --mangoapp] → [mangohud]
+#   → [dlss-swapper] → [wrappers] → [gamescope --mangoapp] → [mangohud]
 build_launch_chain() {
 	local use_mangoapp=0
+	local dlss_bin=""
 
 	launch=( )
 	append_launch_wrappers
@@ -61,6 +62,13 @@ build_launch_chain() {
 	fi
 	if [[ "${GAME_PERFORMANCE:-1}" == "1" ]] && launch_wrapper_available game-performance; then
 		launch+=(game-performance)
+	fi
+	if dlss_bin="$(resolve_dlss_swapper_bin)"; then
+		if launch_wrapper_available "$dlss_bin"; then
+			launch+=("$dlss_bin")
+		else
+			debug "$dlss_bin unavailable — continuing without DLSS swapper wrapper"
+		fi
 	fi
 	append_launch_wrappers_after_performance
 
@@ -107,6 +115,9 @@ build_launch_chain() {
 launch_wrapper_config_conflict_errors() {
 	local wrapper
 	local -a errors=()
+	local dlss_enabled=0
+
+	resolve_dlss_swapper_bin >/dev/null && dlss_enabled=1
 
 	for wrapper in ${LAUNCH_WRAPPERS_BEFORE:-} ${LAUNCH_WRAPPERS:-}; do
 		case "$wrapper" in
@@ -125,6 +136,10 @@ launch_wrapper_config_conflict_errors() {
 			game-performance)
 				[[ "${GAME_PERFORMANCE:-1}" == "1" ]] \
 					&& errors+=("LAUNCH_WRAPPERS includes game-performance while GAME_PERFORMANCE=1")
+				;;
+			dlss-swapper|dlss-swapper-dll)
+				(( dlss_enabled )) \
+					&& errors+=("LAUNCH_WRAPPERS includes $wrapper while DLSS_SWAPPER=${DLSS_SWAPPER}")
 				;;
 		esac
 	done
@@ -177,12 +192,15 @@ launch_chain_duplicate_wrapper_errors() {
 	local -a errors=()
 	local has_mangohud=0 has_mangoapp=0
 
-	for wrapper in gamemoderun game-performance gamescope mangohud; do
+	for wrapper in gamemoderun game-performance dlss-swapper dlss-swapper-dll gamescope mangohud; do
 		count="$(launch_chain_count_token "$wrapper")"
 		if (( count > 1 )); then
 			errors+=("duplicate $wrapper in launch chain (count=$count)")
 		fi
 	done
+	if (( $(launch_chain_count_token dlss-swapper) > 0 && $(launch_chain_count_token dlss-swapper-dll) > 0 )); then
+		errors+=("dlss-swapper and dlss-swapper-dll both present in launch chain")
+	fi
 
 	for item in "${launch[@]}"; do
 		[[ "$item" == mangohud ]] && has_mangohud=1

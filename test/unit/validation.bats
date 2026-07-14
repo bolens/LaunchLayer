@@ -113,3 +113,43 @@ EOF
 	[[ ! "$output" == *"unknown key"* ]]
 	rm -rf "$tmp"
 }
+
+@test "validate_single_config_file accepts DLSS_SWAPPER values" {
+	local tmp
+	tmp="$(temp_config_dir)"
+	printf '%s\n' 'DLSS_SWAPPER=1' > "$tmp/launch.d/local.env"
+	run env CONFIG_DIR="$tmp" VALIDATION_FILE="$tmp/launch.d/local.env" bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform steam keys config runtime inspect
+		validate_single_config_file "$VALIDATION_FILE" 2>&1
+	'
+	[[ $status -eq 0 ]]
+	[[ -z "$output" ]]
+
+	printf '%s\n' 'DLSS_SWAPPER=dll' > "$tmp/launch.d/local.env"
+	run env CONFIG_DIR="$tmp" VALIDATION_FILE="$tmp/launch.d/local.env" bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform steam keys config runtime inspect
+		validate_single_config_file "$VALIDATION_FILE" 2>&1
+	'
+	[[ $status -eq 0 ]]
+	[[ -z "$output" ]]
+	rm -rf "$tmp"
+}
+
+@test "validate_single_config_file flags DLSS_SWAPPER with LAUNCH_WRAPPERS overlap" {
+	local tmp
+	tmp="$(temp_config_dir)"
+	cat > "$tmp/launch.d/local.env" <<'EOF'
+DLSS_SWAPPER=1
+LAUNCH_WRAPPERS=dlss-swapper
+EOF
+	run env CONFIG_DIR="$tmp" VALIDATION_FILE="$tmp/launch.d/local.env" bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform steam keys config runtime inspect
+		validate_single_config_file "$VALIDATION_FILE" 2>&1
+	'
+	[[ $status -ne 0 ]]
+	[[ "$output" == *"LAUNCH_WRAPPERS includes dlss-swapper while DLSS_SWAPPER=1"* ]]
+	rm -rf "$tmp"
+}

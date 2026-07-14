@@ -226,3 +226,39 @@ EOF
 	[[ $status -eq 0 ]]
 	[[ "$output" == "gamemode:unset native:0 anticheat:0 launch:0 layers:0" ]]
 }
+
+@test "apply_defaults sets DLSS_SWAPPER off" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config
+		unset DLSS_SWAPPER
+		apply_defaults
+		printf "default:%s\n" "$DLSS_SWAPPER"
+		DLSS_SWAPPER=dll
+		apply_defaults
+		printf "preserved:%s\n" "$DLSS_SWAPPER"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'default:0\npreserved:dll' ]]
+}
+
+@test "apply_defaults sets upscaler and shader-boost knobs off" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config
+		unset SHADER_CACHE_BOOST SHADER_CACHE_BOOST_GB PROTON_DLSS_UPGRADE \
+			PROTON_FSR4_UPGRADE PROTON_XESS_UPGRADE PROTON_NVIDIA_LIBS
+		apply_defaults
+		printf "boost:%s gb:%s dlss:%s fsr4:%s xess:%s libs:%s\n" \
+			"$SHADER_CACHE_BOOST" "$SHADER_CACHE_BOOST_GB" \
+			"$PROTON_DLSS_UPGRADE" "$PROTON_FSR4_UPGRADE" \
+			"$PROTON_XESS_UPGRADE" "$PROTON_NVIDIA_LIBS"
+		SHADER_CACHE_BOOST=1 PROTON_DLSS_UPGRADE=1
+		apply_defaults
+		printf "preserved:%s %s\n" "$SHADER_CACHE_BOOST" "$PROTON_DLSS_UPGRADE"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'boost:0 gb:12 dlss:0 fsr4:0 xess:0 libs:0\npreserved:1 1' ]]
+}

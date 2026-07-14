@@ -15,13 +15,13 @@ run_launch_chain_case() {
 		source_lib platform runtime
 		optional_tool_installed() {
 			case "$1" in
-				gamemoderun|mangohud|taskset|gamescope|game-performance) return 0 ;;
+				gamemoderun|mangohud|taskset|gamescope|game-performance|dlss-swapper) return 0 ;;
 				*) return 1 ;;
 			esac
 		}
 		command_available() {
 			case "$1" in
-				game-performance|wrapper-a) return 0 ;;
+				game-performance|wrapper-a|dlss-swapper|dlss-swapper-dll) return 0 ;;
 				*) return 1 ;;
 			esac
 		}
@@ -117,6 +117,99 @@ run_launch_chain_case() {
 	[[ "$output" == *"dup:no"* ]]
 	[[ "$output" == *"gamemoderun:1 gamescope:1 game-performance:1"* ]]
 	[[ "$output" != *"duplicate"* ]]
+}
+
+@test "build_launch_chain DLSS_SWAPPER=1 inserts dlss-swapper" {
+	run_launch_chain_case \
+		'export is_native=0 GAMEMODE=0 GAME_PERFORMANCE=0 GAMESCOPE=0 MANGOHUD=0 DLSS_SWAPPER=1 DISABLE_CPU_AFFINITY=1' \
+		'printf "dlss:%s\n" "$(launch_chain_count_token dlss-swapper)"
+		printf "chain:%s\n" "${launch[*]}"'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"dlss:1"* ]]
+	[[ "$output" == *"chain:dlss-swapper"* ]]
+}
+
+@test "build_launch_chain DLSS_SWAPPER=dll inserts dlss-swapper-dll" {
+	run_launch_chain_case \
+		'export is_native=0 GAMEMODE=0 GAME_PERFORMANCE=0 GAMESCOPE=0 MANGOHUD=0 DLSS_SWAPPER=dll DISABLE_CPU_AFFINITY=1' \
+		'printf "dll:%s swapper:%s\n" "$(launch_chain_count_token dlss-swapper-dll)" "$(launch_chain_count_token dlss-swapper)"
+		printf "chain:%s\n" "${launch[*]}"'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"dll:1 swapper:0"* ]]
+	[[ "$output" == *"chain:dlss-swapper-dll"* ]]
+}
+
+@test "build_launch_chain DLSS_SWAPPER=0 omits dlss wrappers" {
+	run_launch_chain_case \
+		'export is_native=0 GAMEMODE=0 GAME_PERFORMANCE=0 GAMESCOPE=0 MANGOHUD=0 DLSS_SWAPPER=0 DISABLE_CPU_AFFINITY=1' \
+		'printf "dlss:%s dll:%s\n" "$(launch_chain_count_token dlss-swapper)" "$(launch_chain_count_token dlss-swapper-dll)"
+		printf "chain:%s\n" "${launch[*]:-empty}"'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"dlss:0 dll:0"* ]]
+	[[ "$output" != *"dlss-swapper"* ]]
+}
+
+@test "build_launch_chain places dlss-swapper after game-performance" {
+	run_launch_chain_case \
+		'export is_native=0 GAMEMODE=0 GAME_PERFORMANCE=1 GAMESCOPE=0 MANGOHUD=0 DLSS_SWAPPER=1 DISABLE_CPU_AFFINITY=1' \
+		'printf "chain:%s\n" "${launch[*]}"'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"chain:game-performance dlss-swapper"* ]]
+}
+
+@test "build_launch_chain skips DLSS_SWAPPER when binary missing" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export is_native=0 GAMEMODE=0 GAME_PERFORMANCE=0 GAMESCOPE=0 MANGOHUD=0
+		export DLSS_SWAPPER=1 DISABLE_CPU_AFFINITY=1
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform runtime
+		optional_tool_installed() { return 1; }
+		command_available() { return 1; }
+		default_online_cpus() { echo 0-3; }
+		launch=()
+		build_launch_chain
+		printf "count:%s chain:%s\n" "${#launch[@]}" "${launch[*]:-empty}"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"count:0"* ]]
+	[[ "$output" != *"dlss-swapper"* ]]
+}
+
+@test "launch_chain_duplicate_wrapper_errors flags both dlss wrappers" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform runtime
+		launch=(dlss-swapper dlss-swapper-dll /bin/true)
+		launch_chain_duplicate_wrapper_errors
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"dlss-swapper and dlss-swapper-dll both present"* ]]
+}
+
+@test "launch_wrapper_config_conflict_errors flags dlss-swapper with DLSS_SWAPPER=1" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export DLSS_SWAPPER=1 LAUNCH_WRAPPERS=dlss-swapper
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform runtime
+		launch_wrapper_config_conflict_errors
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"LAUNCH_WRAPPERS includes dlss-swapper while DLSS_SWAPPER=1"* ]]
+}
+
+@test "launch_wrapper_config_conflict_errors flags dlss-swapper-dll with DLSS_SWAPPER=dll" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export DLSS_SWAPPER=dll LAUNCH_WRAPPERS_BEFORE=dlss-swapper-dll
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform runtime
+		launch_wrapper_config_conflict_errors
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"LAUNCH_WRAPPERS includes dlss-swapper-dll while DLSS_SWAPPER=dll"* ]]
 }
 
 @test "launch_wrapper_config_conflict_errors flags gamemoderun with GAMEMODE=1" {

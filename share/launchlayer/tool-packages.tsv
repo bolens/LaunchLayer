@@ -15,6 +15,10 @@ game-performance	brew	cpupower
 game-performance	*	cpupower
 gamescope	*	gamescope
 mangohud	*	mangohud
+dlss-swapper	pacman	cachyos-settings
+dlss-swapper	*	-
+dlss-updater	pacman	dlss-updater
+dlss-updater	*	-
 fzf	*	fzf
 taskset	emerge	sys-apps/util-linux
 taskset	*	util-linux

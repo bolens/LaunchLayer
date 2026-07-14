@@ -278,6 +278,8 @@ apply_defaults() {
 	: "${SHADER_CACHE_MAX_GB:=10}"
 	: "${SHADER_CACHE_TRIM:=0}"
 	: "${SHADER_CACHE_CHECK_INTERVAL_HOURS:=24}"
+	: "${SHADER_CACHE_BOOST:=0}"
+	: "${SHADER_CACHE_BOOST_GB:=12}"
 	: "${COMPATDATA_CHECK:=1}"
 	: "${COMPATDATA_MAX_GB:=50}"
 	: "${COMPATDATA_TRIM:=0}"
@@ -313,6 +315,17 @@ apply_defaults() {
 	: "${GAMESCOPE_HDR:=0}"
 	: "${DISK_TUNE:=0}"
 	: "${OVERRIDE_PROTON:=}"
+	# 0=off, 1=dlss-swapper (NGX updater + latest preset), dll=dlss-swapper-dll (presets only)
+	: "${DLSS_SWAPPER:=0}"
+	# Proton-CachyOS / GE / EM upscaler DLL upgrades (not Valve Proton).
+	: "${PROTON_DLSS_UPGRADE:=0}"
+	: "${PROTON_DLSS_INDICATOR:=0}"
+	: "${PROTON_FSR4_UPGRADE:=0}"
+	: "${PROTON_FSR4_RDNA3_UPGRADE:=0}"
+	: "${PROTON_FSR4_INDICATOR:=0}"
+	: "${PROTON_XESS_UPGRADE:=0}"
+	: "${PROTON_NVIDIA_LIBS:=0}"
+	: "${PROTON_NVIDIA_LIBS_NO_32BIT:=0}"
 }
 
 # config_file_display_name — Parse game name from scaffold header, or fall back to AppID.

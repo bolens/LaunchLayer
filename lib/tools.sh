@@ -10,6 +10,8 @@ LAUNCHLAYER_OPTIONAL_TOOLS=(
 	game-performance
 	gamescope
 	mangohud
+	dlss-swapper
+	dlss-updater
 	fzf
 	taskset
 	cpupower
@@ -79,8 +81,12 @@ detect_package_manager() {
 optional_tool_relevant() {
 	local tool=$1
 	case "$tool" in
-		nvidia-smi|nvidia-settings)
+		nvidia-smi|nvidia-settings|dlss-swapper)
 			[[ "$(detect_gpu_vendor 2>/dev/null || true)" == nvidia ]]
+			;;
+		dlss-updater)
+			# GUI DLL updater (DLSS/XeSS/FSR); relevant on any GPU that ships those DLLs.
+			return 0
 			;;
 		pw-metadata)
 			[[ "$(detect_audio_server 2>/dev/null || true)" == pipewire ]]
@@ -109,6 +115,14 @@ optional_tool_installed() {
 		powerprofilesctl)
 			command_available powerprofilesctl
 			;;
+		dlss-swapper)
+			command_available dlss-swapper || command_available dlss-swapper-dll
+			;;
+		dlss-updater)
+			command_available dlss-updater \
+				|| command_available DLSS_Updater \
+				|| { command_available flatpak && flatpak info io.github.recol.dlss-updater >/dev/null 2>&1; }
+			;;
 		*)
 			command_available "$tool"
 			;;
@@ -123,11 +137,31 @@ launch_wrapper_available() {
 		game-performance)
 			command_available game-performance
 			;;
+		dlss-swapper|dlss-swapper-dll)
+			command_available "$wrapper"
+			;;
 		gamemoderun|gamescope|mangohud|taskset)
 			optional_tool_installed "$wrapper"
 			;;
 		*)
 			command_available "$wrapper"
+			;;
+	esac
+}
+
+# resolve_dlss_swapper_bin — Print dlss-swapper binary for DLSS_SWAPPER; return 1 when off.
+# Values: 1 → dlss-swapper (NGX updater + latest preset), dll → dlss-swapper-dll (presets only).
+# See: https://wiki.cachyos.org/configuration/gaming/#forcing-the-latest-dlss-preset
+resolve_dlss_swapper_bin() {
+	case "${DLSS_SWAPPER:-0}" in
+		1|yes|true|on|YES|TRUE|ON)
+			printf '%s' dlss-swapper
+			;;
+		dll|DLL)
+			printf '%s' dlss-swapper-dll
+			;;
+		*)
+			return 1
 			;;
 	esac
 }
@@ -206,12 +240,8 @@ tool_install_hint() {
 	optional_tool_relevant "$tool" || return 0
 
 	pm="$(detect_package_manager)"
-	pkg="$(tool_package_name "$tool" "$pm")"
-	[[ -n "$pkg" ]] || {
-		printf 'install %s manually (no package mapping for this OS)\n' "$tool"
-		return 0
-	}
 
+	# Distro-specific messaging before generic package lookup (some tools map to "-").
 	case "$tool" in
 		game-performance)
 			case "$pm" in
@@ -231,6 +261,26 @@ tool_install_hint() {
 					;;
 			esac
 			;;
+		dlss-swapper)
+			case "$pm" in
+				pacman)
+					printf 'sudo pacman -S cachyos-settings  # CachyOS; provides dlss-swapper\n'
+					return 0
+					;;
+			esac
+			printf 'install dlss-swapper (CachyOS: cachyos-settings) — https://wiki.cachyos.org/configuration/gaming/#forcing-the-latest-dlss-preset\n'
+			return 0
+			;;
+		dlss-updater)
+			case "$pm" in
+				pacman)
+					printf 'sudo pacman -S dlss-updater  # GUI; no launch CLI — or Flatpak from https://github.com/Recol/DLSS-Updater\n'
+					return 0
+					;;
+			esac
+			printf 'install dlss-updater (GUI DLL updater) — https://github.com/Recol/DLSS-Updater\n'
+			return 0
+			;;
 		nvidia-smi)
 			case "$pm" in
 				apt)
@@ -240,6 +290,12 @@ tool_install_hint() {
 			esac
 			;;
 	esac
+
+	pkg="$(tool_package_name "$tool" "$pm")"
+	[[ -n "$pkg" ]] || {
+		printf 'install %s manually (no package mapping for this OS)\n' "$tool"
+		return 0
+	}
 
 	format_install_command "$pm" "$pkg"
 }
@@ -286,7 +342,7 @@ command_required_or_fail() {
 
 # warn_enabled_missing_tools — Pre-launch warnings for enabled features with missing tools.
 warn_enabled_missing_tools() {
-	local wrapper hint
+	local wrapper hint dlss_bin
 	warn_if_feature_enabled_needs_tool GAMEMODE gamemoderun \
 		"GAMEMODE=1 but gamemoderun is not installed"
 	if [[ "${GAME_PERFORMANCE:-1}" == "1" ]] && ! optional_tool_installed game-performance; then
@@ -297,6 +353,12 @@ warn_enabled_missing_tools() {
 		"GAMESCOPE=1 but gamescope is not installed"
 	warn_if_feature_enabled_needs_tool MANGOHUD mangohud \
 		"MANGOHUD=1 but mangohud is not installed"
+	if dlss_bin="$(resolve_dlss_swapper_bin)"; then
+		if ! command_available "$dlss_bin"; then
+			hint="$(tool_install_hint dlss-swapper 2>/dev/null || true)"
+			warn "DLSS_SWAPPER=${DLSS_SWAPPER} but $dlss_bin is not installed${hint:+ — $hint}"
+		fi
+	fi
 	if [[ "${DISABLE_CPU_AFFINITY:-0}" != "1" ]]; then
 		warn_if_tool_missing taskset \
 			"CPU affinity enabled but taskset is not installed — launch continues without pinning"
