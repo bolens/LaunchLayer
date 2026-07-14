@@ -20,7 +20,21 @@ PROFILES_DIR="$LAUNCHD_DIR/profiles"
 GAMES_DIR="${LAUNCHLAYER_GAMES_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/launchlayer/games}"
 
 # launchlayer_share_dir — Shipped templates, completions, systemd units, sysctl drop-ins.
+# Prefer CONFIG_DIR (install/repo root). When tests point CONFIG_DIR at a temp tree,
+# fall back to LIB_DIR/SCRIPT_DIR so packageless fixtures still find share data.
 launchlayer_share_dir() {
+	local candidate
+	for candidate in \
+		"$CONFIG_DIR/share/launchlayer" \
+		"${LIB_DIR:+$LIB_DIR/../share/launchlayer}" \
+		"${SCRIPT_DIR:+$SCRIPT_DIR/share/launchlayer}"; do
+		[[ -n "$candidate" ]] || continue
+		if [[ -d "$candidate" ]]; then
+			# Normalize .. components when falling back via LIB_DIR.
+			(cd "$candidate" && pwd)
+			return 0
+		fi
+	done
 	printf '%s/share/launchlayer' "$CONFIG_DIR"
 }
 

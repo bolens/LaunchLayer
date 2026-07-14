@@ -378,7 +378,10 @@ apply_flawless_widescreen() {
 		if [[ -n "${PRE_LAUNCH_CMD:-}" ]]; then
 			warn "FWS_COLAUNCH=1 but PRE_LAUNCH_CMD already set — not overriding; start FWS manually"
 		elif command_available protontricks-launch && [[ -n "${steam_app_id:-}" ]]; then
+			# PRE_LAUNCH_CMD is eval'd by run_pre_launch_cmd; embedded quotes protect $bin.
+			# shellcheck disable=SC2089
 			PRE_LAUNCH_CMD="protontricks-launch --appid ${steam_app_id} \"$bin\" &"
+			# shellcheck disable=SC2090
 			export PRE_LAUNCH_CMD
 			debug "PRE_LAUNCH_CMD set for FWS co-launch"
 		else

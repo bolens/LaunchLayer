@@ -37,7 +37,8 @@ hub_load_untrusted_env_keys() {
 	HUB_UNTRUSTED_ENV_KEYS=()
 	file="$(launchlayer_share_dir)/hub-untrusted-keys.txt"
 	if [[ ! -f "$file" ]]; then
-		warn "hub-untrusted-keys.txt missing at $file — using minimal builtin strip list"
+		# debug (not warn): temp CONFIG_DIR fixtures omit share/; keep --json stdout clean.
+		debug "hub-untrusted-keys.txt missing at $file — using minimal builtin strip list"
 		HUB_UNTRUSTED_ENV_KEYS=(
 			PRE_LAUNCH_CMD POST_LAUNCH_CMD
 			LAUNCH_WRAPPERS LAUNCH_WRAPPERS_BEFORE

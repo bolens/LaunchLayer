@@ -60,6 +60,8 @@ TUI_PREVIEW_HOT_KEYS=(
 # INCLUDE is handled as a preset picker, not listed here.
 # GAMESCOPE_ADAPTIVE_SYNC is 3-state (empty/auto/0/1) — Advanced, not a boolean flip.
 # FWS is an alias of FLAWLESS_WIDESCREEN — Advanced only (prefer the long name in toggles).
+# Coverage source of truth for tui.bats; menus-game groups keys explicitly.
+# shellcheck disable=SC2034
 TUI_ADVANCED_KEYS=(
 	OVERRIDE_PROTON DLSS_SWAPPER FRAME_RATE ENABLE_HDR MALLOC_ALLOCATOR
 	GAMESCOPE_W GAMESCOPE_H GAMESCOPE_R GAMESCOPE_FSR_SHARPNESS GAMESCOPE_ADAPTIVE_SYNC
