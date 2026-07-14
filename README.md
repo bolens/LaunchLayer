@@ -68,6 +68,8 @@ Launch chain:
 | Full CLI command tables | [docs/cli.md](docs/cli.md) |
 | TUI menus and shortcuts | [docs/tui.md](docs/tui.md) |
 | Module-level internals | [docs/architecture.md](docs/architecture.md) |
+| Licenses / inject / nest Gamescope | [docs/third-party.md](docs/third-party.md) |
+| Docs map (topic → page) | [docs/README.md](docs/README.md) |
 
 ---
 
@@ -84,9 +86,11 @@ Launch chain:
 | ▤ | [Interactive TUI](#interactive-tui) · [docs/tui.md](docs/tui.md) |
 | ◉ | [Community hub](#community-hub) |
 | ⊞ | [System tuning](#system-tuning) |
+| ⚖ | [Third-party licenses](docs/third-party.md) |
+| ☰ | [Docs index](docs/README.md) |
 | / | [Project layout](#project-layout) |
 | + | [Optional dependencies](#optional-dependencies) |
-| ✓ | [Testing](#testing) |
+| ✓ | [Testing](#testing) · [Release runbook](docs/release_runbook.md) · [Changelog](CHANGELOG.md) |
 | ? | [FAQ](#faq) |
 | ↗ | [Contributing](#contributing) |
 | § | [License](#license) |
@@ -319,13 +323,13 @@ flowchart LR
 
 </details>
 
-For module-level detail, see [docs/architecture.md](docs/architecture.md).
+For module-level detail, see [docs/architecture.md](docs/architecture.md). Config-key cheat sheets: [docs/cli.md](docs/cli.md). Inject / license policy: [docs/third-party.md](docs/third-party.md). Docs map: [docs/README.md](docs/README.md).
 
 ---
 
 ## Configuration
 
-Settings are plain `KEY=VALUE` files. **Later layers override earlier ones.**
+Settings are plain `KEY=VALUE` files. **Later layers override earlier ones.** Full key tables: [docs/cli.md](docs/cli.md). TUI editors: [docs/tui.md](docs/tui.md#quick-toggles).
 
 ### Layer order
 
@@ -421,6 +425,12 @@ SHADER_CACHE_BOOST=1        # raise Mesa/NVIDIA shader cache size limits
 LD_BIND_NOW=0               # 1=eager dynamic linking (Arch Gaming)
 DISABLE_VBLANK=0            # 1=Mesa vblank off / immediate present
 VKBASALT=0                  # 1=ENABLE_VKBASALT (vkBasalt layer)
+VKBASALT_CONFIG_FILE=       # optional path to vkBasalt.conf
+LSFG_VK=0                   # lsfg-vk (owned Lossless Scaling required)
+OBS_VKCAPTURE=0             # obs-gamecapture / obs-vkcapture after Gamescope
+SPECIAL_K=0                 # Special K under Proton (WINEDLLOVERRIDES + optional inject)
+RESHADE=0                   # Wine ReShade local inject
+GAMESCOPE_NESTED_FIX=1      # strip LD_PRELOAD for nested desktop Gamescope
 LATENCYFLEX=0               # 1=LFX=1 (LatencyFleX layer)
 DISABLE_STEAM_DECK=0        # 1=SteamDeck=0 (Bazzite sd0)
 FRAME_RATE=                 # e.g. 60 → DXVK_FRAME_RATE + VKD3D_FRAME_RATE
@@ -460,6 +470,8 @@ VM_MAX_MAP_COUNT_MIN  VM_MAX_MAP_COUNT_FIX
 # Proton / GPU (passed through when set)
 PROTON_*  DXVK_*  VKD3D_*  __GL_*  __VK_*  SDL_*  MESA_*  RADV_*  AMD_*  INTEL_*
 ```
+
+Inject, capture, Conty, and Wine keys: [docs/cli.md](docs/cli.md) · licenses / purchase gates: [docs/third-party.md](docs/third-party.md) · nest Gamescope: [docs/third-party.md § Nested Gamescope](docs/third-party.md#nested-gamescope-scopebuddy-parity).
 
 ### Upscaling paths (DLSS / FSR / XeSS)
 
@@ -663,10 +675,13 @@ scripts/
   check-staged-hub-secrets.sh
   setup-workstation-tuning.sh
 test/                    # ✓ bats integration + unit tests
-docs/
+docs/                    # [docs/README.md](docs/README.md) — topic → page map
+  README.md              # docs index + drift checklist
   architecture.md        # module load order, paths, hub API
   cli.md                 # full CLI command reference
   tui.md                 # interactive TUI menus, shortcuts, screenshots
+  third-party.md         # licenses, purchase gates, nest Gamescope
+  release_runbook.md     # version bump + GitHub release
   assets/
     launchlayer.svg
     tui-main-menu.png
@@ -704,7 +719,14 @@ The script degrades gracefully when tools are missing. Run `--doctor` or `--dete
 | `gamescope` | Compositor upscaling, VRR |
 | `mangohud` | Overlay |
 | `vkbasalt` | Vulkan post-process layer via `VKBASALT=1` |
+| `lsfg-vk` | Frame gen layer via `LSFG_VK=1` (needs owned Lossless Scaling — [third-party](docs/third-party.md)) |
+| `obs-vkcapture` / `obs-gamecapture` | Capture wrap via `OBS_VKCAPTURE=1` |
 | `latencyflex` | LatencyFleX layer via `LATENCYFLEX=1` |
+| `conty` | 32-bit container wrap via `CONTY=1` |
+| `protontricks` / `winetricks` | Prefix verbs / winecfg / registry |
+| `replay-sorcery` | Chain-wrapped replay via `REPLAY_CAPTURE=1` |
+| `gpu-screen-recorder` | Preferred external recorder (`REPLAY_TOOL`) — not chain-wrapped |
+| `wine-discord-ipc-bridge` | Discord IPC via `DISCORD_IPC=1` |
 | `dlss-swapper` | NGX + latest DLSS presets via `DLSS_SWAPPER=1` ([CachyOS wiki](https://wiki.cachyos.org/configuration/gaming/#forcing-the-latest-dlss-preset); package `cachyos-settings`) |
 | `dlss-updater` | Optional GUI for offline DLL replace (detected/tipped only — no launch CLI) |
 | `taskset` | Pin to X3D V-Cache CCD |
@@ -766,17 +788,23 @@ No. Use the same `"/path/to/launchlayer" %command%` on every title. Per-game tun
 **Can I keep `gamemoderun` or `mangohud` in Steam’s launch options?**
 Remove external wrappers from Steam and enable `GAMEMODE=1`, `MANGOHUD=1`, `GAMESCOPE=1`, etc. in config instead — otherwise you get double-wrapped launches.
 
+**Steam Overlay / Steam Input broken under nested Gamescope?**
+LaunchLayer clears `LD_PRELOAD` around nested desktop Gamescope by default (`GAMESCOPE_NESTED_FIX`). See [docs/third-party.md § Nested Gamescope](docs/third-party.md#nested-gamescope-scopebuddy-parity) and [docs/cli.md § Gamescope nest](docs/cli.md#gamescope-nest--extras).
+
+**Special K, ReShade, lsfg-vk, Conty — where are licenses and keys?**
+[docs/third-party.md](docs/third-party.md) (licenses / purchase gates) · [docs/cli.md](docs/cli.md) (keys) · [docs/tui.md § Advanced config](docs/tui.md#advanced-config) (Inject & Wine).
+
 **Does this work with Flatpak Steam?**
 Yes. Installs under `$HOME` usually work as-is; paths outside `$HOME` need a Flatpak filesystem override. Run `./launchlayer --detect-environment` and see [Flatpak Steam](#3-flatpak-steam).
 
 **Do I need the community hub?**
-No. Local launches, the TUI, backup/restore, and doctor all work without it. The hub is optional for sharing configs with similar machines.
+No. Local launches, the TUI, backup/restore, and doctor all work without it. The hub is optional for sharing configs with similar machines. Hub strip rules: [docs/architecture.md](docs/architecture.md) · [docs/cli.md § Community hub](docs/cli.md#community-hub).
 
 **Where do per-game configs live?**
 In `~/.local/share/launchlayer/games/<AppID>.env` by default — not in the git repo. See [Configuration](#configuration).
 
 **Commercial use?**
-This project is [CC BY-NC-SA 4.0](LICENSE). Commercial use requires separate permission from bolens.
+This project is [CC BY-NC-SA 4.0](LICENSE). Commercial use requires separate permission from bolens. Third-party tool licenses: [docs/third-party.md](docs/third-party.md).
 
 ---
 
@@ -790,8 +818,11 @@ make check-all  # check + hub lint/test (needs hub/node_modules)
 make test       # bats only
 ```
 
+- Docs map (update when adding features): [docs/README.md](docs/README.md)
 - Deep module reference: [docs/architecture.md](docs/architecture.md)
 - CLI and TUI reference: [docs/cli.md](docs/cli.md) · [docs/tui.md](docs/tui.md) (with [TUI screenshots](docs/tui.md#screenshots))
+- Third-party / inject policy: [docs/third-party.md](docs/third-party.md)
+- Releases: [docs/release_runbook.md](docs/release_runbook.md) · [CHANGELOG.md](CHANGELOG.md)
 - Example per-game config: [examples/games/2357570.env](examples/games/2357570.env)
 - Do not commit `hub/.env.local`, `hub/.convex/`, or publish tokens — `make check-hub-git` catches accidental staging
 
@@ -812,5 +843,7 @@ make test       # bats only
 ## License
 
 [CC BY-NC-SA 4.0](LICENSE) — non-commercial use with attribution; derivatives must use the same license.
+
+Third-party tools keep their own licenses. See [docs/third-party.md](docs/third-party.md) for upstream links, SPDX notes, purchase gates (e.g. Lossless Scaling for lsfg-vk), and redistrib rules. LaunchLayer never vendors proprietary/GPL binaries into this repository.
 
 You may use, modify, and share this project for personal or non-commercial purposes if you credit **bolens**, link to [github.com/bolens/LaunchLayer](https://github.com/bolens/LaunchLayer), and release any derivatives under the same terms. Commercial use requires separate permission.

@@ -2,6 +2,8 @@
 
 LaunchLayer is a bash orchestration layer for Steam game launches. The repo separates **shipped config**, **user data**, and **runtime state**.
 
+[Docs index](README.md) · [README](../README.md) · [CLI](cli.md) · [TUI](tui.md) · [Architecture](architecture.md) · [Third-party](third-party.md) · [Release](release_runbook.md) · [Changelog](../CHANGELOG.md)
+
 ## Directory layout
 
 ```
@@ -29,13 +31,17 @@ share/launchlayer/
   completions/              # bash, zsh, fish, nu, pwsh scripts
 launch.d/                   # shipped layers only (presets, profiles, lists)
 examples/games/             # tracked example per-game configs
-docs/
+docs/                       # index: [docs/README.md](README.md)
   architecture.md           # this file
   cli.md                    # CLI command reference
   tui.md                    # TUI menus + screenshots (assets/tui-*.png)
+  third-party.md            # upstream licenses, purchase gates, nest Gamescope notes
+  release_runbook.md        # version bump + GitHub release checklist
   assets/                   # logo + TUI screenshots (regenerate: make tui-screenshots)
 scripts/tui-screenshots/    # VHS capture scripts
 ```
+
+`lib/runtime/` includes `tuning.sh` (env), `chain.sh` (wrappers), `inject.sh` (cache/NOTICE/track), and `extras.sh` (Special K, ReShade, Conty, VR, winetricks, …). Upstream license policy: [third-party.md](third-party.md).
 
 ## Config layers (later overrides earlier)
 
@@ -207,7 +213,7 @@ publish_token=<your-token>
 # cd hub && npx convex env set HUB_ALLOW_OPEN_PUBLISH 1
 ```
 
-Recommend, similar-machines, and config download stay public (no token required). Published `env_content` / settings may not set remote-exec keys (`PRE_LAUNCH_CMD`, `POST_LAUNCH_CMD`, wrappers, `OVERRIDE_PROTON`, VRAM-hog controls). `--hub-apply` strips those keys and unsafe `INCLUDE=` lines before writing a local file. Config import rejects tarballs whose members use absolute or `..` paths.
+Recommend, similar-machines, and config download stay public (no token required). Published `env_content` / settings may not set remote-exec or game-mutating keys listed in [`share/launchlayer/hub-untrusted-keys.txt`](../share/launchlayer/hub-untrusted-keys.txt) (wrappers, `OVERRIDE_PROTON`, VRAM-hog controls, Conty, specialty runtimes, winetricks/registry, Special K / ReShade / inject paths, VR inject toggles, Block Internet, …). Convex `HUB_UNTRUSTED_ENV_KEYS` must match that file. `--hub-apply` strips those keys and unsafe `INCLUDE=` lines before writing a local file. Config import rejects tarballs whose members use absolute or `..` paths.
 
 | Route | Auth | Rate limit (per client IP / min) |
 |-------|------|----------------------------------|
@@ -255,8 +261,10 @@ CI (`.github/workflows/ci.yml`) uses path filters:
 
 | Filter | Paths (high level) | Jobs |
 |--------|--------------------|------|
-| `shell` | `lib/`, `test/`, `scripts/`, `share/`, `launch.d/`, `README.md`, `docs/cli.md`, `docs/tui.md`, … | `ci-shell.yml`: shellcheck + bats matrix (`unit`, `integration`) |
+| `shell` | `lib/`, `test/`, `scripts/`, `share/`, `launch.d/`, `README.md`, `docs/README.md`, `docs/cli.md`, `docs/tui.md`, `docs/third-party.md`, `docs/release_runbook.md`, … | `ci-shell.yml`: shellcheck + bats matrix (`unit`, `integration`) |
 | `hub` | `hub/`, `docs/architecture.md`, `scripts/hub-pm.sh`, hub workflows, … | `ci-hub.yml`: matrix (`lint`, `test`) via `scripts/hub-pm.sh` |
 | `workflows` | `.github/workflows/**` | actionlint |
 
 `pnpm audit` is a weekly workflow (`.github/workflows/hub-audit.yml`), not part of the PR gate.
+
+Cutting a tagged release: [release_runbook.md](release_runbook.md). User-facing CLI/TUI: [cli.md](cli.md) · [tui.md](tui.md).

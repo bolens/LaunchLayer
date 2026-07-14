@@ -38,9 +38,12 @@ jobs:
               - '.shellcheckrc'
               - 'README.md'
               - 'CHANGELOG.md'
+              - 'docs/README.md'
               - 'docs/cli.md'
               - 'docs/tui.md'
+              - 'docs/third-party.md'
               - 'docs/release_runbook.md'
+              - 'share/launchlayer/hub-untrusted-keys.txt'
               - '.github/workflows/ci-shell.yml'
               - '.github/workflows/ci.yml'
             hub:

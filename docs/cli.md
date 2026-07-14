@@ -4,7 +4,7 @@ Run from a terminal — no `%command%` needed. Most game commands accept **AppID
 
 `./launchlayer --help` is the live source of truth; this page mirrors the grouped reference.
 
-[← README](../README.md) · [TUI reference](tui.md) · [Architecture](architecture.md)
+[Docs index](README.md) · [README](../README.md) · [CLI](cli.md) · [TUI](tui.md) · [Architecture](architecture.md) · [Third-party](third-party.md) · [Release](release_runbook.md) · [Changelog](../CHANGELOG.md)
 
 ---
 
@@ -109,7 +109,7 @@ Privileged actions (`--hub-publish`, `--hub-update`, `--hub-delete`) need `publi
 | `--hub-history CONFIG_ID [--json]` | List publication history for a shared config |
 | `--hub-prefs [show\|reset\|set] [--json]` | Edit `hub.conf` without the TUI (`publish_token` is never echoed) |
 
-TUI equivalents: **Community hub** (main menu) and **[Hub] Community configs** (per-game actions). Bulk preset changes: **`--bulk-set-include`** or **Games → Bulk change INCLUDE preset**.
+TUI equivalents: **Community hub** (main menu) and **[Hub] Community configs** (per-game actions) — see [tui.md](tui.md). Hub internals / strip rules: [architecture.md](architecture.md) · overview: [README § Community hub](../README.md#community-hub). Bulk preset changes: **`--bulk-set-include`** or **Games → Bulk change INCLUDE preset**.
 
 ---
 
@@ -139,7 +139,60 @@ Env knobs from the [Arch Gaming wiki](https://wiki.archlinux.org/title/Gaming) (
 | `LD_BIND_NOW=1` | Eager dynamic linking (`LD_BIND_NOW=1`) — can cut first-call hitch |
 | `DISABLE_VBLANK=1` | Mesa `vblank_mode=0` + `MESA_VK_WSI_PRESENT_MODE=immediate`; NVIDIA `__GL_SYNC_TO_VBLANK=0` |
 | `VKBASALT=1` | Enable vkBasalt (`ENABLE_VKBASALT=1`); install the Vulkan layer package |
+| `VKBASALT_CONFIG_FILE=…` | Export config path for vkBasalt (see [upstream](https://github.com/DadSchoorse/vkBasalt)) |
 | `LATENCYFLEX=1` | Enable LatencyFleX (`LFX=1`); works best with `DISABLE_VBLANK=1` and game Reflex settings |
+| `LSFG_VK=1` | Enable [lsfg-vk](https://github.com/PancakeTAS/lsfg-vk) (GPL); requires owned Steam *Lossless Scaling* — never redistributes `Lossless.dll` |
+| `LSFG_PROCESS=…` / `LSFG_CONFIG_FILE=…` | Optional lsfg-vk process/config exports |
+
+Layer stacking with MangoHud / vkBasalt / Gamescope can conflict — see [third-party.md](third-party.md#lsfg-vk-and-layer-stacking).
+
+## Capture / network / Conty
+
+| Key | Effect |
+|-----|--------|
+| `OBS_VKCAPTURE=1` | Prefers `obs-gamecapture` / `obs-vkcapture` after Gamescope `--` |
+| `DISCORD_IPC=1` | Discord rich-presence bridge hint / wrapper when `wine-discord-ipc-bridge` (or `discord-ipc-bridge`) is on `PATH` |
+| `REPLAY_CAPTURE=1` | Prefer `REPLAY_TOOL=auto\|gpu-screen-recorder\|replay-sorcery`; only `replay-sorcery` is chain-wrapped — **gpu-screen-recorder starts externally** |
+| `BLOCK_INTERNET=1` | Best-effort `unshare -n` wrap when user namespaces allow |
+| `CONTY=1` / `CONTY_PATH=…` | Wrap with Conty (32-bit container) when installed |
+
+## Wine inject (local mutate — hub-stripped)
+
+See [docs/third-party.md](third-party.md) for licenses. Prefer user-supplied DLL directories; optional fetch only with explicit URLs / NOTICE cache. Mutate keys are listed in [`share/launchlayer/hub-untrusted-keys.txt`](../share/launchlayer/hub-untrusted-keys.txt).
+
+| Key | Effect |
+|-----|--------|
+| `SPECIAL_K=1` | `WINEDLLOVERRIDES` + optional `SPECIAL_K_SOURCE` inject |
+| `SPECIAL_K_DLL` / `SPECIAL_K_SOURCE` / `SPECIAL_K_INI` | Proxy DLL name, extract dir, UsingWINE ini path |
+| `SPECIAL_K_FETCH=1` + `SPECIAL_K_FETCH_URL` | Cache fetch + extract (zip/7z/tar); no default mirror |
+| `SPECIAL_K_VERSION` / `INJECT_SHA256` | Cache subdirectory / optional fetch checksum |
+| `RESHADE=1` | Standalone ReShade inject (`RESHADE_SOURCE`, `RESHADE_DLL`) |
+| `RESHADE_SK_VERSION` | Pin hint when both SK + ReShade enabled |
+| `DEPTH3D=1` | Assist-only shader path (`DEPTH3D_SOURCE` or cache); optional `DEPTH3D_FETCH_URL` |
+| `WINETRICKS_VERBS=…` | `protontricks -q` or winetricks + resolvable prefix |
+| `WINETRICKS_GUI` / `WINECFG_BEFORE` / `REGISTRY_FILES` | GUI / winecfg / `.reg` apply |
+| `WINE_FSR=1` (+ strength/mode) | `WINE_FULLSCREEN_FSR*` |
+| `FLAWLESS_WIDESCREEN` / `FWS_PATH` / `FWS_COLAUNCH` | User path + vcrun2010; co-launch without stomping `PRE_LAUNCH_CMD` |
+| `SKIF` / `SKIF_PATH` / `SKIF_LAUNCH` | SKIF path; optional one-shot via protontricks-launch |
+| `VALVEPLUG*` | Windows Steam client assist only |
+| `OPENVR_FSR=1` + `OPENVR_FSR_SOURCE` | Tracked `openvr_api.dll` swap (restored after launch) |
+| `GEO11` / `FLAT2VR` / `SBS_VR*` | **Assist-only** path/HMD markers (no DLL inject) |
+| `SPECIALTY_RUNTIME` | `boxtron\|luxtorpeda\|roberta` → sets `OVERRIDE_PROTON` |
+| `PLAYTIME_LOG` / `CRASH_GUESS` | Optional playtime log; crash retry prompt (`CRASH_GUESS=1` defaults timeout to 5s) |
+
+## Gamescope nest / extras
+
+| Key | Effect |
+|-----|--------|
+| `GAMESCOPE_NESTED_FIX=1` | Default on — clear `LD_PRELOAD` for gamescope, re-apply after `--` (desktop Overlay/Steam Input) |
+| `GAMESCOPE_EXTRA_ARGS=…` | Extra argv before `--` |
+| `GAMESCOPE_PREFER_OUTPUT=…` | `-O` prefer-output |
+| `GAMESCOPE_FRAME_LIMIT=…` | `--framerate-limit` |
+| `GAMESCOPE_FILTER=nis\|fsr\|…` | `--filter` |
+| `GAMESCOPE_FOCUSED_FPS` / `GAMESCOPE_UNFOCUSED_FPS` | Focused/unfocused FPS caps |
+| `GAMESCOPE_ADAPTIVE_SYNC=` | Empty/`auto` = detect VRR; `0`/`1` force (TUI: Advanced, not boolean flip) |
+
+Inside gamescope-session, `GAMESCOPE=1` is skipped automatically. Details: [third-party.md](third-party.md).
 
 ## Bazzite / Deck identity & frame limits (config keys)
 
@@ -170,3 +223,13 @@ Supported shells: **bash**, **zsh**, **fish**, **nushell** (`nu`), **PowerShell*
 ```
 
 Disable with `--completions disable`. Unknown flags suggest close matches (“Did you mean …?”).
+
+---
+
+## See also
+
+- [Docs index](README.md) — topic → canonical page map
+- [tui.md](tui.md) — same commands via menus / quick toggles
+- [third-party.md](third-party.md) — licenses, purchase gates, nest Gamescope notes
+- [architecture.md](architecture.md) — dispatch, layers, hub strip rules
+- [README § Configuration](../README.md#configuration) — layered `.env` overview
