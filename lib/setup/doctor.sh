@@ -54,7 +54,7 @@ doctor_issue_count() {
 	printf '%s\n' "$issues"
 }
 
-# doctor_print_gaming_tips — Non-critical CachyOS / upscaler / sched tips.
+# doctor_print_gaming_tips — Non-critical CachyOS / Arch / upscaler / sched tips.
 doctor_print_gaming_tips() {
 	local cachyos_tool="" vendor
 	vendor="$(detect_gpu_vendor 2>/dev/null || true)"
@@ -82,6 +82,42 @@ doctor_print_gaming_tips() {
 
 	if [[ "${SHADER_CACHE_BOOST:-0}" != "1" ]]; then
 		echo "tip: SHADER_CACHE_BOOST=1 raises Mesa/NVIDIA shader cache size limits (reduces recompile stutters)"
+	fi
+
+	if [[ "$vendor" == amd ]]; then
+		echo "tip: AMD/RADV — optional per-game RADV_PERFTEST=… (e.g. sam,nggc) for some titles; start unset and test carefully"
+		echo "  wiki: https://wiki.archlinux.org/title/Gaming#Improving_performance"
+	fi
+
+	if sched_ext_supported 2>/dev/null; then
+		if sched_ext_loaded 2>/dev/null; then
+			echo "tip: sched_ext active ($(sched_ext_ops_name 2>/dev/null || echo unknown)) — complements GameMode; avoid stacking with conflicting CPUfreq daemons"
+		else
+			echo "tip: kernel supports sched_ext — optional gaming schedulers: scx_lavd / scx_bpfland (Arch: pacman -S scx-scheds)"
+			echo "  wiki: https://wiki.archlinux.org/title/sched_ext"
+		fi
+	fi
+
+	if [[ "${LD_BIND_NOW:-0}" != "1" || "${DISABLE_VBLANK:-0}" != "1" \
+		|| "${VKBASALT:-0}" != "1" || "${LATENCYFLEX:-0}" != "1" ]]; then
+		echo "tip: Arch Gaming latency knobs: LD_BIND_NOW=1, DISABLE_VBLANK=1, VKBASALT=1 (vkBasalt), LATENCYFLEX=1 (LFX)"
+		echo "  wiki: https://wiki.archlinux.org/title/Gaming"
+	fi
+
+	local os_id=""
+	os_id="$(detect_os_id 2>/dev/null || true)"
+	if [[ "$os_id" == bazzite ]] || is_immutable_os 2>/dev/null; then
+		if [[ "${DISABLE_STEAM_DECK:-0}" != "1" ]]; then
+			echo "tip: DISABLE_STEAM_DECK=1 exports SteamDeck=0 (Bazzite sd0) — unlocks full graphics menus on titles that force Deck limits"
+			echo "  docs: https://docs.bazzite.gg/Gaming/launch-options-env-variables/"
+		fi
+		if [[ "$os_id" == bazzite ]] && [[ "$(detect_gpu_vendor 2>/dev/null || true)" == nvidia ]]; then
+			echo "tip: Bazzite ships dlss-swapper — prefer DLSS_SWAPPER=1 over pasting the wrapper into Steam launch options"
+		fi
+		if [[ -z "${FRAME_RATE:-}" || "${FRAME_RATE}" == "0" ]]; then
+			echo "tip: FRAME_RATE=N sets DXVK_FRAME_RATE/VKD3D_FRAME_RATE (lowest-latency API caps; restart to change)"
+			echo "  docs: https://docs.bazzite.gg/Gaming/launch-options-env-variables/#frame-rate-limiting-issues-and-inconsistency"
+		fi
 	fi
 }
 

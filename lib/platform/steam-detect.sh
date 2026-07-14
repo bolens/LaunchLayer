@@ -180,6 +180,25 @@ ananicy_cpp_active() {
 	systemctl is-active --quiet ananicy-cpp 2>/dev/null
 }
 
+# sched_ext_supported — Kernel exposes sched_ext sysfs (Linux 6.12+ gaming kernels).
+sched_ext_supported() {
+	[[ -d /sys/kernel/sched_ext ]]
+}
+
+# sched_ext_loaded — True when a sched_ext userspace scheduler is attached.
+sched_ext_loaded() {
+	local ops=""
+	[[ -r /sys/kernel/sched_ext/root/ops ]] || return 1
+	ops="$(tr -d '[:space:]' < /sys/kernel/sched_ext/root/ops 2>/dev/null || true)"
+	[[ -n "$ops" && "$ops" != "(none)" && "$ops" != "none" ]]
+}
+
+# sched_ext_ops_name — Print attached sched_ext ops name, or empty.
+sched_ext_ops_name() {
+	sched_ext_loaded || return 1
+	tr -d '[:space:]' < /sys/kernel/sched_ext/root/ops 2>/dev/null
+}
+
 # apply_override_proton — Rewrite */proton entries in an argv array (nameref).
 apply_override_proton() {
 	local -n _argv=$1

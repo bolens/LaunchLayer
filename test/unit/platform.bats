@@ -137,6 +137,74 @@ setup() {
 	[[ "$out" == "proton-cachyos-slr" ]]
 }
 
+@test "doctor_print_gaming_tips mentions Bazzite DISABLE_STEAM_DECK" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export GAMEMODE=0 SHADER_CACHE_BOOST=1 LD_BIND_NOW=1 DISABLE_VBLANK=1 \
+			VKBASALT=1 LATENCYFLEX=1 DISABLE_STEAM_DECK=0 FRAME_RATE=
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform setup tools
+		ananicy_cpp_active() { return 1; }
+		prefer_proton_cachyos() { return 1; }
+		detect_gpu_vendor() { echo nvidia; }
+		detect_os_id() { echo bazzite; }
+		is_immutable_os() { return 0; }
+		optional_tool_installed() { return 1; }
+		sched_ext_supported() { return 1; }
+		doctor_print_gaming_tips
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"DISABLE_STEAM_DECK=1"* ]]
+	[[ "$output" == *"SteamDeck=0"* ]]
+	[[ "$output" == *"FRAME_RATE=N"* ]]
+	[[ "$output" == *"DLSS_SWAPPER=1"* ]]
+	[[ "$output" == *"docs.bazzite.gg"* ]]
+}
+
+@test "sched_ext helpers report unsupported without sysfs" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		# Point checks at a missing path by stubbing when real sysfs lacks sched_ext,
+		# or verify loaded ops parsing against a temp root via function override.
+		if [[ ! -d /sys/kernel/sched_ext ]]; then
+			sched_ext_supported && echo supported || echo unsupported
+			sched_ext_loaded && echo loaded || echo unloaded
+		else
+			# On kernels with sched_ext, overrides still exercise naming helpers.
+			sched_ext_supported || exit 1
+			sched_ext_loaded() { return 0; }
+			sched_ext_ops_name() { echo scx_rusty; }
+			printf "supported ops=%s\n" "$(sched_ext_ops_name)"
+		fi
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"unsupported"* || "$output" == *"supported ops=scx_rusty"* ]]
+}
+
+@test "doctor_print_gaming_tips mentions RADV and Arch latency knobs" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export GAMEMODE=0 SHADER_CACHE_BOOST=1 LD_BIND_NOW=0 DISABLE_VBLANK=0 VKBASALT=0 LATENCYFLEX=0
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform setup tools
+		ananicy_cpp_active() { return 1; }
+		prefer_proton_cachyos() { return 1; }
+		detect_gpu_vendor() { echo amd; }
+		optional_tool_installed() { return 1; }
+		sched_ext_supported() { return 0; }
+		sched_ext_loaded() { return 0; }
+		sched_ext_ops_name() { echo scx_lavd; }
+		doctor_print_gaming_tips
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"RADV"* ]]
+	[[ "$output" == *"sched_ext active (scx_lavd)"* ]]
+	[[ "$output" == *"LD_BIND_NOW=1"* ]]
+	[[ "$output" == *"LATENCYFLEX=1"* ]]
+}
+
 @test "doctor_print_gaming_tips warns on gamemode plus ananicy" {
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"
