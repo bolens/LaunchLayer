@@ -826,3 +826,22 @@ orphan line'"'"'
 	[[ $status -eq 0 ]]
 	[[ "$output" == "pos:1" ]]
 }
+
+@test "TUI_TOGGLE_KEYS include upscaler and shader-boost flags" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib load-modules
+		launchlayer_source_tui
+		for key in DLSS_SWAPPER SHADER_CACHE_BOOST PROTON_DLSS_UPGRADE \
+			PROTON_FSR4_UPGRADE PROTON_XESS_UPGRADE; do
+			printf "%s\n" "${TUI_TOGGLE_KEYS[@]}" | grep -qx "$key" || {
+				echo "missing:$key"
+				exit 1
+			}
+		done
+		echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}

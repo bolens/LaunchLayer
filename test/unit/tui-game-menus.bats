@@ -102,6 +102,7 @@ _tui_game_shell() {
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"GAMEMODE"* ]]
 	[[ "$output" == *"MANGOHUD"* ]]
+	[[ "$output" == *"DLSS_SWAPPER"* ]]
 	[[ "$output" == *"Clear override (inherit from layers)"* ]]
 	[[ "$output" == *"Clear ALL overrides"* ]]
 	[[ "$output" == *"Back"* ]]
@@ -118,4 +119,20 @@ _tui_game_shell() {
 	'
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"MANGOHUD=1"* ]]
+}
+
+@test "tui_toggle_game_key enables DLSS_SWAPPER override" {
+	run _tui_game_shell '
+		appid=42424242
+		tui_ensure_appid_env "$appid"
+		prepare_launch_context "$appid"
+		printf "before:%s\n" "${DLSS_SWAPPER:-unset}"
+		tui_toggle_game_key "$appid" DLSS_SWAPPER
+		prepare_launch_context "$appid"
+		printf "after:%s file:%s\n" "$DLSS_SWAPPER" "$(grep ^DLSS_SWAPPER= "$(tui_appid_env_path "$appid")")"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"before:0"* ]]
+	[[ "$output" == *"after:1"* ]]
+	[[ "$output" == *"file:DLSS_SWAPPER=1"* ]]
 }

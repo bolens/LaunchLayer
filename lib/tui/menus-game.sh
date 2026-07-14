@@ -143,7 +143,7 @@ tui_advanced_config() {
 				tui_validate_game_config_brief "$appid"
 				;;
 			"Edit LAUNCH_WRAPPERS")
-				tui_prompt_env_key "$appid" LAUNCH_WRAPPERS "Wrappers after game-performance"
+				tui_prompt_env_key "$appid" LAUNCH_WRAPPERS "Wrappers after game-performance/DLSS (not dlss-swapper if DLSS_SWAPPER=1)"
 				tui_validate_game_config_brief "$appid"
 				;;
 			"Edit LAUNCH_WRAPPERS_BEFORE")
