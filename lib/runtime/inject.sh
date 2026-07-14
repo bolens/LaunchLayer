@@ -288,7 +288,7 @@ inject_ensure_ini_key() {
 
 # inject_resolve_game_dir — Best-effort Steam game install directory for AppID.
 inject_resolve_game_dir() {
-	local appid=${1:-${steam_app_id:-}}
+	local appid="${steam_app_id:-}"
 	local dir=""
 	[[ -n "$appid" ]] || return 1
 	if declare -f get_game_dir_for_appid >/dev/null 2>&1; then

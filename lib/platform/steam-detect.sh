@@ -165,7 +165,7 @@ proton_tool_supports_upscaler_upgrades() {
 
 # resolve_effective_proton_tool — OVERRIDE_PROTON, else AppID tool, else empty.
 resolve_effective_proton_tool() {
-	local appid=${1:-${steam_app_id:-}}
+	local appid="${steam_app_id:-}"
 	if [[ -n "${OVERRIDE_PROTON:-}" ]]; then
 		printf '%s\n' "${OVERRIDE_PROTON}"
 		return 0
