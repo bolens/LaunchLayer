@@ -191,6 +191,34 @@ teardown() {
 	[[ "$output" == *"Invalid hub config ID"* ]]
 }
 
+@test "hub_publish_config rejects untrusted PRE_LAUNCH_CMD before upload" {
+	local tmp games
+	tmp="$(mktemp -d)"
+	games="$tmp/games"
+	mkdir -p "$games" "$tmp/launch.d/presets"
+	printf 'GAMEMODE=1\n' > "$tmp/launch.d/default.env"
+	printf 'MANGOHUD=0\n' > "$tmp/launch.d/presets/standard.env"
+	cat > "$games/42424242.env" <<'EOF'
+INCLUDE=presets/standard.env
+GAMEMODE=1
+PRE_LAUNCH_CMD=echo should-not-publish
+EOF
+	write_hub_conf "$XDG_CONFIG_HOME" "$HUB_MOCK_URL" test-secret minimal
+	run env \
+		XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
+		CONFIG_DIR="$tmp" \
+		LAUNCHLAYER_GAMES_DIR="$games" \
+		bash -c '
+			source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+			source_lib commands prefs platform hardware cli tools config inspect hub
+			hub_publish_config 42424242 --json 2>&1
+		'
+	rm -rf "$tmp"
+	[[ $status -eq 1 ]]
+	[[ "$output" == *"Cannot publish"* ]]
+	[[ "$output" == *"PRE_LAUNCH_CMD"* ]]
+}
+
 @test "hub_update_config rejects invalid local env before upload" {
 	local tmp games
 	tmp="$(mktemp -d)"

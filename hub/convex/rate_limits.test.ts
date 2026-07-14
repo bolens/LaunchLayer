@@ -54,4 +54,36 @@ describe("enforceRateLimit", () => {
       }),
     ).resolves.toBeNull();
   });
+
+  it("enforces publish and delete route caps", async () => {
+    const t = convexTest(schema, modules);
+    const publishId = "ip:203.0.113.80";
+    const deleteId = "ip:203.0.113.81";
+
+    for (let i = 0; i < RATE_LIMITS.publish; i += 1) {
+      await t.mutation(internal.rate_limits.enforceRateLimit, {
+        route: "publish",
+        identifier: publishId,
+      });
+    }
+    await expect(
+      t.mutation(internal.rate_limits.enforceRateLimit, {
+        route: "publish",
+        identifier: publishId,
+      }),
+    ).rejects.toThrowError(/RATE_LIMITED/);
+
+    for (let i = 0; i < RATE_LIMITS.delete; i += 1) {
+      await t.mutation(internal.rate_limits.enforceRateLimit, {
+        route: "delete",
+        identifier: deleteId,
+      });
+    }
+    await expect(
+      t.mutation(internal.rate_limits.enforceRateLimit, {
+        route: "delete",
+        identifier: deleteId,
+      }),
+    ).rejects.toThrowError(/RATE_LIMITED/);
+  });
 });

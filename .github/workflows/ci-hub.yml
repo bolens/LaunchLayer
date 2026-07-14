@@ -1,5 +1,5 @@
 # Reusable hub suite — called from ci.yml when hub paths change.
-# Lint and test run in parallel. Install/run go through scripts/hub-pm.sh
+# Lint and test run as a matrix. Install/run go through scripts/hub-pm.sh
 # (pnpm fallback on CI — Vite+ is not installed on runners).
 name: CI / Hub
 
@@ -10,9 +10,13 @@ permissions:
   contents: read
 
 jobs:
-  hub-lint:
+  hub:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [lint, test]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -30,27 +34,5 @@ jobs:
       - name: Install hub dependencies
         run: bash scripts/hub-pm.sh install --frozen-lockfile
 
-      - name: Lint and typecheck hub
-        run: bash scripts/hub-pm.sh lint
-
-  hub-test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-        with:
-          package_json_file: hub/package.json
-
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-          cache-dependency-path: hub/pnpm-lock.yaml
-
-      - name: Install hub dependencies
-        run: bash scripts/hub-pm.sh install --frozen-lockfile
-
-      - name: Test hub
-        run: bash scripts/hub-pm.sh test
+      - name: Hub ${{ matrix.task }}
+        run: bash scripts/hub-pm.sh ${{ matrix.task }}

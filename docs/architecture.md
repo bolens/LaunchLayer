@@ -53,7 +53,7 @@ If a per-game file exists, auto `standard`/`native` is **not** loaded—only tha
 
 After file layers, `apply_defaults` and `apply_detected_defaults` fill unset keys.
 
-Per-game `INCLUDE=` loads the preset **under** that file’s keys (preset first, then per-game overrides).
+Per-game `INCLUDE=` loads the preset **under** that file’s keys (preset first, then per-game overrides). `INCLUDE=` paths must be relative under `launch.d/` — absolute paths and `..` segments are rejected (validation + loader).
 
 ## CLI and TUI parity
 
@@ -174,7 +174,7 @@ pnpm run convex:deploy
 
 Point `hub_url` at the Convex HTTP actions URL.
 
-**Publish authentication** (optional): when `HUB_PUBLISH_TOKEN` is set on the Convex deployment, privileged routes (`POST /api/publish`, `POST /api/delete`) require `Authorization: Bearer <token>`. The client sends the same value from `publish_token` in `hub.conf` and probes `GET /api/auth` before privileged commands when auth is enforced. When the env var is unset or empty, publishes/deletes are open (typical for local dev).
+**Publish authentication** (fail closed): privileged routes (`POST /api/publish`, `POST /api/delete`) require `Authorization: Bearer <token>` matching Convex env `HUB_PUBLISH_TOKEN`. The client sends the same value from `publish_token` in `hub.conf` and probes `GET /api/auth` before privileged commands. If `HUB_PUBLISH_TOKEN` is unset, privileged routes are **rejected** unless `HUB_ALLOW_OPEN_PUBLISH=1` is set explicitly (local/dev only).
 
 ```bash
 # Generate a token
@@ -185,19 +185,23 @@ cd hub && npx convex env set HUB_PUBLISH_TOKEN '<your-token>'
 
 # Match in ~/.config/launchlayer/hub.conf
 publish_token=<your-token>
+
+# Local open hub only (never in production):
+# cd hub && npx convex env set HUB_ALLOW_OPEN_PUBLISH 1
 ```
 
-Recommend, similar-machines, and config download stay public (no token required).
+Recommend, similar-machines, and config download stay public (no token required). Published `env_content` / settings may not set remote-exec keys (`PRE_LAUNCH_CMD`, `POST_LAUNCH_CMD`, wrappers, `OVERRIDE_PROTON`, VRAM-hog controls). `--hub-apply` strips those keys and unsafe `INCLUDE=` lines before writing a local file. Config import rejects tarballs whose members use absolute or `..` paths.
 
-| Route | Auth |
-|-------|------|
-| `GET /api/auth` | Public — returns `{ publish_auth_required: bool }` |
-| `POST /api/publish` | Privileged when `HUB_PUBLISH_TOKEN` set; upserts by machine fingerprint + appid; optional `config_id` updates that record when fingerprint matches |
-| `POST /api/my-config` | Public; returns `{ config_id, published_at, downloads }` or `null` for this machine + appid |
-| `POST /api/delete` | Privileged when `HUB_PUBLISH_TOKEN` set |
-| `POST /api/recommend` | Public |
-| `POST /api/similar-machines` | Public |
-| `GET /api/config/:id` | Public |
+| Route | Auth | Rate limit (per client IP / min) |
+|-------|------|----------------------------------|
+| `GET /api/auth` | Public — returns `{ publish_auth_required: bool }` | — |
+| `POST /api/publish` | Privileged (token required unless `HUB_ALLOW_OPEN_PUBLISH=1`); upserts by machine fingerprint + appid; optional `config_id` updates that record when fingerprint matches | 10 |
+| `POST /api/my-config` | Public; returns `{ config_id, published_at, downloads }` or `null` for this machine + appid | 60 |
+| `POST /api/delete` | Privileged (token required unless `HUB_ALLOW_OPEN_PUBLISH=1`) | 5 |
+| `POST /api/recommend` | Public | 30 |
+| `POST /api/similar-machines` | Public | 30 |
+| `GET /api/config/:id` | Public | 120 |
+| `GET /api/config-history/:id` | Public | 120 (same bucket as getConfig) |
 
 Similarity scoring weights GPU vendor, OS/session, desktop compositor, display and refresh tiers, VRAM tier, monitor layout, X3D flags, profile overlap, and platform flags (Deck, Flatpak, WSL2, container, etc.) on a 0–100 scale — same algorithm in bash (`lib/hub/similarity.sh`) and TypeScript (`hub/convex/lib/similarity.ts`).
 
@@ -228,4 +232,12 @@ make test-all          # shell bats + test-hub
 make check-all         # check + check-hub
 ```
 
-CI runs shellcheck, unit bats, and integration bats in parallel; hub lint and hub test are also parallel (both via `scripts/hub-pm.sh`). `pnpm audit` is a weekly workflow (`.github/workflows/hub-audit.yml`), not part of the PR gate.
+CI (`.github/workflows/ci.yml`) uses path filters:
+
+| Filter | Paths (high level) | Jobs |
+|--------|--------------------|------|
+| `shell` | `lib/`, `test/`, `scripts/`, `share/`, `launch.d/`, `README.md`, `docs/cli.md`, `docs/tui.md`, … | `ci-shell.yml`: shellcheck + bats matrix (`unit`, `integration`) |
+| `hub` | `hub/`, `docs/architecture.md`, `scripts/hub-pm.sh`, hub workflows, … | `ci-hub.yml`: matrix (`lint`, `test`) via `scripts/hub-pm.sh` |
+| `workflows` | `.github/workflows/**` | actionlint |
+
+`pnpm audit` is a weekly workflow (`.github/workflows/hub-audit.yml`), not part of the PR gate.

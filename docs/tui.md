@@ -176,6 +176,8 @@ Four compact rows + footer:
 - `[Hub]` URL · `[Auth]` token ●/○ · `[You]` machine label · `[Privacy]` fingerprint level
 - `[·] Open hub.conf in $EDITOR` · Show all · Reset · Save
 
+Publish/delete require a matching Convex `HUB_PUBLISH_TOKEN` (fail closed). Token value is stored in `hub.conf` (`chmod 600` on save) and never printed by `--hub-prefs set`. Apply strips remote-exec keys before writing a game `.env`.
+
 ---
 
 ## Keyboard shortcuts

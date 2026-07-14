@@ -51,13 +51,42 @@ load_env_file() {
 	debug "loaded $file"
 }
 
+# is_safe_include_path — Reject absolute paths and parent-directory traversal.
+is_safe_include_path() {
+	local include_path=$1
+	[[ -n "$include_path" ]] || return 1
+	case "$include_path" in
+		/*|~*|*".."*) return 1 ;;
+	esac
+	[[ "$include_path" =~ ^[a-zA-Z0-9/_.-]+$ ]] || return 1
+	return 0
+}
+
+# resolve_include_under_launchd — Resolve INCLUDE target; must stay under LAUNCHD_DIR.
+resolve_include_under_launchd() {
+	local include_path=$1
+	local candidate resolved base
+
+	is_safe_include_path "$include_path" || return 1
+	candidate="$LAUNCHD_DIR/$include_path"
+	if command -v realpath >/dev/null 2>&1; then
+		resolved="$(realpath -m "$candidate" 2>/dev/null || true)"
+		base="$(realpath -m "$LAUNCHD_DIR" 2>/dev/null || true)"
+		[[ -n "$resolved" && -n "$base" ]] || return 1
+		[[ "$resolved" == "$base" || "$resolved" == "$base"/* ]] || return 1
+		printf '%s\n' "$resolved"
+		return 0
+	fi
+	printf '%s\n' "$candidate"
+}
+
 # load_config_file — Recursively load a config file and its INCLUDE= chain.
 #
 # Tracks loaded files in config_loaded[] to prevent circular INCLUDE loops.
 load_config_file() {
 	local file=$1
 	local force=$2
-	local include_line include_path
+	local include_line include_path include_file
 
 	[[ -f "$file" ]] || return 0
 	[[ -n "${config_loaded[$file]+x}" ]] && return 0
@@ -71,7 +100,11 @@ load_config_file() {
 		include_path="${include_path%"${include_path##*[![:space:]]}"}"
 		include_path="${include_path#\"}"; include_path="${include_path%\"}"
 		include_path="${include_path#\'}"; include_path="${include_path%\'}"
-		load_config_file "$LAUNCHD_DIR/$include_path" 0
+		if ! include_file="$(resolve_include_under_launchd "$include_path")"; then
+			echo "Refusing unsafe INCLUDE path: $include_path (from $file)" >&2
+		else
+			load_config_file "$include_file" 0
+		fi
 	fi
 
 	config_layers+=("$file")

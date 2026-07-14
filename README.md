@@ -418,7 +418,7 @@ LAUNCH_WRAPPERS_BEFORE=""
 GAME_EXTRA_ARGS="-skipintro -nolog"
 UNSET_VARS="DXVK_ASYNC VKD3D_CONFIG"
 
-# Hooks
+# Hooks (local only — hub publish rejects non-empty values; hub apply strips them)
 PRE_LAUNCH_CMD=""
 POST_LAUNCH_CMD=""
 
@@ -491,14 +491,17 @@ Regenerate screenshots after UI changes: `make tui-screenshots` (requires [VHS](
 
 Share per-game configs and discover settings from **similar machines** (GPU, OS, display tier, profiles, Deck/Flatpak/WSL flags). Optional — local launches do not need the hub. Client: `lib/hub/`; backend: Convex app in `hub/`.
 
-**Setup** — copy the template and set your deployment URL:
+**Setup** — copy the template and set your deployment URL **and** publish token:
 
 ```bash
 mkdir -p ~/.config/launchlayer
 cp share/launchlayer/templates/hub.conf.example ~/.config/launchlayer/hub.conf
 # hub_url=https://your-deployment.convex.site
-# Optional: publish_token, machine_label, fingerprint_level (minimal | standard | detailed)
+# publish_token=<same value as Convex HUB_PUBLISH_TOKEN>
+# Optional: machine_label, fingerprint_level (minimal | standard | detailed)
 ```
+
+Hub publish/delete is **fail-closed**: set `HUB_PUBLISH_TOKEN` on the Convex deployment and matching `publish_token` in `hub.conf`. For local open hubs only, set `HUB_ALLOW_OPEN_PUBLISH=1` on the deployment (never in production). Published configs cannot include remote-exec keys (`PRE_LAUNCH_CMD`, wrappers, `OVERRIDE_PROTON`, VRAM-hog controls); hub apply strips those if present. `INCLUDE=` paths must stay under `launch.d/`.
 
 **Hub CLI commands:** [docs/cli.md § Community hub](docs/cli.md#community-hub)
 

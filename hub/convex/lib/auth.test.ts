@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import {
+  allowOpenPublish,
   configuredPublishToken,
   extractBearerToken,
   publishAuthEnforced,
@@ -8,12 +9,18 @@ import {
 } from "./auth";
 
 const ORIGINAL_TOKEN = process.env.HUB_PUBLISH_TOKEN;
+const ORIGINAL_ALLOW_OPEN = process.env.HUB_ALLOW_OPEN_PUBLISH;
 
 afterEach(() => {
   if (ORIGINAL_TOKEN === undefined) {
     delete process.env.HUB_PUBLISH_TOKEN;
   } else {
     process.env.HUB_PUBLISH_TOKEN = ORIGINAL_TOKEN;
+  }
+  if (ORIGINAL_ALLOW_OPEN === undefined) {
+    delete process.env.HUB_ALLOW_OPEN_PUBLISH;
+  } else {
+    process.env.HUB_ALLOW_OPEN_PUBLISH = ORIGINAL_ALLOW_OPEN;
   }
 });
 
@@ -62,28 +69,55 @@ describe("extractBearerToken", () => {
 describe("configuredPublishToken", () => {
   it("trims whitespace from HUB_PUBLISH_TOKEN", () => {
     process.env.HUB_PUBLISH_TOKEN = "  trimmed-secret  ";
+    delete process.env.HUB_ALLOW_OPEN_PUBLISH;
     assert.equal(configuredPublishToken(), "trimmed-secret");
     assert.equal(publishAuthEnforced(), true);
   });
 
-  it("treats whitespace-only token as open hub", () => {
+  it("treats whitespace-only token as empty", () => {
     process.env.HUB_PUBLISH_TOKEN = "   ";
+    delete process.env.HUB_ALLOW_OPEN_PUBLISH;
     assert.equal(configuredPublishToken(), "");
-    assert.equal(publishAuthEnforced(), false);
+    assert.equal(publishAuthEnforced(), true);
+  });
+});
+
+describe("allowOpenPublish", () => {
+  it("requires explicit HUB_ALLOW_OPEN_PUBLISH=1", () => {
+    delete process.env.HUB_ALLOW_OPEN_PUBLISH;
+    assert.equal(allowOpenPublish(), false);
+    process.env.HUB_ALLOW_OPEN_PUBLISH = "1";
+    assert.equal(allowOpenPublish(), true);
+    process.env.HUB_ALLOW_OPEN_PUBLISH = "true";
+    assert.equal(allowOpenPublish(), false);
   });
 });
 
 describe("verifyPrivilegedHubAuth", () => {
-  it("allows requests when HUB_PUBLISH_TOKEN is unset", () => {
+  it("rejects requests when HUB_PUBLISH_TOKEN is unset (fail closed)", async () => {
     delete process.env.HUB_PUBLISH_TOKEN;
+    delete process.env.HUB_ALLOW_OPEN_PUBLISH;
+    const request = new Request("https://example.test", { method: "POST" });
+    const response = verifyPrivilegedHubAuth(request);
+    assert.ok(response);
+    assert.equal(response.status, 401);
+    assert.equal(publishAuthEnforced(), true);
+    assert.equal(configuredPublishToken(), "");
+    const body = (await response.json()) as { message: string };
+    assert.match(body.message, /HUB_PUBLISH_TOKEN|HUB_ALLOW_OPEN_PUBLISH/);
+  });
+
+  it("allows requests when open publish is explicitly enabled", () => {
+    delete process.env.HUB_PUBLISH_TOKEN;
+    process.env.HUB_ALLOW_OPEN_PUBLISH = "1";
     const request = new Request("https://example.test", { method: "POST" });
     assert.equal(verifyPrivilegedHubAuth(request), null);
     assert.equal(publishAuthEnforced(), false);
-    assert.equal(configuredPublishToken(), "");
   });
 
   it("rejects missing Authorization when token is configured", async () => {
     process.env.HUB_PUBLISH_TOKEN = "server-secret";
+    delete process.env.HUB_ALLOW_OPEN_PUBLISH;
     const request = new Request("https://example.test", { method: "POST" });
     const response = verifyPrivilegedHubAuth(request);
     assert.ok(response);

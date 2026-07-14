@@ -4,6 +4,26 @@
 [[ -n "${LAUNCHLAYER_BACKUP_IMPORT_LOADED:-}" ]] && return 0
 LAUNCHLAYER_BACKUP_IMPORT_LOADED=1
 
+# _tar_archive_members_are_safe — Reject absolute paths and parent-dir traversal in tar members.
+_tar_archive_members_are_safe() {
+	local archive=$1
+	local member
+
+	while IFS= read -r member; do
+		[[ -z "$member" ]] && continue
+		case "$member" in
+			/*)
+				return 1
+				;;
+		esac
+		# Reject any parent-directory segment (leading, middle, or trailing).
+		if [[ "$member" == *".."* ]]; then
+			return 1
+		fi
+	done < <(tar -tzf "$archive" 2>/dev/null)
+	return 0
+}
+
 # _filter_import_files_by_appid — Keep only games/<AppID>.env when restoring one game.
 _filter_import_files_by_appid() {
 	local filter_appid=$1
@@ -40,10 +60,22 @@ import_config() {
 
 	tmpdir="$(mktemp -d)"
 	trap 'rm -rf "'"$tmpdir"'"' RETURN
-	tar -xzf "$archive" -C "$tmpdir" || {
-		echo "Failed to extract archive: $archive" >&2
+	if ! _tar_archive_members_are_safe "$archive"; then
+		echo "Archive contains unsafe member paths: $archive" >&2
 		return 1
-	}
+	fi
+	# Prefer GNU tar --restrict when available (blocks absolute paths / escape tricks).
+	if tar --help 2>&1 | grep -q -- '--restrict'; then
+		tar --restrict -xzf "$archive" -C "$tmpdir" || {
+			echo "Failed to extract archive: $archive" >&2
+			return 1
+		}
+	else
+		tar -xzf "$archive" -C "$tmpdir" || {
+			echo "Failed to extract archive: $archive" >&2
+			return 1
+		}
+	fi
 
 	bundle_root="$(_find_config_bundle_root "$tmpdir")" || {
 		echo "Archive does not contain a launchlayer config bundle: $archive" >&2

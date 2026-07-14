@@ -105,6 +105,11 @@ validate_single_config_file() {
 			preset_path="${preset_path#"${preset_path%%[![:space:]]*}"}"
 			preset_path="${preset_path%"${preset_path##*[![:space:]]}"}"
 			preset_path="${preset_path#\"}"; preset_path="${preset_path%\"}"
+			if declare -f is_safe_include_path >/dev/null 2>&1 && ! is_safe_include_path "$preset_path"; then
+				echo "$file:$line_num: unsafe INCLUDE path: $preset_path"
+				((issues++)) || true
+				continue
+			fi
 			if [[ ! -f "$LAUNCHD_DIR/$preset_path" ]]; then
 				echo "$file:$line_num: INCLUDE target missing: $preset_path"
 				((issues++)) || true

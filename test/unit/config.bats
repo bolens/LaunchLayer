@@ -89,6 +89,43 @@ EOF
 	[[ "$output" == "gamemode:9" ]]
 }
 
+@test "is_safe_include_path rejects traversal and absolute paths" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config
+		is_safe_include_path "presets/standard.env" && echo safe_ok || echo safe_bad
+		is_safe_include_path "../../../etc/passwd" && echo trav_ok || echo trav_bad
+		is_safe_include_path "/etc/passwd" && echo abs_ok || echo abs_bad
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"safe_ok"* ]]
+	[[ "$output" == *"trav_bad"* ]]
+	[[ "$output" == *"abs_bad"* ]]
+}
+
+@test "load_config_file refuses unsafe INCLUDE without loading escape target" {
+	local tmp
+	tmp="$(mktemp -d)"
+	mkdir -p "$tmp/launch.d"
+	# Plant a file outside launch.d that must not be loaded via INCLUDE traversal.
+	echo 'EVIL_KEY=1' > "$tmp/evil.env"
+	echo 'INCLUDE=../evil.env' > "$tmp/launch.d/local.env"
+	run env CONFIG_DIR="$tmp" bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config
+		declare -A config_loaded=()
+		config_layers=()
+		declare -A config_key_sources=()
+		load_config_file "$LAUNCHD_DIR/local.env" 1 2>&1
+		echo "evil:${EVIL_KEY:-unset}"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"Refusing unsafe INCLUDE"* ]]
+	[[ "$output" == *"evil:unset"* ]]
+	rm -rf "$tmp"
+}
+
 @test "config_file_relative strips launch.d prefix" {
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"

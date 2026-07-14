@@ -85,6 +85,20 @@ EOF
 	rm -rf "$tmp"
 }
 
+@test "validate_single_config_file flags unsafe INCLUDE path" {
+	local tmp
+	tmp="$(temp_config_dir)"
+	echo 'INCLUDE=../../../etc/passwd' > "$tmp/launch.d/local.env"
+	run env CONFIG_DIR="$tmp" VALIDATION_FILE="$tmp/launch.d/local.env" bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform steam keys config runtime inspect
+		validate_single_config_file "$VALIDATION_FILE" 2>&1
+	'
+	[[ $status -ne 0 ]]
+	[[ "$output" == *"unsafe INCLUDE path"* ]]
+	rm -rf "$tmp"
+}
+
 @test "validate_single_config_file accepts known keys" {
 	local tmp
 	tmp="$(temp_config_dir)"
