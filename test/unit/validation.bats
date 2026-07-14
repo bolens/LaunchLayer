@@ -114,6 +114,60 @@ EOF
 	rm -rf "$tmp"
 }
 
+@test "validate_single_config_file flags invalid FRAME_RATE" {
+	local tmp
+	tmp="$(temp_config_dir)"
+	printf '%s\n' 'FRAME_RATE=nope' > "$tmp/launch.d/local.env"
+	run env CONFIG_DIR="$tmp" VALIDATION_FILE="$tmp/launch.d/local.env" bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform steam keys config runtime inspect
+		validate_single_config_file "$VALIDATION_FILE" 2>&1
+	'
+	[[ $status -ne 0 ]]
+	[[ "$output" == *"FRAME_RATE must be a positive integer"* ]]
+	rm -rf "$tmp"
+}
+
+@test "validate_single_config_file accepts FRAME_RATE integer or empty" {
+	local tmp
+	tmp="$(temp_config_dir)"
+	printf '%s\n' 'FRAME_RATE=120' > "$tmp/launch.d/local.env"
+	run env CONFIG_DIR="$tmp" VALIDATION_FILE="$tmp/launch.d/local.env" bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform steam keys config runtime inspect
+		validate_single_config_file "$VALIDATION_FILE" 2>&1
+	'
+	[[ $status -eq 0 ]]
+	[[ -z "$output" ]]
+
+	printf '%s\n' 'FRAME_RATE=' > "$tmp/launch.d/local.env"
+	run env CONFIG_DIR="$tmp" VALIDATION_FILE="$tmp/launch.d/local.env" bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform steam keys config runtime inspect
+		validate_single_config_file "$VALIDATION_FILE" 2>&1
+	'
+	[[ $status -eq 0 ]]
+	[[ -z "$output" ]]
+	rm -rf "$tmp"
+}
+
+@test "validate_single_config_file flags sd0 with DISABLE_STEAM_DECK" {
+	local tmp
+	tmp="$(temp_config_dir)"
+	cat > "$tmp/launch.d/local.env" <<'EOF'
+DISABLE_STEAM_DECK=1
+LAUNCH_WRAPPERS=sd0
+EOF
+	run env CONFIG_DIR="$tmp" VALIDATION_FILE="$tmp/launch.d/local.env" bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform steam keys config runtime inspect
+		validate_single_config_file "$VALIDATION_FILE" 2>&1
+	'
+	[[ $status -ne 0 ]]
+	[[ "$output" == *"sd0 while DISABLE_STEAM_DECK=1"* ]]
+	rm -rf "$tmp"
+}
+
 @test "validate_single_config_file accepts DLSS_SWAPPER values" {
 	local tmp
 	tmp="$(temp_config_dir)"
