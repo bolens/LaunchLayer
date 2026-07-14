@@ -225,6 +225,59 @@ setup() {
 	[[ "$output" == *"Archive does not contain games/42424242.env"* ]]
 }
 
+@test "_tar_archive_members_are_safe rejects absolute and parent paths" {
+	local tmp good bad_abs bad_trav
+	tmp="$(mktemp -d)"
+	mkdir -p "$tmp/bundle/launch.d"
+	echo 'GAMEMODE=1' > "$tmp/bundle/launch.d/default.env"
+	good="$tmp/good.tar.gz"
+	bad_abs="$tmp/abs.tar.gz"
+	bad_trav="$tmp/trav.tar.gz"
+	tar -C "$tmp" -czf "$good" bundle
+	(
+		cd "$tmp"
+		printf 'x\n' > evil.txt
+		# Absolute member name
+		tar --absolute-names -czf "$bad_abs" /etc/hosts 2>/dev/null || \
+			tar -czf "$bad_abs" --transform 's|^|/|' evil.txt
+		# Parent-directory traversal in member name
+		tar -czf "$bad_trav" --transform 's|^|../|' evil.txt
+	)
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform cli inspect
+		_tar_archive_members_are_safe "'"$good"'" && echo good_ok || echo good_bad
+		_tar_archive_members_are_safe "'"$bad_abs"'" && echo abs_ok || echo abs_bad
+		_tar_archive_members_are_safe "'"$bad_trav"'" && echo trav_ok || echo trav_bad
+	'
+	rm -rf "$tmp"
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"good_ok"* ]]
+	[[ "$output" == *"abs_bad"* ]]
+	[[ "$output" == *"trav_bad"* ]]
+}
+
+@test "import_config rejects archives with unsafe member paths" {
+	local tmp archive
+	tmp="$(mktemp -d)"
+	(
+		cd "$tmp"
+		printf 'x\n' > evil.txt
+		tar -czf unsafe.tar.gz --transform 's|^|../|' evil.txt
+	)
+	archive="$tmp/unsafe.tar.gz"
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform cli keys config inspect
+		import_config "'"$archive"'" 1 merge 0 1 1 0 0 "" 2>&1
+	'
+	rm -rf "$tmp"
+	[[ $status -ne 0 ]]
+	[[ "$output" == *"unsafe member paths"* ]]
+}
+
 @test "resolve_restore_filter_appid accepts numeric AppID" {
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"

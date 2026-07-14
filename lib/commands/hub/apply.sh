@@ -7,6 +7,7 @@ LAUNCHLAYER_COMMANDS_HUB_APPLY_LOADED=1
 # hub_validate_downloaded_env — Lint downloaded env content before writing.
 hub_validate_downloaded_env() {
 	local appid=$1 file=$2
+	hub_sanitize_remote_env_file "$file" || return 1
 	hub_validate_local_env_file "$file" "Hub config for AppID $appid"
 }
 
@@ -65,6 +66,7 @@ hub_apply_config() {
 		rm -f "$tmp_env"
 		return 1
 	}
+	env_content="$(cat "$tmp_env")"
 
 	path="$(resolve_appid_env_path "$appid")"
 	if [[ "$dry_run" == "1" ]]; then

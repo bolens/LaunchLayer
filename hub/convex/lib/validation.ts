@@ -183,6 +183,35 @@ function assertFiniteNumber(
   }
 }
 
+/**
+ * Keys that must not appear with a non-empty value in published hub configs.
+ * Remote clients eval or execute these on apply/launch (RCE / local damage).
+ */
+export const HUB_UNTRUSTED_ENV_KEYS = new Set([
+  "PRE_LAUNCH_CMD",
+  "POST_LAUNCH_CMD",
+  "LAUNCH_WRAPPERS",
+  "LAUNCH_WRAPPERS_BEFORE",
+  "OVERRIDE_PROTON",
+  "VRAM_HOG_UNITS",
+  "VRAM_HOG_PIDS",
+  "VRAM_HOGS",
+]);
+
+function isUnsafeIncludePath(includePath: string): boolean {
+  const trimmed = includePath.trim().replace(/^["']|["']$/g, "");
+  if (!trimmed) {
+    return true;
+  }
+  if (trimmed.startsWith("/") || trimmed.startsWith("~")) {
+    return true;
+  }
+  if (trimmed.includes("..")) {
+    return true;
+  }
+  return !PATTERNS.presetPath.test(trimmed);
+}
+
 function validateEnvContent(envContent: string): void {
   assertMaxLength("env_content", envContent, PUBLISH_LIMITS.envContent);
   if (!PATTERNS.printableText.test(envContent)) {
@@ -191,6 +220,32 @@ function validateEnvContent(envContent: string): void {
   const lines = envContent.split("\n");
   if (lines.length > PUBLISH_LIMITS.envLines) {
     validationError(`env_content exceeds ${PUBLISH_LIMITS.envLines} lines`);
+  }
+  for (const [index, rawLine] of lines.entries()) {
+    const line = rawLine.replace(/#.*$/, "").trim();
+    if (!line) {
+      continue;
+    }
+    if (/^INCLUDE=/i.test(line)) {
+      const includePath = line.slice("INCLUDE=".length);
+      if (isUnsafeIncludePath(includePath)) {
+        validationError(
+          `env_content line ${index + 1}: INCLUDE path is not allowed for hub publish`,
+        );
+      }
+      continue;
+    }
+    const match = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line);
+    if (!match) {
+      continue;
+    }
+    const key = match[1] ?? "";
+    const value = (match[2] ?? "").trim().replace(/^["']|["']$/g, "");
+    if (HUB_UNTRUSTED_ENV_KEYS.has(key) && value.length > 0) {
+      validationError(
+        `env_content must not set ${key} (rejected for hub publish safety)`,
+      );
+    }
   }
 }
 
@@ -214,6 +269,11 @@ function validateSettings(
     );
     if (!PATTERNS.printableText.test(setting.value)) {
       validationError(`settings[${index}].value contains invalid characters`);
+    }
+    if (HUB_UNTRUSTED_ENV_KEYS.has(setting.key) && setting.value.trim().length > 0) {
+      validationError(
+        `settings must not include ${setting.key} (rejected for hub publish safety)`,
+      );
     }
     if (setting.source !== undefined) {
       assertMaxLength(`settings[${index}].source`, setting.source, 128);

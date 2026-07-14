@@ -80,6 +80,7 @@ machine_label=${HUB_PREFS_MACHINE_LABEL}
 fingerprint_level=${HUB_PREFS_FINGERPRINT_LEVEL}
 EOF
 	} > "$file"
+	chmod 600 "$file" 2>/dev/null || true
 }
 
 # reset_hub_prefs — Restore hub.conf from the repo example template.
@@ -205,7 +206,10 @@ handle_hub_prefs_subcommand() {
 			}
 			hub_prefs_set_key "$key" "$val" || return $?
 			save_hub_prefs
-			echo "Set $key=$val"
+			case "$key" in
+				publish_token|token) echo "Set publish_token=(set)" ;;
+				*) echo "Set $key=$val" ;;
+			esac
 			;;
 		*)
 			echo "Usage: $0 --hub-prefs {show|reset|set} [args...] [--json]" >&2

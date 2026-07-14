@@ -95,17 +95,19 @@ Place before subcommands:
 
 Optional — local launches do not need the hub. Requires `curl` for publish/delete/apply; `jq` or `python3` for apply.
 
+Privileged actions (`--hub-publish`, `--hub-update`, `--hub-delete`) need `publish_token` in `hub.conf` matching Convex `HUB_PUBLISH_TOKEN` (hubs fail closed unless `HUB_ALLOW_OPEN_PUBLISH=1` for local/dev). Publish rejects remote-exec keys (`PRE_LAUNCH_CMD`, `POST_LAUNCH_CMD`, wrappers, `OVERRIDE_PROTON`, VRAM-hog controls); `--hub-apply` strips those keys and unsafe `INCLUDE=` paths before writing.
+
 | Command | Description |
 |---------|-------------|
 | `--hub-fingerprint [--json] [--fingerprint-level minimal\|standard\|detailed]` | Machine descriptor for matching (`minimal` default; override via `hub.conf` or env) |
-| `--hub-publish APPID\|NAME [--note TEXT] [--config-id ID] [--all-configured] [--json]` | Upload per-game config(s) |
+| `--hub-publish APPID\|NAME [--note TEXT] [--config-id ID] [--all-configured] [--json]` | Upload per-game config(s) (rejects untrusted exec keys) |
 | `--hub-update APPID\|NAME\|CONFIG_ID [--all-configured] [--note TEXT] [--include-new] [--json]` | Update existing shared config(s) for this machine |
-| `--hub-delete CONFIG_ID [--yes] [--json]` | Delete a shared config (publish token when enforced) |
+| `--hub-delete CONFIG_ID [--yes] [--json]` | Delete a shared config (requires publish token unless open publish is enabled) |
 | `--hub-recommend APPID\|NAME [--limit N] [--json]` | Configs from similar machines |
 | `--hub-search [--limit N] [--json]` | Machines most like yours |
-| `--hub-apply CONFIG_ID [--history] [--dry-run] [--json]` | Download and write a shared config (or a historical version with `--history`) |
+| `--hub-apply CONFIG_ID [--history] [--dry-run] [--json]` | Download and write a shared config (strips untrusted keys; or a historical version with `--history`) |
 | `--hub-history CONFIG_ID [--json]` | List publication history for a shared config |
-| `--hub-prefs [show\|reset\|set] [--json]` | Edit `hub.conf` without the TUI |
+| `--hub-prefs [show\|reset\|set] [--json]` | Edit `hub.conf` without the TUI (`publish_token` is never echoed) |
 
 TUI equivalents: **Community hub** (main menu) and **[Hub] Community configs** (per-game actions). Bulk preset changes: **`--bulk-set-include`** or **Games → Bulk change INCLUDE preset**.
 

@@ -154,3 +154,18 @@ teardown() {
 	[[ $status -eq 1 ]]
 	[[ "$output" == *"failed validation"* ]]
 }
+
+@test "launchlayer hub-apply strips untrusted remote exec keys" {
+	mkdir -p "$CONFIG_TMP/launch.d/presets"
+	printf 'GAMEMODE=0\n' > "$CONFIG_TMP/launch.d/presets/standard.env"
+	run env \
+		HOME="$HUB_TMP" \
+		XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
+		LAUNCHLAYER_CONFIG_DIR="$CONFIG_TMP" \
+		LAUNCHLAYER_GAMES_DIR="$CONFIG_TMP/games" \
+		"$SCRIPT" --hub-apply cfgunsafe01 --dry-run 2>&1
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"Stripped untrusted hub keys"* ]]
+	[[ "$output" == *"Would write"* ]]
+	[[ "$output" != *"curl evil.example"* ]]
+}

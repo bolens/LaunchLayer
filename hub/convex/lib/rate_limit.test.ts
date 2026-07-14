@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   RATE_LIMITS,
   RATE_LIMIT_WINDOW_MS,
+  clientIpFromRequest,
   rateLimitAllows,
   rateLimitBucketKey,
   rateLimitExceededError,
@@ -28,22 +29,32 @@ describe("rateLimitAllows", () => {
 describe("rateLimitBucketKey", () => {
   it("namespaces route and identifier", () => {
     assert.equal(
-      rateLimitBucketKey("recommend", "hash:abc"),
-      "recommend:hash:abc",
+      rateLimitBucketKey("recommend", "ip:203.0.113.10"),
+      "recommend:ip:203.0.113.10",
     );
   });
 });
 
 describe("requestIdentifier", () => {
-  it("prefers fingerprint hash when present", () => {
+  it("ignores client fingerprint hashes for rate-limit identity", () => {
     const request = new Request("https://example.test/api/recommend", {
       method: "POST",
       headers: { "X-Forwarded-For": "203.0.113.10" },
     });
     assert.equal(
       requestIdentifier(request, { fingerprint_hash: "a".repeat(64) }),
-      `hash:${"a".repeat(64)}`,
+      "ip:203.0.113.10",
     );
+  });
+
+  it("prefers CF-Connecting-IP over forwarded headers", () => {
+    const request = new Request("https://example.test/api/config/id", {
+      headers: {
+        "CF-Connecting-IP": "203.0.113.99",
+        "X-Forwarded-For": "203.0.113.10",
+      },
+    });
+    assert.equal(clientIpFromRequest(request), "ip:203.0.113.99");
   });
 
   it("falls back to forwarded client IP", () => {
@@ -72,5 +83,12 @@ describe("rateLimitExceededError", () => {
       () => rateLimitExceededError(),
       /RATE_LIMITED: Too many requests/,
     );
+  });
+});
+
+describe("RATE_LIMITS", () => {
+  it("caps privileged write routes", () => {
+    assert.equal(RATE_LIMITS.publish, 10);
+    assert.equal(RATE_LIMITS.delete, 5);
   });
 });

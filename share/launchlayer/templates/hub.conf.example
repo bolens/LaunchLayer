@@ -5,7 +5,7 @@
 #
 # Keys (aliases in parentheses):
 #   hub_url (url)              Convex HTTP actions base URL
-#   publish_token (token)      Bearer token when hub enforces publish auth
+#   publish_token (token)      Bearer token matching HUB_PUBLISH_TOKEN (required unless hub allows open publish)
 #   machine_label (label)      Friendly name shown on shared configs
 #   fingerprint_level          minimal | standard | detailed (privacy vs match quality)
 
@@ -13,8 +13,9 @@
 # Example after `npx convex dev`: https://your-deployment.convex.site
 # hub_url=
 
-# Optional bearer token if your hub requires authenticated publishes.
-# Must match HUB_PUBLISH_TOKEN on the Convex deployment (see hub/.env.example).
+# Bearer token for publish/delete. Must match Convex env HUB_PUBLISH_TOKEN.
+# Hub deployments fail closed without a token unless HUB_ALLOW_OPEN_PUBLISH=1 (local/dev only).
+# See hub/.env.example and docs/architecture.md.
 # publish_token=
 
 # Optional friendly label shown next to your published configs.

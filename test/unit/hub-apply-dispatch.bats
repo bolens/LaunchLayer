@@ -61,6 +61,27 @@ teardown() {
 	[[ "$output" == *"Invalid hub config ID"* ]]
 }
 
+@test "dispatch_hub_subcommand hub-apply strips untrusted remote exec keys" {
+	mkdir -p "$CONFIG_TMP/launch.d/presets"
+	printf 'GAMEMODE=0\n' > "$CONFIG_TMP/launch.d/presets/standard.env"
+	run env \
+		XDG_CONFIG_HOME="$HUB_TMP" \
+		CONFIG_DIR="$CONFIG_TMP" \
+		LAUNCHLAYER_GAMES_DIR="$CONFIG_TMP/games" \
+		bash -c '
+			source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+			source_lib commands hub prefs platform cli tools config inspect
+			dispatch_hub_subcommand --hub-apply cfgunsafe01 --dry-run 2>&1
+		'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"Stripped untrusted hub keys"* ]]
+	[[ "$output" == *"PRE_LAUNCH_CMD"* ]]
+	[[ "$output" == *"Would write"* ]]
+	[[ "$output" == *"GAMEMODE=1"* ]]
+	[[ "$output" != *"curl evil.example"* ]]
+	[[ "$output" != *"OVERRIDE_PROTON=/tmp"* ]]
+}
+
 @test "dispatch_hub_subcommand hub-prefs set requires key and value" {
 	run env XDG_CONFIG_HOME="$HUB_TMP" bash -c '
 		export CONFIG_DIR="'"$CONFIG_TMP"'"

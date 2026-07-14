@@ -36,6 +36,9 @@ jobs:
               - 'test/**'
               - 'Makefile'
               - '.shellcheckrc'
+              - 'README.md'
+              - 'docs/cli.md'
+              - 'docs/tui.md'
               - '.github/workflows/ci-shell.yml'
               - '.github/workflows/ci.yml'
             hub:
@@ -43,8 +46,10 @@ jobs:
               - 'package.json'
               - '.node-version'
               - 'scripts/hub-pm.sh'
+              - 'docs/architecture.md'
               - '.github/workflows/ci-hub.yml'
               - '.github/workflows/ci.yml'
+              - '.github/workflows/hub-audit.yml'
             workflows:
               - '.github/workflows/**'
 

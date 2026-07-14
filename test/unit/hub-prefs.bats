@@ -106,10 +106,27 @@ EOF
 		source_lib prefs hub
 		save_hub_prefs
 		cat "$(hub_prefs_path)"
+		stat -c %a "$(hub_prefs_path)"
 	'
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"hub_url=https://example.convex.site"* ]]
 	[[ "$output" == *"fingerprint_level=standard"* ]]
+	[[ "$output" == *"600"* ]]
+	rm -rf "$tmp"
+}
+
+@test "handle_hub_prefs set redacts publish_token in output" {
+	local tmp
+	tmp="$(mktemp -d)"
+	run env XDG_CONFIG_HOME="$tmp" bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib prefs hub cli
+		handle_hub_prefs_subcommand set publish_token super-secret-token
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"Set publish_token=(set)"* ]]
+	[[ "$output" != *"super-secret-token"* ]]
 	rm -rf "$tmp"
 }
 

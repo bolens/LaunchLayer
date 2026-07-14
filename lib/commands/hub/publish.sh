@@ -67,6 +67,7 @@ hub_publish_config() {
 			path="$(resolve_appid_env_path "$id" 2>/dev/null || true)"
 			[[ -f "$path" ]] || continue
 			hub_validate_local_env_file "$path" "Config for $name ($id)" || return 1
+			hub_assert_publish_env_safe "$path" || return 1
 			content="$(cat "$path")"
 			hub_sync_one_game "$fingerprint" "$id" "$name" "$content" "$note" || return 1
 			published+=("$id")
@@ -102,6 +103,7 @@ hub_publish_config() {
 		return 1
 	}
 	hub_validate_local_env_file "$path" "Config for $name ($appid)" || return 1
+	hub_assert_publish_env_safe "$path" || return 1
 	content="$(cat "$path")"
 	hub_sync_one_game "$fingerprint" "$appid" "$name" "$content" "$note" "$config_id" || return 1
 	response="$HUB_SYNC_RESPONSE"
@@ -156,6 +158,7 @@ hub_update_config() {
 			path="$(resolve_appid_env_path "$id" 2>/dev/null || true)"
 			[[ -f "$path" ]] || continue
 			hub_validate_local_env_file "$path" "Config for $name ($id)" || return 1
+			hub_assert_publish_env_safe "$path" || return 1
 			existing_id="$(hub_find_my_config_id "$id" "$fingerprint" 2>/dev/null || true)"
 			if [[ -z "$existing_id" ]]; then
 				if [[ "$only_existing" == "1" ]]; then
@@ -209,6 +212,7 @@ hub_update_config() {
 		return 1
 	}
 	hub_validate_local_env_file "$path" "Config for $name ($appid)" || return 1
+	hub_assert_publish_env_safe "$path" || return 1
 	content="$(cat "$path")"
 	hub_sync_one_game "$fingerprint" "$appid" "$name" "$content" "$note" "$config_id" || return 1
 	response="$HUB_SYNC_RESPONSE"

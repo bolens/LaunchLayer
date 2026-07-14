@@ -79,6 +79,7 @@ http.route({
 
     try {
       const body = await readJson(request);
+      await enforceRouteRateLimit(ctx, request, "publish", body);
       const settings = (body.settings as Array<{ key: string; value: string }>) ?? [];
       const detection = parseDetection(body.detection);
       const configIdRaw = body.config_id ? String(body.config_id) : undefined;
@@ -143,6 +144,7 @@ http.route({
 
     try {
       const body = await readJson(request);
+      await enforceRouteRateLimit(ctx, request, "delete", body);
       const configId = String(body.config_id ?? "");
       const fingerprintHash = String(body.fingerprint_hash ?? "");
       if (!configId) {
