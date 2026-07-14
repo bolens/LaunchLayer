@@ -56,10 +56,10 @@ teardown() {
 	[[ "$output" == *"--tui"* ]]
 }
 
-@test "version reports 0.9.0" {
+@test "version reports 0.10.0" {
 	run "$SCRIPT" --version
 	[[ $status -eq 0 ]]
-	[[ "$output" == *"0.9.0"* ]]
+	[[ "$output" == *"0.10.0"* ]]
 }
 
 @test "quiet flag suppresses non-error output" {

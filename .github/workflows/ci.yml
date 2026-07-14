@@ -37,8 +37,10 @@ jobs:
               - 'Makefile'
               - '.shellcheckrc'
               - 'README.md'
+              - 'CHANGELOG.md'
               - 'docs/cli.md'
               - 'docs/tui.md'
+              - 'docs/release_runbook.md'
               - '.github/workflows/ci-shell.yml'
               - '.github/workflows/ci.yml'
             hub:
