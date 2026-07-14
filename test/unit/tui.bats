@@ -27,11 +27,15 @@ setup() {
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib load-modules
 		launchlayer_source_tui
-		printf "%s\n" "$(tui_help_text main | head -1)" "$(tui_help_text game | head -1)" "$(tui_help_text menu | head -1)"
+		printf "%s\n" "$(tui_help_text main | head -1)" "$(tui_help_text game | head -1)" \
+			"$(tui_help_text toggles | head -1)" "$(tui_help_text advanced | head -1)" \
+			"$(tui_help_text menu | head -1)"
 	'
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"Main menu"* ]]
 	[[ "$output" == *"Game picker"* ]]
+	[[ "$output" == *"Quick toggles"* ]]
+	[[ "$output" == *"Advanced config"* ]]
 	[[ "$output" == *"Navigation"* ]]
 }
 
@@ -825,6 +829,74 @@ orphan line'"'"'
 	'
 	[[ $status -eq 0 ]]
 	[[ "$output" == "pos:1" ]]
+}
+
+@test "TUI_TOGGLE_KEYS and TUI_ADVANCED_KEYS cover every config key" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys
+		source_lib load-modules
+		launchlayer_source_tui
+		in_array() {
+			local needle=$1; shift
+			local x
+			for x in "$@"; do
+				[[ "$x" == "$needle" ]] && return 0
+			done
+			return 1
+		}
+		missing=0
+		for key in "${LAUNCHLAYER_CONFIG_KEYS[@]}"; do
+			if in_array "$key" "${TUI_TOGGLE_KEYS[@]}" || in_array "$key" "${TUI_ADVANCED_KEYS[@]}"; then
+				continue
+			fi
+			echo "uncovered:$key"
+			missing=1
+		done
+		# Dual-path keys must appear in both lists where intentional.
+		in_array DLSS_SWAPPER "${TUI_TOGGLE_KEYS[@]}" || { echo missing-toggle:DLSS_SWAPPER; missing=1; }
+		in_array DLSS_SWAPPER "${TUI_ADVANCED_KEYS[@]}" || { echo missing-advanced:DLSS_SWAPPER; missing=1; }
+		for key in FRAME_RATE OVERRIDE_PROTON SHADER_CACHE_BOOST_GB ENABLE_HDR; do
+			in_array "$key" "${TUI_ADVANCED_KEYS[@]}" || {
+				echo "missing-advanced:$key"
+				missing=1
+			}
+		done
+		(( missing == 0 )) && echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
+@test "TUI_TOGGLE_KEYS include DISABLE_STEAM_DECK" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib load-modules
+		launchlayer_source_tui
+		printf "%s\n" "${TUI_TOGGLE_KEYS[@]}" | grep -qx DISABLE_STEAM_DECK && echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
+@test "TUI_TOGGLE_KEYS include Arch latency flags" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib load-modules
+		launchlayer_source_tui
+		for key in LD_BIND_NOW VKBASALT LATENCYFLEX DISABLE_VBLANK; do
+			printf "%s\n" "${TUI_TOGGLE_KEYS[@]}" | grep -qx "$key" || {
+				echo "missing:$key"
+				exit 1
+			}
+		done
+		echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
 }
 
 @test "TUI_TOGGLE_KEYS include upscaler and shader-boost flags" {

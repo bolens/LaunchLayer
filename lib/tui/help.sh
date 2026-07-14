@@ -84,7 +84,7 @@ EOF
 		toggles)
 			cat <<'EOF'
 Quick toggles
-  Enter             Flip the highlighted setting (per-game override)
+  Enter             Flip the highlighted 0/1 setting (per-game override)
   ↑ / ↓             Move selection
   ?                 Show this help
   Esc               Back to game actions
@@ -92,6 +92,17 @@ Quick toggles
 Green/red ●/○ = per-game override in GAMES_DIR/<AppID>.env
 Dim ○ = inherited layer. Override off uses red ○.
 Dim labels = inherited from config layers
+String keys (FRAME_RATE, OVERRIDE_PROTON, …) live under Advanced config.
+EOF
+			;;
+		advanced)
+			cat <<'EOF'
+Advanced config
+  Enter             Open a key group (Proton, Gamescope, …)
+  Within a group    Edit KEY prompts; empty keeps, "-" clears
+  Esc               Back
+
+Every non-boolean launch.d key is reachable here (or via Open in $EDITOR).
 EOF
 			;;
 		*)

@@ -25,12 +25,34 @@ tui_json_flag() {
 }
 
 # Boolean keys exposed in the quick-toggle menu (per-game overrides).
+# Every 0/1 LAUNCHLAYER_CONFIG_KEYS flag that is safe to flip should appear here.
 TUI_TOGGLE_KEYS=(
-	GAMEMODE MANGOHUD GAMESCOPE GAMESCOPE_ADAPTIVE_SYNC VRAM_HOGS
-	NETWORK_TUNE PIPEWIRE_LOW_LATENCY SHADER_CACHE_TRIM SHADER_CACHE_BOOST GPU_POWER_CHECK
-	LAUNCH_WATCHDOG GAME_PERFORMANCE DLSS_SWAPPER PROTON_DLSS_UPGRADE PROTON_FSR4_UPGRADE
-	PROTON_XESS_UPGRADE BENCHMARK DEBUG
-	FORCE_NATIVE FORCE_PROTON DISABLE_CPU_AFFINITY
+	GAMEMODE MANGOHUD MANGOHUD_LOG GAMESCOPE GAMESCOPE_ADAPTIVE_SYNC
+	GAMESCOPE_EXPOSE_WAYLAND GAMESCOPE_FSR GAMESCOPE_HDR VRAM_HOGS
+	NETWORK_TUNE PIPEWIRE_LOW_LATENCY SHADER_CACHE_CHECK SHADER_CACHE_TRIM SHADER_CACHE_BOOST
+	COMPATDATA_CHECK COMPATDATA_TRIM VM_MAX_MAP_COUNT_FIX
+	LAUNCH_WATCHDOG GAME_PERFORMANCE GPU_POWER_CHECK NVIDIA_POWER_MODE
+	CONCURRENT_LAUNCH_GUARD DISK_TUNE DISABLE_NIC_EEE DISABLE_WIFI_POWER_SAVE
+	DLSS_SWAPPER PROTON_DLSS_UPGRADE PROTON_DLSS_INDICATOR
+	PROTON_FSR4_UPGRADE PROTON_FSR4_RDNA3_UPGRADE PROTON_FSR4_INDICATOR
+	PROTON_XESS_UPGRADE PROTON_NVIDIA_LIBS PROTON_NVIDIA_LIBS_NO_32BIT
+	LD_BIND_NOW VKBASALT LATENCYFLEX DISABLE_VBLANK DISABLE_STEAM_DECK
+	BENCHMARK DEBUG FORCE_NATIVE FORCE_PROTON DISABLE_CPU_AFFINITY
+)
+
+# Advanced-config string/numeric keys (edited via prompts; not boolean flips).
+# INCLUDE is handled as a preset picker, not listed here.
+TUI_ADVANCED_KEYS=(
+	OVERRIDE_PROTON DLSS_SWAPPER FRAME_RATE ENABLE_HDR MALLOC_ALLOCATOR
+	GAMESCOPE_W GAMESCOPE_H GAMESCOPE_R GAMESCOPE_FSR_SHARPNESS
+	SHADER_CACHE_MAX_GB SHADER_CACHE_BOOST_GB SHADER_CACHE_CHECK_INTERVAL_HOURS
+	COMPATDATA_MAX_GB VM_MAX_MAP_COUNT_MIN
+	X3D_CPUS CPU_AFFINITY_RANGE GAME_NIC
+	VRAM_HOG_UNITS VRAM_HOG_PIDS VRAM_PREFLIGHT_MIN_MB
+	DISK_PREFLIGHT_MIN_GB GPU_VRAM_PROCESS_MIN_MB
+	MANGOHUD_CONFIG MANGOHUD_CONFIGFILE
+	PRE_LAUNCH_CMD POST_LAUNCH_CMD LAUNCH_LOG_MAX_LINES
+	GAME_EXTRA_ARGS LAUNCH_WRAPPERS LAUNCH_WRAPPERS_BEFORE UNSET_VARS
 )
 
 # tui_appid_env_path — Preferred write path for per-game configs (GAMES_DIR).
@@ -107,6 +129,7 @@ tui_set_include_preset() {
 }
 
 # tui_prompt_env_key — Prompt for a string key and write to per-game .env.
+# Empty keeps the current value; enter "-" to clear.
 tui_prompt_env_key() {
 	local appid=$1 key=$2 prompt=$3
 	local file current new_val
@@ -114,10 +137,59 @@ tui_prompt_env_key() {
 	file="$(tui_appid_env_path "$appid")"
 	current="$(tui_env_file_get "$file" "$key")"
 	[[ -z "$current" ]] && current="$(tui_effective_key "$appid" "$key")"
-	read -r -p "${prompt} [${current:-empty}]: " new_val </dev/tty || return 1
-	[[ -z "$new_val" ]] && new_val="$current"
+	read -r -p "${prompt} [${current:-empty}; - clears]: " new_val </dev/tty || return 1
+	if [[ "$new_val" == "-" ]]; then
+		new_val=""
+	elif [[ -z "$new_val" ]]; then
+		new_val="$current"
+	fi
 	tui_env_upsert "$file" "$key" "$new_val"
-	tui_panel_note "Set $key=$new_val" "Config"
+	tui_panel_note "Set $key=${new_val:-<empty>}" "Config"
+}
+
+# tui_advanced_key_prompt — Human prompt for an advanced config key.
+tui_advanced_key_prompt() {
+	case "$1" in
+		OVERRIDE_PROTON) printf '%s' "Compat tool (e.g. proton-cachyos-slr, GE-Proton10-34)" ;;
+		DLSS_SWAPPER) printf '%s' "DLSS wrapper: 0 | 1 (NGX) | dll (presets only)" ;;
+		FRAME_RATE) printf '%s' "DXVK/VKD3D FPS cap (blank/0 = off)" ;;
+		ENABLE_HDR) printf '%s' "HDR: empty=auto | 0=off | 1=on" ;;
+		MALLOC_ALLOCATOR) printf '%s' "Allocator: empty | jemalloc | mimalloc" ;;
+		GAMESCOPE_W) printf '%s' "Gamescope width" ;;
+		GAMESCOPE_H) printf '%s' "Gamescope height" ;;
+		GAMESCOPE_R) printf '%s' "Gamescope refresh Hz" ;;
+		GAMESCOPE_FSR_SHARPNESS) printf '%s' "Gamescope FSR sharpness (0-20)" ;;
+		SHADER_CACHE_MAX_GB) printf '%s' "Shader cache max GB" ;;
+		SHADER_CACHE_BOOST_GB) printf '%s' "Shader cache boost size GB" ;;
+		SHADER_CACHE_CHECK_INTERVAL_HOURS) printf '%s' "Shader cache check interval (hours)" ;;
+		COMPATDATA_MAX_GB) printf '%s' "Compatdata max GB" ;;
+		VM_MAX_MAP_COUNT_MIN) printf '%s' "vm.max_map_count minimum" ;;
+		X3D_CPUS) printf '%s' "X3D CCD CPU list (e.g. 0-7)" ;;
+		CPU_AFFINITY_RANGE) printf '%s' "taskset CPU range" ;;
+		GAME_NIC) printf '%s' "Network interface for NETWORK_TUNE" ;;
+		VRAM_HOG_UNITS) printf '%s' "VRAM-hog systemd user units (space-separated)" ;;
+		VRAM_HOG_PIDS) printf '%s' "VRAM-hog PIDs (space-separated)" ;;
+		VRAM_PREFLIGHT_MIN_MB) printf '%s' "VRAM preflight minimum MB" ;;
+		DISK_PREFLIGHT_MIN_GB) printf '%s' "Disk free-space preflight GB" ;;
+		GPU_VRAM_PROCESS_MIN_MB) printf '%s' "Warn if other GPU processes exceed MB" ;;
+		MANGOHUD_CONFIG) printf '%s' "MangoHUD config string" ;;
+		MANGOHUD_CONFIGFILE) printf '%s' "MangoHUD config file path" ;;
+		PRE_LAUNCH_CMD) printf '%s' "Command before launch (local only)" ;;
+		POST_LAUNCH_CMD) printf '%s' "Command after launch (local only)" ;;
+		LAUNCH_LOG_MAX_LINES) printf '%s' "launch.log max lines" ;;
+		GAME_EXTRA_ARGS) printf '%s' "Game CLI args" ;;
+		LAUNCH_WRAPPERS) printf '%s' "Wrappers after game-performance/DLSS" ;;
+		LAUNCH_WRAPPERS_BEFORE) printf '%s' "Wrappers before gamemoderun" ;;
+		UNSET_VARS) printf '%s' "Space-separated vars to unset" ;;
+		*) printf '%s' "Value for $1" ;;
+	esac
+}
+
+# tui_edit_advanced_key — Prompt and validate one advanced key for an appid.
+tui_edit_advanced_key() {
+	local appid=$1 key=$2
+	tui_prompt_env_key "$appid" "$key" "$(tui_advanced_key_prompt "$key")"
+	tui_validate_game_config_brief "$appid"
 }
 
 # tui_open_in_editor — Open a config file in \$EDITOR.

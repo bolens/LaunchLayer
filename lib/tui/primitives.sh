@@ -38,6 +38,9 @@ tui_fzf_footer_for() {
 		toggles)
 			printf '%s' 'enter flip toggle · ? help · esc back'
 			;;
+		advanced)
+			printf '%s' 'enter edit group/key · ? help · esc back'
+			;;
 		*)
 			printf '%s' '↑↓ navigate · home/end jump · pgup/pgdn page · alt-s sort · enter select · ? help · esc back'
 			;;

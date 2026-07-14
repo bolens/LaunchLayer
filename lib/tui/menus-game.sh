@@ -113,7 +113,8 @@ tui_quick_toggles() {
 	tui_crumb_leave
 }
 
-# tui_advanced_config — String keys and preset INCLUDE changes.
+# tui_advanced_config — String/numeric keys and preset INCLUDE changes.
+# Groups keep the menu short while covering every TUI_ADVANCED_KEYS entry.
 tui_advanced_config() {
 	local appid=$1 name preset action include_label
 	name="$(get_game_name "$appid" 2>/dev/null || echo "AppID $appid")"
@@ -121,15 +122,16 @@ tui_advanced_config() {
 	while true; do
 		prepare_launch_context "$appid"
 		include_label="${INCLUDE:-auto}"
+		TUI_MENU_CONTEXT=advanced
 		action="$(tui_menu "Advanced config: $name (INCLUDE=${include_label})" \
 			"Change INCLUDE preset" \
-			"Edit GAME_EXTRA_ARGS" \
-			"Edit LAUNCH_WRAPPERS" \
-			"Edit LAUNCH_WRAPPERS_BEFORE" \
-			"Edit GAMESCOPE_W / H / R" \
-			"Edit SHADER_CACHE_MAX_GB" \
-			"Edit MANGOHUD_CONFIG" \
-			"Edit UNSET_VARS" \
+			"Proton & tools" \
+			"Gamescope" \
+			"Shader & storage" \
+			"Affinity & network" \
+			"VRAM & preflight" \
+			"HUD & hooks" \
+			"Wrappers & args" \
 			"Back")" || return 0
 
 		case "$action" in
@@ -138,35 +140,62 @@ tui_advanced_config() {
 				tui_set_include_preset "$appid" "$preset"
 				tui_validate_game_config_brief "$appid"
 				;;
-			"Edit GAME_EXTRA_ARGS")
-				tui_prompt_env_key "$appid" GAME_EXTRA_ARGS "Game CLI args"
-				tui_validate_game_config_brief "$appid"
+			"Proton & tools")
+				tui_advanced_config_group "$appid" "Proton & tools" \
+					OVERRIDE_PROTON DLSS_SWAPPER FRAME_RATE ENABLE_HDR MALLOC_ALLOCATOR
 				;;
-			"Edit LAUNCH_WRAPPERS")
-				tui_prompt_env_key "$appid" LAUNCH_WRAPPERS "Wrappers after game-performance/DLSS (not dlss-swapper if DLSS_SWAPPER=1)"
-				tui_validate_game_config_brief "$appid"
+			"Gamescope")
+				tui_advanced_config_group "$appid" "Gamescope" \
+					GAMESCOPE_W GAMESCOPE_H GAMESCOPE_R GAMESCOPE_FSR_SHARPNESS
 				;;
-			"Edit LAUNCH_WRAPPERS_BEFORE")
-				tui_prompt_env_key "$appid" LAUNCH_WRAPPERS_BEFORE "Wrappers before gamemoderun"
-				tui_validate_game_config_brief "$appid"
+			"Shader & storage")
+				tui_advanced_config_group "$appid" "Shader & storage" \
+					SHADER_CACHE_MAX_GB SHADER_CACHE_BOOST_GB SHADER_CACHE_CHECK_INTERVAL_HOURS \
+					COMPATDATA_MAX_GB VM_MAX_MAP_COUNT_MIN
 				;;
-			"Edit GAMESCOPE_W / H / R")
-				tui_prompt_env_key "$appid" GAMESCOPE_W "Gamescope width"
-				tui_prompt_env_key "$appid" GAMESCOPE_H "Gamescope height"
-				tui_prompt_env_key "$appid" GAMESCOPE_R "Gamescope refresh Hz"
-				tui_validate_game_config_brief "$appid"
+			"Affinity & network")
+				tui_advanced_config_group "$appid" "Affinity & network" \
+					X3D_CPUS CPU_AFFINITY_RANGE GAME_NIC
 				;;
-			"Edit SHADER_CACHE_MAX_GB")
-				tui_prompt_env_key "$appid" SHADER_CACHE_MAX_GB "Shader cache max GB"
-				tui_validate_game_config_brief "$appid"
+			"VRAM & preflight")
+				tui_advanced_config_group "$appid" "VRAM & preflight" \
+					VRAM_HOG_UNITS VRAM_HOG_PIDS VRAM_PREFLIGHT_MIN_MB \
+					DISK_PREFLIGHT_MIN_GB GPU_VRAM_PROCESS_MIN_MB
 				;;
-			"Edit MANGOHUD_CONFIG")
-				tui_prompt_env_key "$appid" MANGOHUD_CONFIG "MangoHUD config string"
-				tui_validate_game_config_brief "$appid"
+			"HUD & hooks")
+				tui_advanced_config_group "$appid" "HUD & hooks" \
+					MANGOHUD_CONFIG MANGOHUD_CONFIGFILE \
+					PRE_LAUNCH_CMD POST_LAUNCH_CMD LAUNCH_LOG_MAX_LINES
 				;;
-			"Edit UNSET_VARS")
-				tui_prompt_env_key "$appid" UNSET_VARS "Space-separated vars to unset"
-				tui_validate_game_config_brief "$appid"
+			"Wrappers & args")
+				tui_advanced_config_group "$appid" "Wrappers & args" \
+					GAME_EXTRA_ARGS LAUNCH_WRAPPERS LAUNCH_WRAPPERS_BEFORE UNSET_VARS
+				;;
+			*) return 0 ;;
+		esac
+	done
+}
+
+# tui_advanced_config_group — Pick and edit keys within one advanced group.
+tui_advanced_config_group() {
+	local appid=$1 title=$2
+	shift 2
+	local -a keys=("$@")
+	local -a items=()
+	local key action
+	for key in "${keys[@]}"; do
+		items+=("Edit $key")
+	done
+	items+=("Back")
+
+	while true; do
+		TUI_MENU_CONTEXT=advanced
+		action="$(tui_menu "Advanced › $title" "${items[@]}")" || return 0
+		case "$action" in
+			Back|"") return 0 ;;
+			Edit\ *)
+				key="${action#Edit }"
+				tui_edit_advanced_key "$appid" "$key"
 				;;
 			*) return 0 ;;
 		esac

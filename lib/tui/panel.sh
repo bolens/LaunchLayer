@@ -26,7 +26,7 @@ tui_panel_active_p() {
 # tui_fzf_panel_context_p — True when fzf should show the output panel.
 tui_fzf_panel_context_p() {
 	case "${1:-menu}" in
-		game|multi|actions|help|toggles) return 1 ;;
+		game|multi|actions|help|toggles|advanced) return 1 ;;
 		*) return 0 ;;
 	esac
 }
