@@ -252,7 +252,7 @@ tail ~/.local/state/launchlayer/launch.log
 | Game never starts / instant exit | `%command%` omitted | Use `"/path/to/launchlayer" %command%`—not the script alone |
 | `Permission denied` or `No such file` | Bad path or Flatpak sandbox | Use absolute path; for Flatpak Steam see [Flatpak Steam](#3-flatpak-steam) |
 | Wrong preset / no per-game config | No `GAMES_DIR` file yet | `./launchlayer --init-appid APPID preset` or `--tui` |
-| Double wrappers / odd behavior | Old launch option left in place | Remove `gamemoderun`, `mangohud`, etc. from Steam; configure via LaunchLayer |
+| Double wrappers / odd behavior | Old launch option left in place | Remove `gamemoderun`, `mangohud`, `dlss-swapper`, etc. from Steam; configure via LaunchLayer (`GAMEMODE`, `MANGOHUD`, `DLSS_SWAPPER`) |
 | Proton crashes / map errors | Low `vm.max_map_count` | `./launchlayer --sysctl install` — see [System tuning](#system-tuning) |
 
 ---
@@ -264,9 +264,9 @@ tail ~/.local/state/launchlayer/launch.log
 | ≡ | **Layered config** | Plain `KEY=VALUE` files stack: profiles → `default.env` → `local.env` → preset → per-game overrides |
 | ◦ | **Auto-detection** | Distro, GPU, compositor, display resolution/VRR, X3D V-Cache CPU mask, native vs Proton |
 | ⊛ | **Preflight** | Checks `vm.max_map_count`, shader/compat cache size (optional trim), VRAM, GPU power/processes, disk space, concurrent launches |
-| ⚡ | **Runtime tuning** | Network (`ethtool`), PipeWire latency, NVIDIA power mode, Proton/DXVK/VKD3D env |
+| ⚡ | **Runtime tuning** | Network (`ethtool`), PipeWire latency, NVIDIA power mode, Proton/DXVK/VKD3D env, shader-cache boost, DLSS/FSR4/XeSS upgrade knobs |
 | ◆ | **VRAM management** | Pause configured systemd units (Sunshine, etc.) during play; resume on exit |
-| → | **Launch chain** | `LAUNCH_WRAPPERS_BEFORE` → GameMode → CPU affinity → `game-performance` → `LAUNCH_WRAPPERS` → Gamescope (`--mangoapp` when both Gamescope and MangoHUD) → MangoHUD → game |
+| → | **Launch chain** | `LAUNCH_WRAPPERS_BEFORE` → GameMode → CPU affinity → `game-performance` → DLSS swapper → `LAUNCH_WRAPPERS` → Gamescope (`--mangoapp` when both Gamescope and MangoHUD) → MangoHUD → game |
 | ▤ | **CLI + TUI** | Manage configs, backup/restore, doctor checks, optional [Community hub](#community-hub) |
 
 Use `--dry-run %command%` to print the resolved config and chain without starting the game.
@@ -413,7 +413,12 @@ Per-game files typically start with `INCLUDE=presets/competitive.env`, then over
 INCLUDE=presets/competitive.env
 
 # Wrappers and game args
-LAUNCH_WRAPPERS="dlss-swapper"
+DLSS_SWAPPER=1              # 1=dlss-swapper (NGX+presets), dll=dlss-swapper-dll (presets only)
+PROTON_DLSS_UPGRADE=0       # 1=Proton-CachyOS/GE DLSS DLL upgrade (not Valve Proton)
+PROTON_FSR4_UPGRADE=0       # 1=FSR4 upgrade (RDNA3 auto → PROTON_FSR4_RDNA3_UPGRADE)
+PROTON_XESS_UPGRADE=0       # 1=XeSS upgrade (Intel / forks)
+SHADER_CACHE_BOOST=1        # raise Mesa/NVIDIA shader cache size limits
+LAUNCH_WRAPPERS=""          # custom PATH wrappers after DLSS; do not list dlss-swapper when DLSS_SWAPPER is set
 LAUNCH_WRAPPERS_BEFORE=""
 GAME_EXTRA_ARGS="-skipintro -nolog"
 UNSET_VARS="DXVK_ASYNC VKD3D_CONFIG"
@@ -431,13 +436,15 @@ GAMEMODE  MANGOHUD  MANGOHUD_CONFIG  MANGOHUD_LOG
 GAMESCOPE  GAMESCOPE_W  GAMESCOPE_H  GAMESCOPE_R
 GAMESCOPE_ADAPTIVE_SYNC  GAMESCOPE_FSR  GAMESCOPE_FSR_SHARPNESS  GAMESCOPE_HDR
 VRAM_HOGS  LAUNCH_WATCHDOG  NETWORK_TUNE  PIPEWIRE_LOW_LATENCY
-GPU_POWER_CHECK  NVIDIA_POWER_MODE  GAME_PERFORMANCE
+GPU_POWER_CHECK  NVIDIA_POWER_MODE  GAME_PERFORMANCE  DLSS_SWAPPER
 DISABLE_CPU_AFFINITY  CPU_AFFINITY_RANGE  CONCURRENT_LAUNCH_GUARD
 DISABLE_NIC_EEE  DISABLE_WIFI_POWER_SAVE  DISK_TUNE
 MALLOC_ALLOCATOR  ENABLE_HDR  OVERRIDE_PROTON
+PROTON_DLSS_UPGRADE  PROTON_FSR4_UPGRADE  PROTON_XESS_UPGRADE
+PROTON_NVIDIA_LIBS  PROTON_NVIDIA_LIBS_NO_32BIT  SHADER_CACHE_BOOST
 
 # Preflight thresholds
-SHADER_CACHE_CHECK  SHADER_CACHE_MAX_GB  SHADER_CACHE_TRIM
+SHADER_CACHE_CHECK  SHADER_CACHE_MAX_GB  SHADER_CACHE_TRIM  SHADER_CACHE_BOOST_GB
 COMPATDATA_CHECK  COMPATDATA_MAX_GB  COMPATDATA_TRIM
 VRAM_PREFLIGHT_MIN_MB  DISK_PREFLIGHT_MIN_GB  GPU_VRAM_PROCESS_MIN_MB
 VM_MAX_MAP_COUNT_MIN  VM_MAX_MAP_COUNT_FIX
@@ -445,6 +452,21 @@ VM_MAX_MAP_COUNT_MIN  VM_MAX_MAP_COUNT_FIX
 # Proton / GPU (passed through when set)
 PROTON_*  DXVK_*  VKD3D_*  __GL_*  __VK_*  SDL_*  MESA_*  RADV_*  AMD_*  INTEL_*
 ```
+
+### Upscaling paths (DLSS / FSR / XeSS)
+
+See also CachyOS: [Forcing the Latest DLSS Preset](https://wiki.cachyos.org/configuration/gaming/#forcing-the-latest-dlss-preset).
+
+| Approach | When to use |
+|----------|-------------|
+| `DLSS_SWAPPER=1` | CachyOS `dlss-swapper`: NGX updater + latest SR/RR/FG presets at launch |
+| `DLSS_SWAPPER=dll` | Manual DLL replace + `dlss-swapper-dll` (presets only, no NGX) |
+| `PROTON_DLSS_UPGRADE=1` | Proton-CachyOS / GE download latest DLSS into the prefix (needs those forks) |
+| `PROTON_FSR4_UPGRADE=1` | Same forks for FSR4; RDNA3 GPUs auto-use `PROTON_FSR4_RDNA3_UPGRADE` |
+| `PROTON_XESS_UPGRADE=1` | Same forks for XeSS |
+| **dlss-updater** | GUI app to replace game-folder DLLs offline — **no CLI**; LaunchLayer detects it and tips only |
+
+Prefer one DLSS path per game (`DLSS_SWAPPER` *or* `PROTON_DLSS_UPGRADE`) to avoid double upgrades. Do not also list `dlss-swapper` in `LAUNCH_WRAPPERS` when `DLSS_SWAPPER` is set.
 
 ### Display detection
 
@@ -655,6 +677,8 @@ The script degrades gracefully when tools are missing. Run `--doctor` or `--dete
 | `game-performance` | CPU perf profile wrapper |
 | `gamescope` | Compositor upscaling, VRR |
 | `mangohud` | Overlay |
+| `dlss-swapper` | NGX + latest DLSS presets via `DLSS_SWAPPER=1` ([CachyOS wiki](https://wiki.cachyos.org/configuration/gaming/#forcing-the-latest-dlss-preset); package `cachyos-settings`) |
+| `dlss-updater` | Optional GUI for offline DLL replace (detected/tipped only — no launch CLI) |
 | `taskset` | Pin to X3D V-Cache CCD |
 | `nvidia-smi`, `nvidia-settings` | VRAM/power checks |
 | `ethtool` | `NETWORK_TUNE` (ring buffers, EEE) |

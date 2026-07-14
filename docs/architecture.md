@@ -107,7 +107,22 @@ Each leaf file uses a load guard (`LAUNCHLAYER_*_LOADED`) so tests can load indi
 
 Dry-run (`--dry-run`) loads the same config path and applies env-only tuners (HDR, malloc, Proton override) so the printed chain matches a live launch; host-mutating steps (network/disk sysfs) are skipped.
 
-Wrapper order (`lib/runtime/chain.sh`): `LAUNCH_WRAPPERS_BEFORE` → `gamemoderun` → `taskset` → `game-performance` → `LAUNCH_WRAPPERS` → `gamescope` (optional `--mangoapp`) → `mangohud`.
+Wrapper order (`lib/runtime/chain.sh`): `LAUNCH_WRAPPERS_BEFORE` → `gamemoderun` → `taskset` → `game-performance` → `dlss-swapper` (when `DLSS_SWAPPER=1` or `dll`) → `LAUNCH_WRAPPERS` → `gamescope` (optional `--mangoapp`) → `mangohud`.
+
+Validation rejects listing `dlss-swapper` / `dlss-swapper-dll` in `LAUNCH_WRAPPERS*` while `DLSS_SWAPPER` is enabled (same pattern as `GAMEMODE` vs `gamemoderun`).
+
+Proton env also applies optional CachyOS-oriented knobs: `SHADER_CACHE_BOOST`, `PROTON_*_UPGRADE` (GE/CachyOS/EM), and `PROTON_NVIDIA_LIBS*`. Doctor surfaces GameMode vs `ananicy-cpp` conflicts and installed Proton-CachyOS / dlss-updater tips.
+
+Compat tools resolve under Steam's user `compatibilitytools.d` and `/usr/share/steam/compatibilitytools.d` (distro Proton-CachyOS packages). Upscaling paths ([CachyOS wiki](https://wiki.cachyos.org/configuration/gaming/#forcing-the-latest-dlss-preset)):
+
+| Mechanism | Role |
+|-----------|------|
+| `DLSS_SWAPPER=1` | Launch wrapper `dlss-swapper` (NGX updater + latest SR/RR/FG presets) |
+| `DLSS_SWAPPER=dll` | Launch wrapper `dlss-swapper-dll` (presets only; after manual DLL replace) |
+| `PROTON_*_UPGRADE` | Fork-native DLL downloaders (GE / CachyOS / EM) |
+| `dlss-updater` | GUI-only offline updater (detect/tip; never exec'd) |
+
+Prefer one live DLSS path per game (`DLSS_SWAPPER` *or* `PROTON_DLSS_UPGRADE`), not both.
 
 ## Backup / export format
 

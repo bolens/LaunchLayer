@@ -41,6 +41,8 @@ Split view: action list on the left, live config preview on the right (same as t
 
 Per-game boolean overrides. Green/red labels mark values set in `GAMES_DIR/<AppID>.env`; dim text marks inherited layers. Footer: `enter flip toggle · ? help · esc back`.
 
+Includes GameMode / MangoHUD / Gamescope, `DLSS_SWAPPER` (toggle flips `0`↔`1`; use **Advanced config** or `$EDITOR` for `dll`), `SHADER_CACHE_BOOST`, `PROTON_DLSS_UPGRADE`, `PROTON_FSR4_UPGRADE`, `PROTON_XESS_UPGRADE`, and other launch flags. String keys like `OVERRIDE_PROTON` or `SHADER_CACHE_BOOST_GB` are under **Advanced config**.
+
 <p align="center">
   <img src="assets/tui-quick-toggles.png" alt="LaunchLayer per-game quick toggles" width="720">
 </p>

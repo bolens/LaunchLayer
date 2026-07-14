@@ -31,7 +31,7 @@ Place before subcommands:
 |---------|-------------|
 | `--help`, `-h` | Grouped command reference |
 | `--version`, `-V` | Version and install paths |
-| `--doctor [--json]` | Environment + config health check (includes `--validate-config all`); exits non-zero when issues remain |
+| `--doctor [--json]` | Environment + config health check (includes `--validate-config all`); exits non-zero when issues remain. Also prints non-critical gaming tips (GameMode vs `ananicy-cpp`, Proton-CachyOS, DLSS helpers). JSON adds `ananicy_cpp_active` and `proton_cachyos`. |
 | `--setup [--completions] [--systemd] [--backup-timer] [--symlink] [--print-launch-option] [--write-local-config]` | Non-destructive onboarding |
 | `--detect-environment [--json]` | Auto-detected platform, GPU, display, tools |
 | `--detect-defaults [--json]` | Recommended machine-local settings |
@@ -59,7 +59,7 @@ Place before subcommands:
 | `--validate-config [APPID\|NAME\|all] [--json]` | Lint `.env` files |
 | `--suggest-config APPID\|NAME [--apply]` | Suggest optimizations from ProtonDB reports |
 | `--scan-anticheat [--update-list]` | Find EAC/BattlEye vs known list |
-| `--scan-detections` | Audit heuristic vs list mismatches |
+| `--scan-detections` | Audit heuristic vs list mismatches (native/anticheat/DLSS; tips suggest `DLSS_SWAPPER=1` or `PROTON_DLSS_UPGRADE=1` when either is unset) |
 
 ---
 
@@ -110,6 +110,25 @@ Privileged actions (`--hub-publish`, `--hub-update`, `--hub-delete`) need `publi
 | `--hub-prefs [show\|reset\|set] [--json]` | Edit `hub.conf` without the TUI (`publish_token` is never echoed) |
 
 TUI equivalents: **Community hub** (main menu) and **[Hub] Community configs** (per-game actions). Bulk preset changes: **`--bulk-set-include`** or **Games → Bulk change INCLUDE preset**.
+
+---
+
+## Upscaling / Proton forks (config keys)
+
+Useful with Steam Launch Options managed by LaunchLayer (set in `games/<AppID>.env` or via TUI toggles). CachyOS reference: [Forcing the Latest DLSS Preset](https://wiki.cachyos.org/configuration/gaming/#forcing-the-latest-dlss-preset).
+
+| Key | Effect |
+|-----|--------|
+| `DLSS_SWAPPER=1` \| `dll` | Insert `dlss-swapper` / `dlss-swapper-dll` after `game-performance` (NGX updater + presets, or presets-only after manual DLL replace) |
+| `PROTON_DLSS_UPGRADE=1` | Proton-CachyOS / GE DLSS DLL upgrade (needs those forks; not Valve Proton) |
+| `PROTON_FSR4_UPGRADE=1` | FSR4 upgrade; RDNA3 GPUs auto-map to `PROTON_FSR4_RDNA3_UPGRADE` |
+| `PROTON_XESS_UPGRADE=1` | XeSS upgrade on supported forks |
+| `PROTON_NVIDIA_LIBS=1` | Enable NVIDIA PhysX/CUDA libs in Proton forks |
+| `PROTON_NVIDIA_LIBS_NO_32BIT=1` | 64-bit NVIDIA libs only (RTX 40-series tip) |
+| `SHADER_CACHE_BOOST=1` | Raise Mesa / NVIDIA shader cache size limits (`SHADER_CACHE_BOOST_GB`, default 12) |
+| `OVERRIDE_PROTON=…` | Force a compat tool (e.g. `proton-cachyos-slr`) |
+
+`dlss-updater` is detected as an optional GUI tool only — it has no launch CLI. Prefer `DLSS_SWAPPER` or `PROTON_DLSS_UPGRADE` at launch time (not both, and not also via `LAUNCH_WRAPPERS=dlss-swapper`).
 
 ---
 

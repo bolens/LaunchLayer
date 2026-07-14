@@ -51,7 +51,7 @@ $(cli_bold "Steam launch options")
   %command% is required; without it Steam never runs the game binary.
 
 $(cli_bold "Onboarding & health")
-  --doctor [--json]                 Full environment + config health check
+  --doctor [--json]                 Full environment + config health check (+ gaming tips)
   --setup [--completions] [--systemd] [--backup-timer] [--symlink] [--print-launch-option]
           [--write-local-config]
   --detect-environment [--json]   Auto-detected platform, GPU, display, tools
@@ -95,7 +95,7 @@ $(cli_bold "Games & config")
   --validate-config [APPID|all] [--json]  Lint .env files
   --suggest-config APPID|NAME [--apply]   Suggest optimizations using ProtonDB comments
   --scan-anticheat [--update-list]  Find EAC/BattlEye vs anticheat-appids.txt
-  --scan-detections                 Audit heuristic vs list mismatches
+  --scan-detections                 Audit native/anticheat/DLSS heuristic vs list mismatches (+ tips)
 
 $(cli_bold "Community hub") $(cli_dim "(requires hub.conf — see share/launchlayer/templates/hub.conf.example)")
   --hub-fingerprint [--json] [--fingerprint-level minimal|standard|detailed]
