@@ -83,6 +83,46 @@ EOF
 	rm -f "$tmp"
 }
 
+@test "hub_sanitize strips SPECIALTY_RUNTIME and CONTY" {
+	local tmp
+	tmp="$(mktemp)"
+	cat > "$tmp" <<'EOF'
+GAMEMODE=1
+SPECIALTY_RUNTIME=boxtron
+CONTY=1
+SPECIAL_K_DLL=dxgi
+EOF
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config commands hub
+		hub_sanitize_remote_env_file "'"$tmp"'" 2>&1
+		echo "---"
+		cat "'"$tmp"'"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"SPECIALTY_RUNTIME"* ]]
+	[[ "$output" == *"CONTY"* ]]
+	[[ "$output" == *"SPECIAL_K_DLL"* ]]
+	[[ "$output" == *"GAMEMODE=1"* ]]
+	! grep -q 'SPECIALTY_RUNTIME=' "$tmp"
+	! grep -q '^CONTY=' "$tmp"
+	rm -f "$tmp"
+}
+
+@test "hub untrusted keys match share/launchlayer/hub-untrusted-keys.txt" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config commands hub
+		file="$(launchlayer_share_dir)/hub-untrusted-keys.txt"
+		mapfile -t from_file < <(grep -vE "^[[:space:]]*(#|$)" "$file" | sed "s/#.*//;s/^[[:space:]]*//;s/[[:space:]]*$//;/^$/d" | sort -u)
+		mapfile -t from_bash < <(printf "%s\n" "${HUB_UNTRUSTED_ENV_KEYS[@]}" | sort -u)
+		diff -u <(printf "%s\n" "${from_file[@]}") <(printf "%s\n" "${from_bash[@]}")
+	'
+	[[ $status -eq 0 ]]
+}
+
 @test "hub_sanitize_remote_env_file strips unsafe INCLUDE paths" {
 	local tmp
 	tmp="$(mktemp)"
