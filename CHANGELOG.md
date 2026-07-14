@@ -13,12 +13,18 @@ and this project uses [Semantic Versioning](https://semver.org/).
 - CachyOS gaming wiki alignment: `SHADER_CACHE_BOOST`, Proton-CachyOS/GE/EM `PROTON_*_UPGRADE` knobs (`PROTON_DLSS_UPGRADE`, `PROTON_FSR4_UPGRADE` / RDNA3 auto-path, `PROTON_XESS_UPGRADE`), and `PROTON_NVIDIA_LIBS*`
 - Doctor gaming tips: GameMode vs `ananicy-cpp`, Proton-CachyOS discovery, `dlss-updater` GUI detection (no launch CLI)
 - Prefer `/usr/share/steam/compatibilitytools.d` when resolving Proton tools (e.g. `proton-cachyos-slr`)
+- Arch Gaming wiki alignment: `LD_BIND_NOW`, `VKBASALT` → `ENABLE_VKBASALT`, `LATENCYFLEX` → `LFX`, `DISABLE_VBLANK` (Mesa `vblank_mode` / immediate present + NVIDIA `__GL_SYNC_TO_VBLANK=0`)
+- Doctor tips for AMD/RADV `RADV_PERFTEST`, sched_ext/`scx_*`, and Arch latency knobs; optional-tool detection for `vkbasalt` / `latencyflex` Vulkan layers
+- Bazzite docs alignment: `DISABLE_STEAM_DECK` → `SteamDeck=0` (sd0 equivalent), `FRAME_RATE=N` → `DXVK_FRAME_RATE`/`VKD3D_FRAME_RATE`; doctor tips for immutable/Bazzite + dlss-swapper shipping
 
 ### Changed
 
 - Prefer `DLSS_SWAPPER=1` over `LAUNCH_WRAPPERS=dlss-swapper`; validation flags combining both; detection tips also accept `PROTON_DLSS_UPGRADE=1`
 - Detected defaults enable `SHADER_CACHE_BOOST=1` off Steam Deck / WSL
-- Quick toggles expose upscaler and shader-boost flags
+- TUI quick toggles cover all boolean launch flags; Advanced config groups every remaining string/numeric key (full config-key parity)
+- Dry-run “Environment (selected)” includes Arch/Bazzite exports (`LD_BIND_NOW`, `ENABLE_VKBASALT`, `LFX`, `SteamDeck`, Mesa present mode, …)
+- Config lint rejects non-integer `FRAME_RATE`; same-file `sd0` + `DISABLE_STEAM_DECK=1` flagged like other wrapper overlaps
+- Flag `sd0` in `LAUNCH_WRAPPERS` when `DISABLE_STEAM_DECK=1` (use one path)
 
 ## [0.10.0] - 2026-07-14
 

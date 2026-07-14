@@ -170,7 +170,7 @@ Rules:
 - **Keep `%command%`** at the end. Without it Steam never runs the game binary.
 - **Quote the script path** when it contains spaces.
 - **Do not** substitute the game `.exe` or Proton command for `%command%`—LaunchLayer receives the full Steam-built argv automatically.
-- **Replace** other wrapper prefixes (`gamemoderun %command%`, `mangohud %command%`, etc.) with LaunchLayer; enable those features in config instead (`GAMEMODE=1`, `MANGOHUD=1`, …).
+- **Replace** other wrapper prefixes (`gamemoderun %command%`, `mangohud %command%`, `sd0 %command%`, etc.) with LaunchLayer; enable those features in config instead (`GAMEMODE=1`, `MANGOHUD=1`, `DISABLE_STEAM_DECK=1`, …).
 
 ### 2. Paste into Steam
 
@@ -252,7 +252,7 @@ tail ~/.local/state/launchlayer/launch.log
 | Game never starts / instant exit | `%command%` omitted | Use `"/path/to/launchlayer" %command%`—not the script alone |
 | `Permission denied` or `No such file` | Bad path or Flatpak sandbox | Use absolute path; for Flatpak Steam see [Flatpak Steam](#3-flatpak-steam) |
 | Wrong preset / no per-game config | No `GAMES_DIR` file yet | `./launchlayer --init-appid APPID preset` or `--tui` |
-| Double wrappers / odd behavior | Old launch option left in place | Remove `gamemoderun`, `mangohud`, `dlss-swapper`, etc. from Steam; configure via LaunchLayer (`GAMEMODE`, `MANGOHUD`, `DLSS_SWAPPER`) |
+| Double wrappers / odd behavior | Old launch option left in place | Remove `gamemoderun`, `mangohud`, `dlss-swapper`, `sd0`, etc. from Steam; configure via LaunchLayer (`GAMEMODE`, `MANGOHUD`, `DLSS_SWAPPER`, `DISABLE_STEAM_DECK`) |
 | Proton crashes / map errors | Low `vm.max_map_count` | `./launchlayer --sysctl install` — see [System tuning](#system-tuning) |
 
 ---
@@ -418,6 +418,12 @@ PROTON_DLSS_UPGRADE=0       # 1=Proton-CachyOS/GE DLSS DLL upgrade (not Valve Pr
 PROTON_FSR4_UPGRADE=0       # 1=FSR4 upgrade (RDNA3 auto → PROTON_FSR4_RDNA3_UPGRADE)
 PROTON_XESS_UPGRADE=0       # 1=XeSS upgrade (Intel / forks)
 SHADER_CACHE_BOOST=1        # raise Mesa/NVIDIA shader cache size limits
+LD_BIND_NOW=0               # 1=eager dynamic linking (Arch Gaming)
+DISABLE_VBLANK=0            # 1=Mesa vblank off / immediate present
+VKBASALT=0                  # 1=ENABLE_VKBASALT (vkBasalt layer)
+LATENCYFLEX=0               # 1=LFX=1 (LatencyFleX layer)
+DISABLE_STEAM_DECK=0        # 1=SteamDeck=0 (Bazzite sd0)
+FRAME_RATE=                 # e.g. 60 → DXVK_FRAME_RATE + VKD3D_FRAME_RATE
 LAUNCH_WRAPPERS=""          # custom PATH wrappers after DLSS; do not list dlss-swapper when DLSS_SWAPPER is set
 LAUNCH_WRAPPERS_BEFORE=""
 GAME_EXTRA_ARGS="-skipintro -nolog"
@@ -442,6 +448,8 @@ DISABLE_NIC_EEE  DISABLE_WIFI_POWER_SAVE  DISK_TUNE
 MALLOC_ALLOCATOR  ENABLE_HDR  OVERRIDE_PROTON
 PROTON_DLSS_UPGRADE  PROTON_FSR4_UPGRADE  PROTON_XESS_UPGRADE
 PROTON_NVIDIA_LIBS  PROTON_NVIDIA_LIBS_NO_32BIT  SHADER_CACHE_BOOST
+LD_BIND_NOW  VKBASALT  LATENCYFLEX  DISABLE_VBLANK
+DISABLE_STEAM_DECK  FRAME_RATE
 
 # Preflight thresholds
 SHADER_CACHE_CHECK  SHADER_CACHE_MAX_GB  SHADER_CACHE_TRIM  SHADER_CACHE_BOOST_GB
@@ -467,6 +475,24 @@ See also CachyOS: [Forcing the Latest DLSS Preset](https://wiki.cachyos.org/conf
 | **dlss-updater** | GUI app to replace game-folder DLLs offline — **no CLI**; LaunchLayer detects it and tips only |
 
 Prefer one DLSS path per game (`DLSS_SWAPPER` *or* `PROTON_DLSS_UPGRADE`) to avoid double upgrades. Do not also list `dlss-swapper` in `LAUNCH_WRAPPERS` when `DLSS_SWAPPER` is set.
+
+### Latency knobs (Arch Gaming)
+
+| Key | Effect |
+|-----|--------|
+| `LD_BIND_NOW=1` | Eager symbol bind (first-call latency) |
+| `DISABLE_VBLANK=1` | Mesa `vblank_mode=0` / immediate present; NVIDIA `__GL_SYNC_TO_VBLANK=0` |
+| `VKBASALT=1` | `ENABLE_VKBASALT=1` (vkBasalt Vulkan layer) |
+| `LATENCYFLEX=1` | `LFX=1` (LatencyFleX); pair with `DISABLE_VBLANK=1` when possible |
+
+### Bazzite / Deck identity & FPS caps
+
+| Key | Effect |
+|-----|--------|
+| `DISABLE_STEAM_DECK=1` | `SteamDeck=0` (Bazzite `sd0`) — full graphics menus when Deck mode locks settings |
+| `FRAME_RATE=N` | `DXVK_FRAME_RATE` + `VKD3D_FRAME_RATE` (restart to change; best latency of the FPS-cap methods) |
+
+See [Bazzite launch options](https://docs.bazzite.gg/Gaming/launch-options-env-variables/). Prefer LaunchLayer keys over pasting `sd0` / `dlss-swapper` into Steam when using `"…/launchlayer" %command%`.
 
 ### Display detection
 
@@ -677,6 +703,8 @@ The script degrades gracefully when tools are missing. Run `--doctor` or `--dete
 | `game-performance` | CPU perf profile wrapper |
 | `gamescope` | Compositor upscaling, VRR |
 | `mangohud` | Overlay |
+| `vkbasalt` | Vulkan post-process layer via `VKBASALT=1` |
+| `latencyflex` | LatencyFleX layer via `LATENCYFLEX=1` |
 | `dlss-swapper` | NGX + latest DLSS presets via `DLSS_SWAPPER=1` ([CachyOS wiki](https://wiki.cachyos.org/configuration/gaming/#forcing-the-latest-dlss-preset); package `cachyos-settings`) |
 | `dlss-updater` | Optional GUI for offline DLL replace (detected/tipped only — no launch CLI) |
 | `taskset` | Pin to X3D V-Cache CCD |

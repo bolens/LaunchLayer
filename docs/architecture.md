@@ -72,6 +72,8 @@ User preferences follow the same pattern for all three config files:
 
 Bulk preset changes: **`--bulk-set-include PRESET`** or **Games → Bulk change INCLUDE preset**.
 
+Per-game launch.d keys: **Quick toggles** (every 0/1 flag) and **Advanced config** groups (every remaining string/numeric key); `$EDITOR` remains available. See [docs/tui.md](tui.md#quick-toggles).
+
 ## Path variables
 
 | Variable | Default | Purpose |
@@ -111,7 +113,7 @@ Wrapper order (`lib/runtime/chain.sh`): `LAUNCH_WRAPPERS_BEFORE` → `gamemoderu
 
 Validation rejects listing `dlss-swapper` / `dlss-swapper-dll` in `LAUNCH_WRAPPERS*` while `DLSS_SWAPPER` is enabled (same pattern as `GAMEMODE` vs `gamemoderun`).
 
-Proton env also applies optional CachyOS-oriented knobs: `SHADER_CACHE_BOOST`, `PROTON_*_UPGRADE` (GE/CachyOS/EM), and `PROTON_NVIDIA_LIBS*`. Doctor surfaces GameMode vs `ananicy-cpp` conflicts and installed Proton-CachyOS / dlss-updater tips.
+Proton env also applies optional CachyOS-oriented knobs: `SHADER_CACHE_BOOST`, `PROTON_*_UPGRADE` (GE/CachyOS/EM), and `PROTON_NVIDIA_LIBS*`. Shared launch env tuning (native + Proton) applies Arch Gaming knobs: `LD_BIND_NOW`, `VKBASALT`/`ENABLE_VKBASALT`, `LATENCYFLEX`/`LFX`, `DISABLE_VBLANK`, plus Bazzite-oriented `DISABLE_STEAM_DECK`/`SteamDeck=0` and `FRAME_RATE` → `DXVK_FRAME_RATE`/`VKD3D_FRAME_RATE`. Doctor surfaces GameMode vs `ananicy-cpp`, Proton-CachyOS / dlss-updater, AMD RADV / sched_ext, Arch latency, and Bazzite/immutable Deck + frame-limit tips.
 
 Compat tools resolve under Steam's user `compatibilitytools.d` and `/usr/share/steam/compatibilitytools.d` (distro Proton-CachyOS packages). Upscaling paths ([CachyOS wiki](https://wiki.cachyos.org/configuration/gaming/#forcing-the-latest-dlss-preset)):
 

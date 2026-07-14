@@ -41,11 +41,28 @@ Split view: action list on the left, live config preview on the right (same as t
 
 Per-game boolean overrides. Green/red labels mark values set in `GAMES_DIR/<AppID>.env`; dim text marks inherited layers. Footer: `enter flip toggle · ? help · esc back`.
 
-Includes GameMode / MangoHUD / Gamescope, `DLSS_SWAPPER` (toggle flips `0`↔`1`; use **Advanced config** or `$EDITOR` for `dll`), `SHADER_CACHE_BOOST`, `PROTON_DLSS_UPGRADE`, `PROTON_FSR4_UPGRADE`, `PROTON_XESS_UPGRADE`, and other launch flags. String keys like `OVERRIDE_PROTON` or `SHADER_CACHE_BOOST_GB` are under **Advanced config**.
+Covers every 0/1 launch flag (GameMode / MangoHUD / Gamescope family, shader/compatdata checks, NVIDIA power, Proton/`PROTON_*_UPGRADE` / indicators / NVIDIA libs, Arch latency knobs, `DISABLE_STEAM_DECK`, `DLSS_SWAPPER` as `0`↔`1`, etc.). Use **Advanced config → Proton & tools → Edit DLSS_SWAPPER** for `dll`, or **Open in $EDITOR**.
 
 <p align="center">
   <img src="assets/tui-quick-toggles.png" alt="LaunchLayer per-game quick toggles" width="720">
 </p>
+
+### Advanced config
+
+String and numeric keys, grouped:
+
+| Group | Keys |
+|-------|------|
+| Change INCLUDE preset | `INCLUDE=presets/…` |
+| Proton & tools | `OVERRIDE_PROTON`, `DLSS_SWAPPER` (`0`/`1`/`dll`), `FRAME_RATE`, `ENABLE_HDR`, `MALLOC_ALLOCATOR` |
+| Gamescope | `GAMESCOPE_W` / `H` / `R`, `GAMESCOPE_FSR_SHARPNESS` |
+| Shader & storage | `SHADER_CACHE_MAX_GB`, `SHADER_CACHE_BOOST_GB`, `SHADER_CACHE_CHECK_INTERVAL_HOURS`, `COMPATDATA_MAX_GB`, `VM_MAX_MAP_COUNT_MIN` |
+| Affinity & network | `X3D_CPUS`, `CPU_AFFINITY_RANGE`, `GAME_NIC` |
+| VRAM & preflight | `VRAM_HOG_UNITS`, `VRAM_HOG_PIDS`, `VRAM_PREFLIGHT_MIN_MB`, `DISK_PREFLIGHT_MIN_GB`, `GPU_VRAM_PROCESS_MIN_MB` |
+| HUD & hooks | `MANGOHUD_CONFIG`, `MANGOHUD_CONFIGFILE`, `PRE_LAUNCH_CMD`, `POST_LAUNCH_CMD`, `LAUNCH_LOG_MAX_LINES` |
+| Wrappers & args | `GAME_EXTRA_ARGS`, `LAUNCH_WRAPPERS`, `LAUNCH_WRAPPERS_BEFORE`, `UNSET_VARS` |
+
+Prompts keep the current value on empty Enter; type `-` to clear. Validation runs after each edit.
 
 ---
 
@@ -116,7 +133,7 @@ Game picker filter lives in **Settings → Interface → [Games]** (footer still
 ### Games › *Game* › Actions `(config ok | validation issues | inherits layers)`
 
 - `[View]` Resolved config · Dry-run launch chain · Paths · Launch stats
-- `[Edit]` Quick toggles · Advanced config · Clear override · Open in `$EDITOR` · Set preset (re-init)
+- `[Edit]` Quick toggles (all 0/1 flags) · Advanced config (grouped string/numeric keys) · Clear override · Open in `$EDITOR` · Set preset (re-init)
 - `[Manage]` Validate config · Delete per-game config
 - `[Hub]` Community configs
 

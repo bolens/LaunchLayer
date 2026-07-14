@@ -130,6 +130,30 @@ Useful with Steam Launch Options managed by LaunchLayer (set in `games/<AppID>.e
 
 `dlss-updater` is detected as an optional GUI tool only — it has no launch CLI. Prefer `DLSS_SWAPPER` or `PROTON_DLSS_UPGRADE` at launch time (not both, and not also via `LAUNCH_WRAPPERS=dlss-swapper`).
 
+## Latency / Arch Gaming (config keys)
+
+Env knobs from the [Arch Gaming wiki](https://wiki.archlinux.org/title/Gaming) (apply to native and Proton launches).
+
+| Key | Effect |
+|-----|--------|
+| `LD_BIND_NOW=1` | Eager dynamic linking (`LD_BIND_NOW=1`) — can cut first-call hitch |
+| `DISABLE_VBLANK=1` | Mesa `vblank_mode=0` + `MESA_VK_WSI_PRESENT_MODE=immediate`; NVIDIA `__GL_SYNC_TO_VBLANK=0` |
+| `VKBASALT=1` | Enable vkBasalt (`ENABLE_VKBASALT=1`); install the Vulkan layer package |
+| `LATENCYFLEX=1` | Enable LatencyFleX (`LFX=1`); works best with `DISABLE_VBLANK=1` and game Reflex settings |
+
+## Bazzite / Deck identity & frame limits (config keys)
+
+From [Bazzite launch options](https://docs.bazzite.gg/Gaming/launch-options-env-variables/) (also useful on other Deck-mode / gamescope sessions).
+
+| Key | Effect |
+|-----|--------|
+| `DISABLE_STEAM_DECK=1` | Export `SteamDeck=0` (same as Bazzite `sd0`) — restores full graphics options on titles that force Deck limits |
+| `FRAME_RATE=N` | Set `DXVK_FRAME_RATE` and `VKD3D_FRAME_RATE` (API-level caps; lowest latency; restart to change) |
+
+Prefer these keys over pasting `sd0` / raw DXVK vars into Steam launch options alongside LaunchLayer. Prefer `DLSS_SWAPPER=1` over Bazzite’s `dlss-swapper %command%` wrapper in Steam.
+
+On desktop session with Gamescope, Bazzite prefers external MangoHUD fps_limit for interactive caps; `GAMESCOPE_R` still sets gamescope `-r`.
+
 ---
 
 ## Shell completion
