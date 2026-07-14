@@ -149,6 +149,92 @@ setup() {
 	[[ "$out" == "nvme0n1" ]]
 }
 
+@test "apply_disable_steam_deck exports SteamDeck=0" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export DISABLE_STEAM_DECK=1
+		unset SteamDeck
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime platform tools
+		apply_disable_steam_deck
+		echo "SteamDeck=$SteamDeck"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "SteamDeck=0" ]]
+}
+
+@test "apply_frame_rate sets DXVK and VKD3D frame rates" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export FRAME_RATE=72
+		unset DXVK_FRAME_RATE VKD3D_FRAME_RATE
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime platform tools
+		apply_frame_rate
+		printf "dxvk=%s vkd3d=%s\n" "$DXVK_FRAME_RATE" "$VKD3D_FRAME_RATE"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "dxvk=72 vkd3d=72" ]]
+}
+
+@test "apply_frame_rate ignores invalid values" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export FRAME_RATE=nope
+		unset DXVK_FRAME_RATE VKD3D_FRAME_RATE
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime platform tools
+		apply_frame_rate 2>/dev/null
+		[[ -z "${DXVK_FRAME_RATE:-}" && -z "${VKD3D_FRAME_RATE:-}" ]] && echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
+@test "apply_launch_env_tuning sets LD_BIND_NOW and DISABLE_VBLANK exports" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export LD_BIND_NOW=1 DISABLE_VBLANK=1 VKBASALT=0 LATENCYFLEX=0
+		unset vblank_mode __GL_SYNC_TO_VBLANK MESA_VK_WSI_PRESENT_MODE
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime platform tools
+		apply_launch_env_tuning
+		printf "bind=%s vblank=%s gl=%s mesa=%s\n" \
+			"$LD_BIND_NOW" "$vblank_mode" "$__GL_SYNC_TO_VBLANK" "$MESA_VK_WSI_PRESENT_MODE"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "bind=1 vblank=0 gl=0 mesa=immediate" ]]
+}
+
+@test "apply_vkbasalt sets ENABLE_VKBASALT" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export VKBASALT=1
+		unset ENABLE_VKBASALT
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime platform tools
+		apply_vkbasalt
+		echo "ENABLE_VKBASALT=$ENABLE_VKBASALT"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "ENABLE_VKBASALT=1" ]]
+}
+
+@test "apply_latencyflex sets LFX and NVAPI for Proton" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export LATENCYFLEX=1 is_native=0 DISABLE_VBLANK=1
+		unset LFX PROTON_ENABLE_NVAPI DXVK_NVAPI_ALLOW_OTHER_DRIVERS
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime platform tools
+		apply_latencyflex
+		printf "lfx=%s nvapi=%s allow=%s\n" \
+			"$LFX" "$PROTON_ENABLE_NVAPI" "$DXVK_NVAPI_ALLOW_OTHER_DRIVERS"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "lfx=1 nvapi=1 allow=1" ]]
+}
+
 @test "apply_shader_cache_boost sets Mesa limit for AMD" {
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"

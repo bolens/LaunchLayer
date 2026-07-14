@@ -141,6 +141,10 @@ launch_wrapper_config_conflict_errors() {
 				(( dlss_enabled )) \
 					&& errors+=("LAUNCH_WRAPPERS includes $wrapper while DLSS_SWAPPER=${DLSS_SWAPPER}")
 				;;
+			sd0)
+				[[ "${DISABLE_STEAM_DECK:-0}" == "1" ]] \
+					&& errors+=("LAUNCH_WRAPPERS includes sd0 while DISABLE_STEAM_DECK=1 (use one path)")
+				;;
 		esac
 	done
 

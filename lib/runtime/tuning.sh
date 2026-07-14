@@ -230,6 +230,81 @@ apply_upscaler_upgrades() {
 	(( any )) && debug "upscaler upgrades: tool=${tool:-default} family=$family dlss=$want_dlss fsr4=$want_fsr4/$want_fsr4_rdna3 xess=$want_xess"
 }
 
+# apply_ld_bind_now — Eager symbol resolution (Arch Gaming: first-call latency).
+# See: https://wiki.archlinux.org/title/Gaming#Load_shared_objects_immediately_for_better_first_time_latency
+apply_ld_bind_now() {
+	[[ "${LD_BIND_NOW:-0}" == "1" ]] || return 0
+	export LD_BIND_NOW=1
+	debug "LD_BIND_NOW=1 (eager dynamic linking)"
+}
+
+# apply_vkbasalt — Enable vkBasalt Vulkan post-process layer (ENABLE_VKBASALT=1).
+# Missing-layer warnings come from warn_enabled_missing_tools.
+apply_vkbasalt() {
+	[[ "${VKBASALT:-0}" == "1" ]] || return 0
+	export ENABLE_VKBASALT=1
+	debug "ENABLE_VKBASALT=1"
+}
+
+# apply_latencyflex — Enable LatencyFleX (LFX=1).
+# See: https://github.com/ishitatsuyuki/LatencyFleX
+# Missing-layer warnings come from warn_enabled_missing_tools.
+apply_latencyflex() {
+	[[ "${LATENCYFLEX:-0}" == "1" ]] || return 0
+	export LFX=1
+	# Reflex-path games under Proton need NVAPI; already default for Proton titles.
+	if [[ "${is_native:-0}" != "1" || "${FORCE_PROTON:-0}" == "1" ]]; then
+		export PROTON_ENABLE_NVAPI="${PROTON_ENABLE_NVAPI:-1}"
+		export DXVK_NVAPI_ALLOW_OTHER_DRIVERS="${DXVK_NVAPI_ALLOW_OTHER_DRIVERS:-1}"
+	fi
+	debug "LFX=1 (LatencyFleX)"
+	if [[ "${DISABLE_VBLANK:-0}" != "1" ]]; then
+		debug "LATENCYFLEX=1 works best with DISABLE_VBLANK=1 (and in-game VSync/Reflex settings)"
+	fi
+}
+
+# apply_disable_vblank — Reduce DRI/compositor wait (Arch Gaming: Reducing DRI latency).
+# Mesa: vblank_mode=0 + immediate present; NVIDIA: __GL_SYNC_TO_VBLANK=0.
+apply_disable_vblank() {
+	[[ "${DISABLE_VBLANK:-0}" == "1" ]] || return 0
+	export vblank_mode="${vblank_mode:-0}"
+	export __GL_SYNC_TO_VBLANK=0
+	export MESA_VK_WSI_PRESENT_MODE="${MESA_VK_WSI_PRESENT_MODE:-immediate}"
+	debug "DISABLE_VBLANK=1 (vblank_mode=0 __GL_SYNC_TO_VBLANK=0 MESA_VK_WSI_PRESENT_MODE=immediate)"
+}
+
+# apply_disable_steam_deck — Hide Deck hardware identity (Bazzite sd0 / SteamDeck=0).
+# See: https://docs.bazzite.gg/Gaming/launch-options-env-variables/
+apply_disable_steam_deck() {
+	[[ "${DISABLE_STEAM_DECK:-0}" == "1" ]] || return 0
+	export SteamDeck=0
+	debug "SteamDeck=0 (DISABLE_STEAM_DECK=1; Bazzite sd0 equivalent)"
+}
+
+# apply_frame_rate — DXVK/VKD3D in-process FPS caps (best latency per Bazzite docs).
+# Sets both DXVK_FRAME_RATE and VKD3D_FRAME_RATE; restart required to change.
+apply_frame_rate() {
+	local fps="${FRAME_RATE:-}"
+	[[ -n "$fps" && "$fps" != "0" ]] || return 0
+	if ! [[ "$fps" =~ ^[1-9][0-9]*$ ]]; then
+		warn "FRAME_RATE=$fps is not a positive integer — ignoring"
+		return 0
+	fi
+	export DXVK_FRAME_RATE="$fps"
+	export VKD3D_FRAME_RATE="$fps"
+	debug "FRAME_RATE=$fps (DXVK_FRAME_RATE=$fps VKD3D_FRAME_RATE=$fps)"
+}
+
+# apply_launch_env_tuning — Env knobs for native and Proton (Arch / Bazzite gaming docs).
+apply_launch_env_tuning() {
+	apply_ld_bind_now
+	apply_vkbasalt
+	apply_latencyflex
+	apply_disable_vblank
+	apply_disable_steam_deck
+	apply_frame_rate
+}
+
 # apply_proton_env — Export Proton/DXVK/VKD3D/NVIDIA tuning variables.
 #
 # Skipped entirely for native games unless FORCE_PROTON=1.

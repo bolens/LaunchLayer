@@ -243,6 +243,39 @@ EOF
 	[[ "$output" == $'default:0\npreserved:dll' ]]
 }
 
+@test "apply_defaults sets Bazzite Deck/FPS knobs empty/off" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config
+		unset DISABLE_STEAM_DECK FRAME_RATE
+		apply_defaults
+		printf "defaults:%s [%s]\n" "$DISABLE_STEAM_DECK" "${FRAME_RATE-}"
+		DISABLE_STEAM_DECK=1 FRAME_RATE=120
+		apply_defaults
+		printf "preserved:%s %s\n" "$DISABLE_STEAM_DECK" "$FRAME_RATE"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'defaults:0 []\npreserved:1 120' ]]
+}
+
+@test "apply_defaults sets Arch latency knobs off" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config
+		unset LD_BIND_NOW VKBASALT LATENCYFLEX DISABLE_VBLANK
+		apply_defaults
+		printf "defaults:%s %s %s %s\n" \
+			"$LD_BIND_NOW" "$VKBASALT" "$LATENCYFLEX" "$DISABLE_VBLANK"
+		LD_BIND_NOW=1 VKBASALT=1
+		apply_defaults
+		printf "preserved:%s %s\n" "$LD_BIND_NOW" "$VKBASALT"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'defaults:0 0 0 0\npreserved:1 1' ]]
+}
+
 @test "apply_defaults sets upscaler and shader-boost knobs off" {
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"

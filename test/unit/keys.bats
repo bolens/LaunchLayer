@@ -61,6 +61,50 @@ setup() {
 	[[ "$output" == ok ]]
 }
 
+@test "known_config_key and summary registry include Bazzite Deck/FPS keys" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys
+		for key in DISABLE_STEAM_DECK FRAME_RATE; do
+			known_config_key "$key" || { echo "missing-known:$key"; exit 1; }
+			printf "%s\n" "${LAUNCHLAYER_SUMMARY_KEYS[@]}" | grep -qx "$key" || {
+				echo "missing-summary:$key"
+				exit 1
+			}
+			printf "%s\n" "${LAUNCHLAYER_CONFIG_KEYS[@]}" | grep -qx "$key" || {
+				echo "missing-config:$key"
+				exit 1
+			}
+		done
+		echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
+@test "known_config_key and summary registry include Arch latency keys" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys
+		for key in LD_BIND_NOW VKBASALT LATENCYFLEX DISABLE_VBLANK; do
+			known_config_key "$key" || { echo "missing-known:$key"; exit 1; }
+			printf "%s\n" "${LAUNCHLAYER_SUMMARY_KEYS[@]}" | grep -qx "$key" || {
+				echo "missing-summary:$key"
+				exit 1
+			}
+			printf "%s\n" "${LAUNCHLAYER_CONFIG_KEYS[@]}" | grep -qx "$key" || {
+				echo "missing-config:$key"
+				exit 1
+			}
+		done
+		echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
 @test "known_config_key accepts proton and wine prefixes" {
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"

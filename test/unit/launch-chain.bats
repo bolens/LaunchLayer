@@ -188,6 +188,18 @@ run_launch_chain_case() {
 	[[ "$output" == *"dlss-swapper and dlss-swapper-dll both present"* ]]
 }
 
+@test "launch_wrapper_config_conflict_errors flags sd0 with DISABLE_STEAM_DECK=1" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export DISABLE_STEAM_DECK=1 LAUNCH_WRAPPERS=sd0
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform runtime
+		launch_wrapper_config_conflict_errors
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"sd0 while DISABLE_STEAM_DECK=1"* ]]
+}
+
 @test "launch_wrapper_config_conflict_errors flags dlss-swapper with DLSS_SWAPPER=1" {
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"

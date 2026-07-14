@@ -22,6 +22,7 @@ prepare_launch_context() {
 	resolve_game_flags
 	apply_auto_hardware_defaults
 	parse_game_extra_args
+	apply_launch_env_tuning
 	apply_proton_env
 	apply_hdr_tuning
 	apply_malloc_allocator
@@ -99,6 +100,7 @@ run_game_launch() {
 	apply_pipewire_low_latency
 	apply_cpu_performance
 	apply_nvidia_power_mode
+	apply_launch_env_tuning
 	apply_proton_env
 	apply_disk_tuning
 	apply_hdr_tuning

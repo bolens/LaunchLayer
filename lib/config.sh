@@ -326,6 +326,14 @@ apply_defaults() {
 	: "${PROTON_XESS_UPGRADE:=0}"
 	: "${PROTON_NVIDIA_LIBS:=0}"
 	: "${PROTON_NVIDIA_LIBS_NO_32BIT:=0}"
+	# Arch Gaming wiki: eager symbol resolve, post-process layers, DRI latency.
+	: "${LD_BIND_NOW:=0}"
+	: "${VKBASALT:=0}"
+	: "${LATENCYFLEX:=0}"
+	: "${DISABLE_VBLANK:=0}"
+	# Bazzite: SteamDeck=0 (sd0) and DXVK/VKD3D frame limiters.
+	: "${DISABLE_STEAM_DECK:=0}"
+	: "${FRAME_RATE:=}"
 }
 
 # config_file_display_name — Parse game name from scaffold header, or fall back to AppID.
