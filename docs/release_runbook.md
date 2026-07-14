@@ -2,7 +2,9 @@
 
 Checklist for cutting a `vX.Y.Z` release of LaunchLayer. Follow in order; do not tag until the release commit is on `main` with a green required `ci` check.
 
-Semver guidance: bump **minor** for user-visible features, **patch** for fixes/docs/tooling-only. The CLI version lives in `LAUNCHLAYER_VERSION` (`lib/cli.sh`).
+[Docs index](README.md) · [README](../README.md) · [CLI](cli.md) · [TUI](tui.md) · [Architecture](architecture.md) · [Third-party](third-party.md) · [Release](release_runbook.md) · [Changelog](../CHANGELOG.md)
+
+Semver guidance: bump **minor** for user-visible features, **patch** for fixes/docs/tooling-only. The CLI version lives in `LAUNCHLAYER_VERSION` (`lib/cli.sh`). Local gates: [README § Testing](../README.md#testing) · [architecture.md § Tests](architecture.md#tests). Release notes: [CHANGELOG.md](../CHANGELOG.md).
 
 ---
 
@@ -147,3 +149,12 @@ git checkout main && git pull origin main
 git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z
 gh release create vX.Y.Z --generate-notes
 ```
+
+---
+
+## See also
+
+- [CHANGELOG.md](../CHANGELOG.md) — notes to edit before tagging
+- [architecture.md § Tests](architecture.md#tests) — `make check-all` / CI path filters
+- [README § Testing](../README.md#testing) · [README § Contributing](../README.md#contributing)
+- [Docs index](README.md)

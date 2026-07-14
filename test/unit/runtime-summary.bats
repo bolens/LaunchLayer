@@ -39,3 +39,17 @@ setup() {
 	[[ "$output" == *"GAMEMODE=1"* ]]
 	[[ "$output" == *"default.env"* ]]
 }
+
+@test "for_each_effective_setting includes DLSS_SWAPPER summary key" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export DLSS_SWAPPER=1
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib runtime keys config
+		declare -gA config_key_sources=([DLSS_SWAPPER]=games/42424242.env)
+		_cb() { printf "key:%s val:%s\n" "$1" "$2"; }
+		for_each_effective_setting _cb
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"key:DLSS_SWAPPER val:1"* ]]
+}

@@ -75,8 +75,23 @@ show_config() {
 		echo "Proton prefix: $compat_path${proton_tool:+ (tool: $proton_tool)}"
 	fi
 	if detect_dlss_present "$appid"; then
-		echo "Note: DLSS libraries detected — consider LAUNCH_WRAPPERS=dlss-swapper"
+		local cachyos_tool=""
+		echo "Note: DLSS libraries detected — consider DLSS_SWAPPER=1 (NGX) or PROTON_DLSS_UPGRADE=1 (GE/CachyOS/EM)"
+		if cachyos_tool="$(prefer_proton_cachyos 2>/dev/null)"; then
+			echo "Note: Proton-CachyOS available ($cachyos_tool) — good match for PROTON_DLSS_UPGRADE"
+		fi
+		if optional_tool_installed dlss-updater 2>/dev/null; then
+			echo "Note: dlss-updater GUI installed — use for in-place DLL replace; no launch CLI"
+		fi
 	fi
+	case "$(detect_gpu_vendor 2>/dev/null || true)" in
+		amd)
+			echo "Note: AMD — consider PROTON_FSR4_UPGRADE=1 with Proton-CachyOS/GE (RDNA3 uses RDNA3 DLL path automatically)"
+			;;
+		intel)
+			echo "Note: Intel — consider PROTON_XESS_UPGRADE=1 with Proton-CachyOS/GE"
+			;;
+	esac
 	echo
 	print_effective_config_summary
 	echo

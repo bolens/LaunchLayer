@@ -66,3 +66,81 @@ teardown() {
 	[[ "$output" == *"42424242"* ]]
 	[[ "$output" == *"yes"* ]]
 }
+
+@test "scan_detections hints DLSS_SWAPPER when nvngx present without config" {
+	local game_dir="$FAKE_STEAM/steamapps/common/TestGame42424242"
+	mkdir -p "$game_dir/bin"
+	touch "$game_dir/bin/nvngx_dlss.dll"
+	run env \
+		HOME="$SCAN_TMP" \
+		CONFIG_DIR="$SCAN_TMP" \
+		LAUNCHLAYER_GAMES_DIR="$SCAN_TMP/games" \
+		STEAM_ROOT="$FAKE_STEAM" \
+		bash -c '
+			source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+			source_lib platform steam keys config inspect
+			scan_detections
+		'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"=== Detection audit ==="* ]]
+	[[ "$output" == *"dlss present: 42424242"* ]]
+	[[ "$output" == *"consider DLSS_SWAPPER=1"* ]]
+}
+
+@test "scan_detections skips DLSS hint when DLSS_SWAPPER is configured" {
+	local game_dir="$FAKE_STEAM/steamapps/common/TestGame42424242"
+	mkdir -p "$game_dir/bin"
+	touch "$game_dir/bin/nvngx_dlss.dll"
+	printf '%s\n' 'DLSS_SWAPPER=1' > "$SCAN_TMP/games/42424242.env"
+	run env \
+		HOME="$SCAN_TMP" \
+		CONFIG_DIR="$SCAN_TMP" \
+		LAUNCHLAYER_GAMES_DIR="$SCAN_TMP/games" \
+		STEAM_ROOT="$FAKE_STEAM" \
+		bash -c '
+			source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+			source_lib platform steam keys config inspect
+			scan_detections
+		'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"=== Detection audit ==="* ]]
+	[[ "$output" != *"dlss present"* ]]
+}
+
+@test "scan_detections skips DLSS hint when LAUNCH_WRAPPERS includes dlss-swapper" {
+	local game_dir="$FAKE_STEAM/steamapps/common/TestGame42424242"
+	mkdir -p "$game_dir/bin"
+	touch "$game_dir/bin/nvngx_dlss.dll"
+	printf '%s\n' 'LAUNCH_WRAPPERS=dlss-swapper' > "$SCAN_TMP/games/42424242.env"
+	run env \
+		HOME="$SCAN_TMP" \
+		CONFIG_DIR="$SCAN_TMP" \
+		LAUNCHLAYER_GAMES_DIR="$SCAN_TMP/games" \
+		STEAM_ROOT="$FAKE_STEAM" \
+		bash -c '
+			source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+			source_lib platform steam keys config inspect
+			scan_detections
+		'
+	[[ $status -eq 0 ]]
+	[[ "$output" != *"dlss present"* ]]
+}
+
+@test "scan_detections skips DLSS hint when PROTON_DLSS_UPGRADE=1 is configured" {
+	local game_dir="$FAKE_STEAM/steamapps/common/TestGame42424242"
+	mkdir -p "$game_dir/bin"
+	touch "$game_dir/bin/nvngx_dlss.dll"
+	printf '%s\n' 'PROTON_DLSS_UPGRADE=1' > "$SCAN_TMP/games/42424242.env"
+	run env \
+		HOME="$SCAN_TMP" \
+		CONFIG_DIR="$SCAN_TMP" \
+		LAUNCHLAYER_GAMES_DIR="$SCAN_TMP/games" \
+		STEAM_ROOT="$FAKE_STEAM" \
+		bash -c '
+			source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+			source_lib platform steam keys config inspect
+			scan_detections
+		'
+	[[ $status -eq 0 ]]
+	[[ "$output" != *"dlss present"* ]]
+}

@@ -10,6 +10,20 @@ LAUNCHLAYER_OPTIONAL_TOOLS=(
 	game-performance
 	gamescope
 	mangohud
+	dlss-swapper
+	dlss-updater
+	vkbasalt
+	latencyflex
+	lsfg-vk
+	obs-vkcapture
+	protontricks
+	winetricks
+	conty
+	replay-sorcery
+	gpu-screen-recorder
+	wine-discord-ipc-bridge
+	discord-ipc-bridge
+	goverlay
 	fzf
 	taskset
 	cpupower
@@ -79,8 +93,12 @@ detect_package_manager() {
 optional_tool_relevant() {
 	local tool=$1
 	case "$tool" in
-		nvidia-smi|nvidia-settings)
+		nvidia-smi|nvidia-settings|dlss-swapper)
 			[[ "$(detect_gpu_vendor 2>/dev/null || true)" == nvidia ]]
+			;;
+		dlss-updater)
+			# GUI DLL updater (DLSS/XeSS/FSR); relevant on any GPU that ships those DLLs.
+			return 0
 			;;
 		pw-metadata)
 			[[ "$(detect_audio_server 2>/dev/null || true)" == pipewire ]]
@@ -92,6 +110,23 @@ optional_tool_relevant() {
 			return 0
 			;;
 	esac
+}
+
+# vulkan_layer_json_present — True when a matching Vulkan implicit/explicit layer JSON exists.
+vulkan_layer_json_present() {
+	local pattern=$1 dir f
+	for dir in \
+		/usr/share/vulkan/implicit_layer.d \
+		/usr/share/vulkan/explicit_layer.d \
+		/usr/local/share/vulkan/implicit_layer.d \
+		"${XDG_DATA_HOME:-$HOME/.local/share}/vulkan/implicit_layer.d"; do
+		[[ -d "$dir" ]] || continue
+		for f in "$dir"/*; do
+			[[ -f "$f" ]] || continue
+			[[ "${f,,}" == *"${pattern,,}"* ]] && return 0
+		done
+	done
+	return 1
 }
 
 # optional_tool_installed — True when the tool (or accepted fallback) is available.
@@ -109,6 +144,37 @@ optional_tool_installed() {
 		powerprofilesctl)
 			command_available powerprofilesctl
 			;;
+		dlss-swapper)
+			command_available dlss-swapper || command_available dlss-swapper-dll
+			;;
+		dlss-updater)
+			command_available dlss-updater \
+				|| command_available DLSS_Updater \
+				|| { command_available flatpak && flatpak info io.github.recol.dlss-updater >/dev/null 2>&1; }
+			;;
+		vkbasalt)
+			# Vulkan layer (ENABLE_VKBASALT); not a launch wrapper binary.
+			vulkan_layer_json_present vkbasalt \
+				|| command_available vkbasalt
+			;;
+		latencyflex)
+			# LatencyFleX layer (LFX=1); Wine/Proton side may also ship separately.
+			vulkan_layer_json_present latencyflex \
+				|| vulkan_layer_json_present lfx \
+				|| command_available latencyflex
+			;;
+		lsfg-vk)
+			vulkan_layer_json_present lsfg \
+				|| vulkan_layer_json_present lossless \
+				|| command_available lsfg-vk \
+				|| command_available lsfg-vk-ui
+			;;
+		obs-vkcapture)
+			command_available obs-gamecapture || command_available obs-vkcapture
+			;;
+		wine-discord-ipc-bridge|discord-ipc-bridge)
+			command_available wine-discord-ipc-bridge || command_available discord-ipc-bridge
+			;;
 		*)
 			command_available "$tool"
 			;;
@@ -123,11 +189,31 @@ launch_wrapper_available() {
 		game-performance)
 			command_available game-performance
 			;;
-		gamemoderun|gamescope|mangohud|taskset)
+		dlss-swapper|dlss-swapper-dll)
+			command_available "$wrapper"
+			;;
+		gamemoderun|gamescope|mangohud|taskset|obs-gamecapture|obs-vkcapture|conty)
 			optional_tool_installed "$wrapper"
 			;;
 		*)
 			command_available "$wrapper"
+			;;
+	esac
+}
+
+# resolve_dlss_swapper_bin — Print dlss-swapper binary for DLSS_SWAPPER; return 1 when off.
+# Values: 1 → dlss-swapper (NGX updater + latest preset), dll → dlss-swapper-dll (presets only).
+# See: https://wiki.cachyos.org/configuration/gaming/#forcing-the-latest-dlss-preset
+resolve_dlss_swapper_bin() {
+	case "${DLSS_SWAPPER:-0}" in
+		1|yes|true|on|YES|TRUE|ON)
+			printf '%s' dlss-swapper
+			;;
+		dll|DLL)
+			printf '%s' dlss-swapper-dll
+			;;
+		*)
+			return 1
 			;;
 	esac
 }
@@ -206,12 +292,8 @@ tool_install_hint() {
 	optional_tool_relevant "$tool" || return 0
 
 	pm="$(detect_package_manager)"
-	pkg="$(tool_package_name "$tool" "$pm")"
-	[[ -n "$pkg" ]] || {
-		printf 'install %s manually (no package mapping for this OS)\n' "$tool"
-		return 0
-	}
 
+	# Distro-specific messaging before generic package lookup (some tools map to "-").
 	case "$tool" in
 		game-performance)
 			case "$pm" in
@@ -231,6 +313,50 @@ tool_install_hint() {
 					;;
 			esac
 			;;
+		dlss-swapper)
+			case "$pm" in
+				pacman)
+					printf 'sudo pacman -S cachyos-settings  # CachyOS; provides dlss-swapper\n'
+					return 0
+					;;
+				rpm-ostree|dnf)
+					printf 'dlss-swapper ships on Bazzite — set DLSS_SWAPPER=1 (https://docs.bazzite.gg/Gaming/launch-options-env-variables/)\n'
+					return 0
+					;;
+			esac
+			printf 'install dlss-swapper (CachyOS: cachyos-settings; Bazzite: preinstalled) — https://wiki.cachyos.org/configuration/gaming/#forcing-the-latest-dlss-preset\n'
+			return 0
+			;;
+		dlss-updater)
+			case "$pm" in
+				pacman)
+					printf 'sudo pacman -S dlss-updater  # GUI; no launch CLI — or Flatpak from https://github.com/Recol/DLSS-Updater\n'
+					return 0
+					;;
+			esac
+			printf 'install dlss-updater (GUI DLL updater) — https://github.com/Recol/DLSS-Updater\n'
+			return 0
+			;;
+		vkbasalt)
+			case "$pm" in
+				pacman)
+					printf 'sudo pacman -S vkbasalt\n'
+					return 0
+					;;
+			esac
+			printf 'install vkbasalt (Vulkan post-process layer) — https://github.com/DadSchoorse/vkBasalt\n'
+			return 0
+			;;
+		latencyflex)
+			case "$pm" in
+				pacman)
+					printf 'yay -S latencyflex  # AUR; or build from https://github.com/ishitatsuyuki/LatencyFleX\n'
+					return 0
+					;;
+			esac
+			printf 'install LatencyFleX — https://github.com/ishitatsuyuki/LatencyFleX\n'
+			return 0
+			;;
 		nvidia-smi)
 			case "$pm" in
 				apt)
@@ -240,6 +366,12 @@ tool_install_hint() {
 			esac
 			;;
 	esac
+
+	pkg="$(tool_package_name "$tool" "$pm")"
+	[[ -n "$pkg" ]] || {
+		printf 'install %s manually (no package mapping for this OS)\n' "$tool"
+		return 0
+	}
 
 	format_install_command "$pm" "$pkg"
 }
@@ -286,7 +418,7 @@ command_required_or_fail() {
 
 # warn_enabled_missing_tools — Pre-launch warnings for enabled features with missing tools.
 warn_enabled_missing_tools() {
-	local wrapper hint
+	local wrapper hint dlss_bin
 	warn_if_feature_enabled_needs_tool GAMEMODE gamemoderun \
 		"GAMEMODE=1 but gamemoderun is not installed"
 	if [[ "${GAME_PERFORMANCE:-1}" == "1" ]] && ! optional_tool_installed game-performance; then
@@ -297,6 +429,38 @@ warn_enabled_missing_tools() {
 		"GAMESCOPE=1 but gamescope is not installed"
 	warn_if_feature_enabled_needs_tool MANGOHUD mangohud \
 		"MANGOHUD=1 but mangohud is not installed"
+	warn_if_feature_enabled_needs_tool VKBASALT vkbasalt \
+		"VKBASALT=1 but vkBasalt Vulkan layer not found"
+	warn_if_feature_enabled_needs_tool LATENCYFLEX latencyflex \
+		"LATENCYFLEX=1 but LatencyFleX layer not found"
+	warn_if_feature_enabled_needs_tool LSFG_VK lsfg-vk \
+		"LSFG_VK=1 but lsfg-vk layer not found (requires owned Lossless Scaling — docs/third-party.md)"
+	warn_if_feature_enabled_needs_tool OBS_VKCAPTURE obs-vkcapture \
+		"OBS_VKCAPTURE=1 but obs-gamecapture/obs-vkcapture not installed"
+	warn_if_feature_enabled_needs_tool CONTY conty \
+		"CONTY=1 but conty is not installed"
+	if [[ "${DISCORD_IPC:-0}" == "1" ]]; then
+		if ! command_available discord-ipc-bridge && ! command_available wine-discord-ipc-bridge; then
+			hint="$(tool_install_hint wine-discord-ipc-bridge 2>/dev/null || true)"
+			warn "DISCORD_IPC=1 but wine-discord-ipc-bridge / discord-ipc-bridge not on PATH${hint:+ — $hint}"
+		fi
+	fi
+	if [[ "${REPLAY_CAPTURE:-0}" == "1" ]]; then
+		if ! command_available replay-sorcery && ! command_available gpu-screen-recorder; then
+			hint="$(tool_install_hint replay-sorcery 2>/dev/null || true)"
+			warn "REPLAY_CAPTURE=1 but replay-sorcery/gpu-screen-recorder missing${hint:+ — $hint} (gsr is external — not chain-wrapped)"
+		fi
+	fi
+	if [[ -n "${WINETRICKS_VERBS:-}" ]] && ! command_available protontricks && ! command_available winetricks; then
+		hint="$(tool_install_hint protontricks 2>/dev/null || true)"
+		warn "WINETRICKS_VERBS set but protontricks/winetricks missing${hint:+ — $hint}"
+	fi
+	if dlss_bin="$(resolve_dlss_swapper_bin)"; then
+		if ! command_available "$dlss_bin"; then
+			hint="$(tool_install_hint dlss-swapper 2>/dev/null || true)"
+			warn "DLSS_SWAPPER=${DLSS_SWAPPER} but $dlss_bin is not installed${hint:+ — $hint}"
+		fi
+	fi
 	if [[ "${DISABLE_CPU_AFFINITY:-0}" != "1" ]]; then
 		warn_if_tool_missing taskset \
 			"CPU affinity enabled but taskset is not installed — launch continues without pinning"
@@ -321,6 +485,10 @@ warn_enabled_missing_tools() {
 	if [[ "${VRAM_HOGS:-0}" == "1" ]] && ! has_systemd_user \
 		&& [[ -z "${VRAM_HOG_PIDS:-}" ]]; then
 		warn "VRAM_HOGS=1 but systemd user session is unavailable and VRAM_HOG_PIDS is unset — hogs will not be paused"
+	fi
+	if [[ "${MANGOHUD:-0}" == "1" || "${LSFG_VK:-0}" == "1" ]] && ! command_available goverlay; then
+		hint="$(tool_install_hint goverlay 2>/dev/null || true)"
+		debug "tip: goverlay can configure MangoHud/lsfg-vk${hint:+ — $hint}"
 	fi
 	for wrapper in ${LAUNCH_WRAPPERS_BEFORE:-} ${LAUNCH_WRAPPERS:-}; do
 		launch_wrapper_available "$wrapper" && continue

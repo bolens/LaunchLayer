@@ -38,6 +38,9 @@ tui_fzf_footer_for() {
 		toggles)
 			printf '%s' 'enter flip toggle · ? help · esc back'
 			;;
+		advanced)
+			printf '%s' 'enter edit group/key · ? help · esc back'
+			;;
 		*)
 			printf '%s' '↑↓ navigate · home/end jump · pgup/pgdn page · alt-s sort · enter select · ? help · esc back'
 			;;
@@ -256,9 +259,11 @@ tui_open_last_menu() {
 	esac
 }
 
-# tui_render_game_preview — Compact INCLUDE + toggles preview for fzf game picker.
+# tui_render_game_preview — Compact INCLUDE + hot toggles + per-game overrides.
 tui_render_game_preview() {
-	local appid=$1 resolved name key val override file
+	local appid=$1 resolved name key val override file mark assist
+	local -a shown=()
+	local -A seen=()
 	[[ -n "$appid" ]] || return 1
 	if [[ "$appid" =~ ^[0-9]+$ ]]; then
 		resolved="$appid"
@@ -273,15 +278,32 @@ tui_render_game_preview() {
 	echo "INCLUDE=${INCLUDE:-auto}"
 	echo "native=$is_native  anticheat=$is_anticheat  engine=${game_engine_hint:-?}"
 	echo
-	echo "Toggles (* = per-game override):"
-	for key in "${TUI_TOGGLE_KEYS[@]}"; do
+	echo "Toggles (* = override; assist = path/env only):"
+	for key in "${TUI_PREVIEW_HOT_KEYS[@]}"; do
+		shown+=("$key")
+		seen[$key]=1
+	done
+	if [[ -f "$file" ]]; then
+		for key in "${TUI_TOGGLE_KEYS[@]}"; do
+			[[ -n "${seen[$key]:-}" ]] && continue
+			override="$(tui_env_file_get "$file" "$key")"
+			[[ -n "$override" ]] || continue
+			shown+=("$key")
+			seen[$key]=1
+		done
+	fi
+	for key in "${shown[@]}"; do
 		val="${!key-}"
 		override=""
 		[[ -f "$file" ]] && override="$(tui_env_file_get "$file" "$key")"
-		if [[ -n "$override" ]]; then
-			printf '  %s=%s *\n' "$key" "$(tui_glyph_bool_onoff "${val:-0}")"
+		mark=""
+		assist=""
+		[[ -n "$override" ]] && mark=" *"
+		tui_assist_only_key_p "$key" && assist=" assist"
+		if [[ "$key" == DLSS_SWAPPER && "${val,,}" == dll ]]; then
+			printf '  %s=dll%s%s\n' "$key" "$mark" "$assist"
 		else
-			printf '  %s=%s\n' "$key" "$(tui_glyph_bool_onoff "${val:-0}" 1)"
+			printf '  %s=%s%s%s\n' "$key" "$(tui_glyph_bool_onoff "${val:-0}")" "$mark" "$assist"
 		fi
 	done
 	echo
@@ -464,10 +486,10 @@ tui_toggle_key_from_option() {
 	printf '%s' "${option// /}"
 }
 
-# tui_bool_on — True when a config value is enabled.
+# tui_bool_on — True when a config value is enabled (includes DLSS_SWAPPER=dll).
 tui_bool_on() {
 	case "${1:-}" in
-		1|yes|true|on|YES|TRUE|ON) return 0 ;;
+		1|yes|true|on|YES|TRUE|ON|dll|DLL) return 0 ;;
 		*) return 1 ;;
 	esac
 }

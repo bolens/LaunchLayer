@@ -9,7 +9,7 @@ Requires an interactive terminal. With [fzf](https://github.com/junegunn/fzf) me
 
 Press **`?`** in any fzf menu to open a keyboard-shortcuts panel (Esc to close). Patterns follow common TUIs (lazygit, k9s, yazi): footer hints, live status on hubs, split preview panes, and section gaps in grouped menus.
 
-[← README](../README.md) · [CLI reference](cli.md) · [Architecture](architecture.md)
+[Docs index](README.md) · [README](../README.md) · [CLI](cli.md) · [TUI](tui.md) · [Architecture](architecture.md) · [Third-party](third-party.md) · [Release](release_runbook.md) · [Changelog](../CHANGELOG.md)
 
 Regenerate screenshots after UI changes: `make tui-screenshots` ([VHS](https://github.com/charmbracelet/vhs) + `fzf` required). Source: `scripts/tui-screenshots/`.
 
@@ -41,9 +41,33 @@ Split view: action list on the left, live config preview on the right (same as t
 
 Per-game boolean overrides. Green/red labels mark values set in `GAMES_DIR/<AppID>.env`; dim text marks inherited layers. Footer: `enter flip toggle · ? help · esc back`.
 
+Covers every 0/1 launch flag (GameMode / MangoHUD / Gamescope family, shader/compatdata checks, NVIDIA power, Proton/`PROTON_*_UPGRADE` / indicators / NVIDIA libs, Arch latency knobs, `DISABLE_STEAM_DECK`, `DLSS_SWAPPER` cycles `0`→`1`→`dll`→`0`, etc.). Assist-only toggles (`DEPTH3D`, `GEO11`, `SBS_VR`, `FLAT2VR`) show an `assist` suffix — path/env markers, not injectors. Prefer `FLAWLESS_WIDESCREEN` over the Advanced-only `FWS` alias. Use **Advanced config → Proton & tools** for specialty runtime pickers, or **Open in $EDITOR**.
+
 <p align="center">
   <img src="assets/tui-quick-toggles.png" alt="LaunchLayer per-game quick toggles" width="720">
 </p>
+
+### Advanced config
+
+String and numeric keys, grouped:
+
+| Group | Keys |
+|-------|------|
+| Change INCLUDE preset | `INCLUDE=presets/…` |
+| Proton & tools | `OVERRIDE_PROTON`, `DLSS_SWAPPER` (picker), `FRAME_RATE`, `ENABLE_HDR`, `MALLOC_ALLOCATOR`, `SPECIALTY_RUNTIME` (picker) |
+| Gamescope | `GAMESCOPE_W/H/R`, FSR sharpness, `GAMESCOPE_ADAPTIVE_SYNC` (picker: empty/`auto`/`0`/`1`), `GAMESCOPE_EXTRA_ARGS`, prefer-output, frame limit, `GAMESCOPE_FILTER` (picker), focused/unfocused FPS |
+| Inject & Wine | vkBasalt/lsfg paths, winetricks verbs, Special K / ReShade / Depth3D / FWS / Conty / VR sources, ValvePlug paths, fetch URL/version |
+| Shader & storage | `SHADER_CACHE_MAX_GB`, `SHADER_CACHE_BOOST_GB`, `SHADER_CACHE_CHECK_INTERVAL_HOURS`, `COMPATDATA_MAX_GB`, `VM_MAX_MAP_COUNT_MIN` |
+| Affinity & network | `X3D_CPUS`, `CPU_AFFINITY_RANGE`, `GAME_NIC` |
+| VRAM & preflight | `VRAM_HOG_UNITS`, `VRAM_HOG_PIDS`, `VRAM_PREFLIGHT_MIN_MB`, `DISK_PREFLIGHT_MIN_GB`, `GPU_VRAM_PROCESS_MIN_MB` |
+| HUD & hooks | MangoHUD config paths, `PRE_LAUNCH_CMD` / `POST_LAUNCH_CMD`, `REPLAY_TOOL` (picker), crash-guess timeout (`CRASH_GUESS=1` defaults to 5s) |
+| Wrappers & args | `GAME_EXTRA_ARGS`, `LAUNCH_WRAPPERS`, `LAUNCH_WRAPPERS_BEFORE`, `UNSET_VARS` |
+
+Game picker preview shows a **hot** toggle subset plus any per-game overrides (not all ~70 flags).
+
+Third-party licenses and purchase gates: [third-party.md](third-party.md). Matching CLI keys: [cli.md](cli.md) (Wine inject · Gamescope nest · capture).
+
+Prompts keep the current value on empty Enter; type `-` to clear. Validation runs after each edit.
 
 ---
 
@@ -114,7 +138,7 @@ Game picker filter lives in **Settings → Interface → [Games]** (footer still
 ### Games › *Game* › Actions `(config ok | validation issues | inherits layers)`
 
 - `[View]` Resolved config · Dry-run launch chain · Paths · Launch stats
-- `[Edit]` Quick toggles · Advanced config · Clear override · Open in `$EDITOR` · Set preset (re-init)
+- `[Edit]` Quick toggles (all 0/1 flags) · Advanced config (grouped string/numeric keys) · Clear override · Open in `$EDITOR` · Set preset (re-init)
 - `[Manage]` Validate config · Delete per-game config
 - `[Hub]` Community configs
 
@@ -176,7 +200,7 @@ Four compact rows + footer:
 - `[Hub]` URL · `[Auth]` token ●/○ · `[You]` machine label · `[Privacy]` fingerprint level
 - `[·] Open hub.conf in $EDITOR` · Show all · Reset · Save
 
-Publish/delete require a matching Convex `HUB_PUBLISH_TOKEN` (fail closed). Token value is stored in `hub.conf` (`chmod 600` on save) and never printed by `--hub-prefs set`. Apply strips remote-exec keys before writing a game `.env`.
+Publish/delete require a matching Convex `HUB_PUBLISH_TOKEN` (fail closed). Token value is stored in `hub.conf` (`chmod 600` on save) and never printed by `--hub-prefs set`. Apply strips remote-exec keys before writing a game `.env`. CLI twins: [cli.md § Community hub](cli.md#community-hub). Internals: [architecture.md](architecture.md) · [README § Community hub](../README.md#community-hub).
 
 ---
 
@@ -217,3 +241,13 @@ Files in `~/.config/launchlayer/`:
 | `hub.conf` | `share/launchlayer/templates/hub.conf.example` |
 
 Reset via `--tui-prefs reset`, `--backup-prefs reset`, `--hub-prefs reset`, or **Settings** (Interface / Backup / Hub panes) and the matching hub shortcuts.
+
+---
+
+## See also
+
+- [Docs index](README.md) — topic → canonical page map
+- [cli.md](cli.md) — full command tables (same underlying handlers)
+- [third-party.md](third-party.md) — licenses / inject policy
+- [architecture.md](architecture.md) — CLI/TUI parity and `lib/tui/`
+- [README § Interactive TUI](../README.md#interactive-tui)

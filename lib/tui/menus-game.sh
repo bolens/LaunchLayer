@@ -21,23 +21,27 @@ tui_games_hub_menu_select_fallback() {
 
 # tui_format_toggle_option — Menu line using already-loaded effective settings.
 tui_format_toggle_option() {
-	local appid=$1 key=$2 effective override file label
+	local appid=$1 key=$2 effective override file label suffix value_note
 	file="$(tui_appid_env_path "$appid")"
 	effective="${!key-}"
 	override=""
 	[[ -f "$file" ]] && override="$(tui_env_file_get "$file" "$key")"
+	suffix=""
+	tui_assist_only_key_p "$key" && suffix=" assist"
+	value_note=""
+	[[ "$key" == DLSS_SWAPPER && "${effective,,}" == dll ]] && value_note="=dll"
 	if [[ -n "$override" ]]; then
 		if cli_uses_color; then
-			label="$(printf '%s %s' "$key" "$(tui_glyph_bool_onoff "$effective")")"
-			printf '%s  %s' "$label" "$(cli_dim override)"
+			label="$(printf '%s%s %s' "$key" "$value_note" "$(tui_glyph_bool_onoff "$effective")")"
+			printf '%s  %s%s' "$label" "$(cli_dim override)" "$(cli_dim "$suffix")"
 		else
-			printf '%s=%s  (override)' "$key" "$(tui_glyph_bool_onoff "$effective")"
+			printf '%s%s=%s  (override)%s' "$key" "$value_note" "$(tui_glyph_bool_onoff "$effective")" "$suffix"
 		fi
 	else
 		if cli_uses_color; then
-			printf '%s  %s  %s' "$key" "$(tui_glyph_bool_onoff "$effective" 1)" "$(cli_dim inherited)"
+			printf '%s%s  %s  %s%s' "$key" "$value_note" "$(tui_glyph_bool_onoff "$effective" 1)" "$(cli_dim inherited)" "$(cli_dim "$suffix")"
 		else
-			printf '%s=%s  (inherited)' "$key" "$(tui_glyph_bool_onoff "$effective")"
+			printf '%s%s=%s  (inherited)%s' "$key" "$value_note" "$(tui_glyph_bool_onoff "$effective")" "$suffix"
 		fi
 	fi
 }
@@ -113,7 +117,8 @@ tui_quick_toggles() {
 	tui_crumb_leave
 }
 
-# tui_advanced_config — String keys and preset INCLUDE changes.
+# tui_advanced_config — String/numeric keys and preset INCLUDE changes.
+# Groups keep the menu short while covering every TUI_ADVANCED_KEYS entry.
 tui_advanced_config() {
 	local appid=$1 name preset action include_label
 	name="$(get_game_name "$appid" 2>/dev/null || echo "AppID $appid")"
@@ -121,15 +126,17 @@ tui_advanced_config() {
 	while true; do
 		prepare_launch_context "$appid"
 		include_label="${INCLUDE:-auto}"
+		TUI_MENU_CONTEXT=advanced
 		action="$(tui_menu "Advanced config: $name (INCLUDE=${include_label})" \
 			"Change INCLUDE preset" \
-			"Edit GAME_EXTRA_ARGS" \
-			"Edit LAUNCH_WRAPPERS" \
-			"Edit LAUNCH_WRAPPERS_BEFORE" \
-			"Edit GAMESCOPE_W / H / R" \
-			"Edit SHADER_CACHE_MAX_GB" \
-			"Edit MANGOHUD_CONFIG" \
-			"Edit UNSET_VARS" \
+			"Proton & tools" \
+			"Gamescope" \
+			"Inject & Wine" \
+			"Shader & storage" \
+			"Affinity & network" \
+			"VRAM & preflight" \
+			"HUD & hooks" \
+			"Wrappers & args" \
 			"Back")" || return 0
 
 		case "$action" in
@@ -138,35 +145,75 @@ tui_advanced_config() {
 				tui_set_include_preset "$appid" "$preset"
 				tui_validate_game_config_brief "$appid"
 				;;
-			"Edit GAME_EXTRA_ARGS")
-				tui_prompt_env_key "$appid" GAME_EXTRA_ARGS "Game CLI args"
-				tui_validate_game_config_brief "$appid"
+			"Proton & tools")
+				tui_advanced_config_group "$appid" "Proton & tools" \
+					OVERRIDE_PROTON DLSS_SWAPPER FRAME_RATE ENABLE_HDR MALLOC_ALLOCATOR \
+					SPECIALTY_RUNTIME
 				;;
-			"Edit LAUNCH_WRAPPERS")
-				tui_prompt_env_key "$appid" LAUNCH_WRAPPERS "Wrappers after game-performance"
-				tui_validate_game_config_brief "$appid"
+			"Gamescope")
+				tui_advanced_config_group "$appid" "Gamescope" \
+					GAMESCOPE_W GAMESCOPE_H GAMESCOPE_R GAMESCOPE_FSR_SHARPNESS GAMESCOPE_ADAPTIVE_SYNC \
+					GAMESCOPE_EXTRA_ARGS GAMESCOPE_PREFER_OUTPUT GAMESCOPE_FRAME_LIMIT \
+					GAMESCOPE_FILTER GAMESCOPE_FOCUSED_FPS GAMESCOPE_UNFOCUSED_FPS
 				;;
-			"Edit LAUNCH_WRAPPERS_BEFORE")
-				tui_prompt_env_key "$appid" LAUNCH_WRAPPERS_BEFORE "Wrappers before gamemoderun"
-				tui_validate_game_config_brief "$appid"
+			"Inject & Wine")
+				tui_advanced_config_group "$appid" "Inject & Wine" \
+					VKBASALT_CONFIG_FILE VKBASALT_LOG_LEVEL LSFG_PROCESS LSFG_CONFIG_FILE \
+					WINETRICKS_VERBS REGISTRY_FILES WINE_FSR_STRENGTH WINE_FSR_MODE \
+					SPECIAL_K_DLL SPECIAL_K_SOURCE SPECIAL_K_INI SPECIAL_K_FETCH_URL SPECIAL_K_VERSION \
+					RESHADE_DLL RESHADE_SOURCE RESHADE_SK_VERSION DEPTH3D_SOURCE DEPTH3D_FETCH_URL \
+					FWS FWS_PATH CONTY_PATH OPENVR_FSR_SOURCE GEO11_SOURCE \
+					SBS_VR_PLAYER FLAT2VR_SOURCE SKIF_PATH \
+					VALVEPLUG_SOURCE VALVEPLUG_STEAM_DIR INJECT_SHA256
 				;;
-			"Edit GAMESCOPE_W / H / R")
-				tui_prompt_env_key "$appid" GAMESCOPE_W "Gamescope width"
-				tui_prompt_env_key "$appid" GAMESCOPE_H "Gamescope height"
-				tui_prompt_env_key "$appid" GAMESCOPE_R "Gamescope refresh Hz"
-				tui_validate_game_config_brief "$appid"
+			"Shader & storage")
+				tui_advanced_config_group "$appid" "Shader & storage" \
+					SHADER_CACHE_MAX_GB SHADER_CACHE_BOOST_GB SHADER_CACHE_CHECK_INTERVAL_HOURS \
+					COMPATDATA_MAX_GB VM_MAX_MAP_COUNT_MIN
 				;;
-			"Edit SHADER_CACHE_MAX_GB")
-				tui_prompt_env_key "$appid" SHADER_CACHE_MAX_GB "Shader cache max GB"
-				tui_validate_game_config_brief "$appid"
+			"Affinity & network")
+				tui_advanced_config_group "$appid" "Affinity & network" \
+					X3D_CPUS CPU_AFFINITY_RANGE GAME_NIC
 				;;
-			"Edit MANGOHUD_CONFIG")
-				tui_prompt_env_key "$appid" MANGOHUD_CONFIG "MangoHUD config string"
-				tui_validate_game_config_brief "$appid"
+			"VRAM & preflight")
+				tui_advanced_config_group "$appid" "VRAM & preflight" \
+					VRAM_HOG_UNITS VRAM_HOG_PIDS VRAM_PREFLIGHT_MIN_MB \
+					DISK_PREFLIGHT_MIN_GB GPU_VRAM_PROCESS_MIN_MB
 				;;
-			"Edit UNSET_VARS")
-				tui_prompt_env_key "$appid" UNSET_VARS "Space-separated vars to unset"
-				tui_validate_game_config_brief "$appid"
+			"HUD & hooks")
+				tui_advanced_config_group "$appid" "HUD & hooks" \
+					MANGOHUD_CONFIG MANGOHUD_CONFIGFILE \
+					PRE_LAUNCH_CMD POST_LAUNCH_CMD LAUNCH_LOG_MAX_LINES REPLAY_TOOL CRASH_GUESS_TIMEOUT
+				;;
+			"Wrappers & args")
+				tui_advanced_config_group "$appid" "Wrappers & args" \
+					GAME_EXTRA_ARGS LAUNCH_WRAPPERS LAUNCH_WRAPPERS_BEFORE UNSET_VARS
+				;;
+			*) return 0 ;;
+		esac
+	done
+}
+
+# tui_advanced_config_group — Pick and edit keys within one advanced group.
+tui_advanced_config_group() {
+	local appid=$1 title=$2
+	shift 2
+	local -a keys=("$@")
+	local -a items=()
+	local key action
+	for key in "${keys[@]}"; do
+		items+=("Edit $key")
+	done
+	items+=("Back")
+
+	while true; do
+		TUI_MENU_CONTEXT=advanced
+		action="$(tui_menu "Advanced › $title" "${items[@]}")" || return 0
+		case "$action" in
+			Back|"") return 0 ;;
+			Edit\ *)
+				key="${action#Edit }"
+				tui_edit_advanced_key "$appid" "$key"
 				;;
 			*) return 0 ;;
 		esac

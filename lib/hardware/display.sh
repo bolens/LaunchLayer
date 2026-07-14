@@ -343,8 +343,13 @@ apply_auto_hardware_defaults() {
 			GAMESCOPE_R="$(detect_display_refresh)"
 			export GAMESCOPE_R
 		fi
-		if [[ -z "${GAMESCOPE_ADAPTIVE_SYNC+x}" ]] && detect_vrr_enabled; then
-			GAMESCOPE_ADAPTIVE_SYNC=1
+		# Empty or auto → detect VRR; explicit 0/1 honored.
+		if [[ -z "${GAMESCOPE_ADAPTIVE_SYNC:-}" || "${GAMESCOPE_ADAPTIVE_SYNC}" == auto ]]; then
+			if detect_vrr_enabled; then
+				GAMESCOPE_ADAPTIVE_SYNC=1
+			else
+				GAMESCOPE_ADAPTIVE_SYNC=0
+			fi
 			export GAMESCOPE_ADAPTIVE_SYNC
 		fi
 	fi

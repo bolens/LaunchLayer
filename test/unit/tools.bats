@@ -66,11 +66,285 @@ setup() {
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib platform
 		source "'"$CONFIG_DIR"'/lib/tools.sh"
-		command_available() { [[ "$1" == dlss-swapper ]]; }
-		launch_wrapper_available dlss-swapper && echo yes || echo no
+		command_available() { [[ "$1" == custom-tool ]]; }
+		launch_wrapper_available custom-tool && echo yes || echo no
 	'
 	[[ $status -eq 0 ]]
 	[[ "$output" == yes ]]
+}
+
+@test "resolve_dlss_swapper_bin maps DLSS_SWAPPER values" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		DLSS_SWAPPER=0; resolve_dlss_swapper_bin && echo on || echo off
+		DLSS_SWAPPER=1; resolve_dlss_swapper_bin; echo
+		DLSS_SWAPPER=dll; resolve_dlss_swapper_bin; echo
+		DLSS_SWAPPER=yes; resolve_dlss_swapper_bin; echo
+		DLSS_SWAPPER=DLL; resolve_dlss_swapper_bin; echo
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'off\ndlss-swapper\ndlss-swapper-dll\ndlss-swapper\ndlss-swapper-dll' ]]
+}
+
+@test "optional_tool_relevant hides dlss-swapper on non-nvidia" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		detect_gpu_vendor() { echo amd; }
+		optional_tool_relevant dlss-swapper && echo yes || echo no
+		detect_gpu_vendor() { echo nvidia; }
+		optional_tool_relevant dlss-swapper && echo yes || echo no
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'no\nyes' ]]
+}
+
+@test "optional_tool_installed dlss-swapper accepts either binary" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		command_available() { [[ "$1" == dlss-swapper-dll ]]; }
+		optional_tool_installed dlss-swapper && echo catalog-yes || echo catalog-no
+		launch_wrapper_available dlss-swapper && echo primary-yes || echo primary-no
+		launch_wrapper_available dlss-swapper-dll && echo dll-yes || echo dll-no
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'catalog-yes\nprimary-no\ndll-yes' ]]
+}
+
+@test "tool_install_hint dlss-swapper is cachyos-aware" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		optional_tool_installed() { return 1; }
+		optional_tool_relevant() { return 0; }
+		detect_package_manager() { echo pacman; }
+		tool_install_hint dlss-swapper
+		echo ---
+		detect_package_manager() { echo apt; }
+		tool_install_hint dlss-swapper
+		echo ---
+		detect_package_manager() { echo rpm-ostree; }
+		tool_install_hint dlss-swapper
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"cachyos-settings"* ]]
+	[[ "$output" == *"dlss-swapper"* ]]
+	[[ "$output" == *wiki.cachyos.org* ]]
+	[[ "$output" == *"Bazzite"* ]]
+	[[ "$output" == *"docs.bazzite.gg"* ]]
+}
+
+@test "optional_tool_installed dlss-updater accepts binary or flatpak" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		command_available() { return 1; }
+		flatpak() { return 1; }
+		optional_tool_installed dlss-updater && echo no || echo missing
+		command_available() { [[ "$1" == dlss-updater ]]; }
+		optional_tool_installed dlss-updater && echo binary-yes || echo binary-no
+		command_available() { [[ "$1" == flatpak ]]; }
+		flatpak() { [[ "$1" == info && "$2" == io.github.recol.dlss-updater ]]; }
+		optional_tool_installed dlss-updater && echo flatpak-yes || echo flatpak-no
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'missing\nbinary-yes\nflatpak-yes' ]]
+}
+
+@test "tool_install_hint dlss-updater points at package or GitHub" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		optional_tool_installed() { return 1; }
+		optional_tool_relevant() { return 0; }
+		detect_package_manager() { echo pacman; }
+		tool_install_hint dlss-updater
+		echo ---
+		detect_package_manager() { echo apt; }
+		tool_install_hint dlss-updater
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"dlss-updater"* ]]
+	[[ "$output" == *"GUI"* ]]
+	[[ "$output" == *"github.com/Recol/DLSS-Updater"* ]]
+}
+
+@test "LAUNCHLAYER_OPTIONAL_TOOLS catalogs vkbasalt and latencyflex" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		printf "%s\n" "${LAUNCHLAYER_OPTIONAL_TOOLS[@]}" | grep -qx vkbasalt || exit 1
+		printf "%s\n" "${LAUNCHLAYER_OPTIONAL_TOOLS[@]}" | grep -qx latencyflex || exit 1
+		echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
+@test "optional_tool_installed vkbasalt detects layer JSON" {
+	local tmp
+	tmp="$(mktemp -d)"
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export XDG_DATA_HOME="'"$tmp"'"
+		mkdir -p "'"$tmp"'/vulkan/implicit_layer.d"
+		touch "'"$tmp"'/vulkan/implicit_layer.d/vkBasalt.json"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		command_available() { return 1; }
+		optional_tool_installed vkbasalt && echo yes || echo no
+	'
+	local st=$status out=$output
+	rm -rf "$tmp"
+	[[ $st -eq 0 ]]
+	[[ "$out" == yes ]]
+}
+
+@test "optional_tool_installed latencyflex detects lfx layer JSON" {
+	local tmp
+	tmp="$(mktemp -d)"
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export XDG_DATA_HOME="'"$tmp"'"
+		mkdir -p "'"$tmp"'/vulkan/implicit_layer.d"
+		touch "'"$tmp"'/vulkan/implicit_layer.d/LFX.json"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		command_available() { return 1; }
+		optional_tool_installed latencyflex && echo yes || echo no
+	'
+	local st=$status out=$output
+	rm -rf "$tmp"
+	[[ $st -eq 0 ]]
+	[[ "$out" == yes ]]
+}
+
+@test "warn_enabled_missing_tools reports VKBASALT" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export VKBASALT=1 LATENCYFLEX=0
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		command_available() { return 1; }
+		optional_tool_installed() { return 1; }
+		optional_tool_relevant() { return 0; }
+		detect_package_manager() { echo pacman; }
+		tool_install_hint() { echo "sudo pacman -S vkbasalt"; }
+		warn_enabled_missing_tools 2>&1
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"VKBASALT=1"* ]]
+	[[ "$output" == *"vkBasalt"* ]]
+}
+
+@test "tool_install_hint vkbasalt and latencyflex" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		optional_tool_installed() { return 1; }
+		optional_tool_relevant() { return 0; }
+		detect_package_manager() { echo pacman; }
+		tool_install_hint vkbasalt
+		tool_install_hint latencyflex
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"vkbasalt"* ]]
+	[[ "$output" == *"LatencyFleX"* || "$output" == *"latencyflex"* ]]
+}
+
+@test "LAUNCHLAYER_OPTIONAL_TOOLS catalogs dlss-updater" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		printf "%s\n" "${LAUNCHLAYER_OPTIONAL_TOOLS[@]}" | grep -qx dlss-updater && echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
+@test "warn_enabled_missing_tools reports DLSS_SWAPPER missing binary" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export DLSS_SWAPPER=1
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		command_available() { return 1; }
+		optional_tool_installed() { return 1; }
+		optional_tool_relevant() { return 0; }
+		detect_package_manager() { echo pacman; }
+		detect_gpu_vendor() { echo nvidia; }
+		detect_audio_server() { echo pulse; }
+		has_systemd_user() { return 1; }
+		# Keep unrelated feature warnings quiet.
+		GAMEMODE=0 GAME_PERFORMANCE=0 GAMESCOPE=0 MANGOHUD=0 NETWORK_TUNE=0
+		PIPEWIRE_LOW_LATENCY=0 NVIDIA_POWER_MODE=0 GPU_POWER_CHECK=0 VRAM_HOGS=0
+		DISABLE_CPU_AFFINITY=1 LAUNCH_WRAPPERS= LAUNCH_WRAPPERS_BEFORE=
+		warn_enabled_missing_tools 2>&1
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"DLSS_SWAPPER=1 but dlss-swapper is not installed"* ]]
+	[[ "$output" == *"cachyos-settings"* ]]
+}
+
+@test "warn_enabled_missing_tools reports DLSS_SWAPPER=dll missing binary" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export DLSS_SWAPPER=dll
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		command_available() { [[ "$1" == dlss-swapper ]]; }
+		optional_tool_installed() { return 1; }
+		optional_tool_relevant() { return 0; }
+		detect_package_manager() { echo pacman; }
+		detect_gpu_vendor() { echo nvidia; }
+		detect_audio_server() { echo pulse; }
+		has_systemd_user() { return 1; }
+		GAMEMODE=0 GAME_PERFORMANCE=0 GAMESCOPE=0 MANGOHUD=0 NETWORK_TUNE=0
+		PIPEWIRE_LOW_LATENCY=0 NVIDIA_POWER_MODE=0 GPU_POWER_CHECK=0 VRAM_HOGS=0
+		DISABLE_CPU_AFFINITY=1 LAUNCH_WRAPPERS= LAUNCH_WRAPPERS_BEFORE=
+		warn_enabled_missing_tools 2>&1
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"DLSS_SWAPPER=dll but dlss-swapper-dll is not installed"* ]]
+}
+
+@test "collect_missing_optional_tools includes dlss-swapper when catalog lists it" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		optional_tool_relevant() { return 0; }
+		optional_tool_installed() { return 1; }
+		collect_missing_optional_tools
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *dlss-swapper* ]]
 }
 
 @test "append_launch_wrappers uses launch_wrapper_available for known tools" {

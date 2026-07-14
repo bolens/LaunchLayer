@@ -226,3 +226,72 @@ EOF
 	[[ $status -eq 0 ]]
 	[[ "$output" == "gamemode:unset native:0 anticheat:0 launch:0 layers:0" ]]
 }
+
+@test "apply_defaults sets DLSS_SWAPPER off" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config
+		unset DLSS_SWAPPER
+		apply_defaults
+		printf "default:%s\n" "$DLSS_SWAPPER"
+		DLSS_SWAPPER=dll
+		apply_defaults
+		printf "preserved:%s\n" "$DLSS_SWAPPER"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'default:0\npreserved:dll' ]]
+}
+
+@test "apply_defaults sets Bazzite Deck/FPS knobs empty/off" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config
+		unset DISABLE_STEAM_DECK FRAME_RATE
+		apply_defaults
+		printf "defaults:%s [%s]\n" "$DISABLE_STEAM_DECK" "${FRAME_RATE-}"
+		DISABLE_STEAM_DECK=1 FRAME_RATE=120
+		apply_defaults
+		printf "preserved:%s %s\n" "$DISABLE_STEAM_DECK" "$FRAME_RATE"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'defaults:0 []\npreserved:1 120' ]]
+}
+
+@test "apply_defaults sets Arch latency knobs off" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config
+		unset LD_BIND_NOW VKBASALT LATENCYFLEX DISABLE_VBLANK
+		apply_defaults
+		printf "defaults:%s %s %s %s\n" \
+			"$LD_BIND_NOW" "$VKBASALT" "$LATENCYFLEX" "$DISABLE_VBLANK"
+		LD_BIND_NOW=1 VKBASALT=1
+		apply_defaults
+		printf "preserved:%s %s\n" "$LD_BIND_NOW" "$VKBASALT"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'defaults:0 0 0 0\npreserved:1 1' ]]
+}
+
+@test "apply_defaults sets upscaler and shader-boost knobs off" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys config
+		unset SHADER_CACHE_BOOST SHADER_CACHE_BOOST_GB PROTON_DLSS_UPGRADE \
+			PROTON_FSR4_UPGRADE PROTON_XESS_UPGRADE PROTON_NVIDIA_LIBS
+		apply_defaults
+		printf "boost:%s gb:%s dlss:%s fsr4:%s xess:%s libs:%s\n" \
+			"$SHADER_CACHE_BOOST" "$SHADER_CACHE_BOOST_GB" \
+			"$PROTON_DLSS_UPGRADE" "$PROTON_FSR4_UPGRADE" \
+			"$PROTON_XESS_UPGRADE" "$PROTON_NVIDIA_LIBS"
+		SHADER_CACHE_BOOST=1 PROTON_DLSS_UPGRADE=1
+		apply_defaults
+		printf "preserved:%s %s\n" "$SHADER_CACHE_BOOST" "$PROTON_DLSS_UPGRADE"
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == $'boost:0 gb:12 dlss:0 fsr4:0 xess:0 libs:0\npreserved:1 1' ]]
+}

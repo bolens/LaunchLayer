@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
 import {
+  HUB_UNTRUSTED_ENV_KEYS,
   PUBLISH_LIMITS,
   QUERY_LIMITS,
   MAX_CONFIGS_SCORED,
@@ -16,6 +20,12 @@ import {
   validateSimilarMachinesRequest,
 } from "./validation";
 import { sampleFingerprint } from "./fixtures";
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+const UNTRUSTED_KEYS_FILE = join(
+  REPO_ROOT,
+  "share/launchlayer/hub-untrusted-keys.txt",
+);
 
 const VALID_HASH = "a".repeat(64);
 const SAMPLE_FP = sampleFingerprint({
@@ -93,6 +103,42 @@ describe("validatePublishSubmission", () => {
           }),
         ),
       /VALIDATION_ERROR: env_content must not set PRE_LAUNCH_CMD/,
+    );
+  });
+
+  it("rejects SPECIALTY_RUNTIME and CONTY in env_content", () => {
+    assert.throws(
+      () =>
+        validatePublishSubmission(
+          validSubmission({
+            envContent: "SPECIALTY_RUNTIME=boxtron\n",
+          }),
+        ),
+      /VALIDATION_ERROR: env_content must not set SPECIALTY_RUNTIME/,
+    );
+    assert.throws(
+      () =>
+        validatePublishSubmission(
+          validSubmission({
+            envContent: "CONTY=1\n",
+          }),
+        ),
+      /VALIDATION_ERROR: env_content must not set CONTY/,
+    );
+  });
+
+  it("matches share/launchlayer/hub-untrusted-keys.txt", () => {
+    const raw = readFileSync(UNTRUSTED_KEYS_FILE, "utf8");
+    const fromFile = new Set(
+      raw
+        .split("\n")
+        .map((line) => line.replace(/#.*$/, "").trim())
+        .filter(Boolean),
+    );
+    assert.deepEqual(
+      [...HUB_UNTRUSTED_ENV_KEYS].sort(),
+      [...fromFile].sort(),
+      "Convex HUB_UNTRUSTED_ENV_KEYS drifted from hub-untrusted-keys.txt",
     );
   });
 

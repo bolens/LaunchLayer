@@ -27,11 +27,15 @@ setup() {
 		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
 		source_lib load-modules
 		launchlayer_source_tui
-		printf "%s\n" "$(tui_help_text main | head -1)" "$(tui_help_text game | head -1)" "$(tui_help_text menu | head -1)"
+		printf "%s\n" "$(tui_help_text main | head -1)" "$(tui_help_text game | head -1)" \
+			"$(tui_help_text toggles | head -1)" "$(tui_help_text advanced | head -1)" \
+			"$(tui_help_text menu | head -1)"
 	'
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"Main menu"* ]]
 	[[ "$output" == *"Game picker"* ]]
+	[[ "$output" == *"Quick toggles"* ]]
+	[[ "$output" == *"Advanced config"* ]]
 	[[ "$output" == *"Navigation"* ]]
 }
 
@@ -825,4 +829,159 @@ orphan line'"'"'
 	'
 	[[ $status -eq 0 ]]
 	[[ "$output" == "pos:1" ]]
+}
+
+@test "TUI_TOGGLE_KEYS and TUI_ADVANCED_KEYS cover every config key" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys
+		source_lib load-modules
+		launchlayer_source_tui
+		in_array() {
+			local needle=$1; shift
+			local x
+			for x in "$@"; do
+				[[ "$x" == "$needle" ]] && return 0
+			done
+			return 1
+		}
+		missing=0
+		for key in "${LAUNCHLAYER_CONFIG_KEYS[@]}"; do
+			if in_array "$key" "${TUI_TOGGLE_KEYS[@]}" || in_array "$key" "${TUI_ADVANCED_KEYS[@]}"; then
+				continue
+			fi
+			echo "uncovered:$key"
+			missing=1
+		done
+		# Dual-path keys must appear in both lists where intentional.
+		in_array DLSS_SWAPPER "${TUI_TOGGLE_KEYS[@]}" || { echo missing-toggle:DLSS_SWAPPER; missing=1; }
+		in_array DLSS_SWAPPER "${TUI_ADVANCED_KEYS[@]}" || { echo missing-advanced:DLSS_SWAPPER; missing=1; }
+		# FWS alias lives in Advanced only; long name stays a toggle.
+		in_array FLAWLESS_WIDESCREEN "${TUI_TOGGLE_KEYS[@]}" || { echo missing-toggle:FLAWLESS; missing=1; }
+		in_array FWS "${TUI_ADVANCED_KEYS[@]}" || { echo missing-advanced:FWS; missing=1; }
+		! in_array FWS "${TUI_TOGGLE_KEYS[@]}" || { echo fws-still-toggle; missing=1; }
+		for key in FRAME_RATE OVERRIDE_PROTON SHADER_CACHE_BOOST_GB ENABLE_HDR GAMESCOPE_ADAPTIVE_SYNC; do
+			in_array "$key" "${TUI_ADVANCED_KEYS[@]}" || {
+				echo "missing-advanced:$key"
+				missing=1
+			}
+		done
+		(( missing == 0 )) && echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
+@test "tui_toggle_game_key cycles DLSS_SWAPPER through dll" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export XDG_DATA_HOME
+		XDG_DATA_HOME="$(mktemp -d)"
+		export LAUNCHLAYER_GAMES_DIR="$XDG_DATA_HOME/games"
+		mkdir -p "$LAUNCHLAYER_GAMES_DIR"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib load-modules
+		launchlayer_load_post_main
+		launchlayer_source_tui
+		appid=424242
+		printf "INCLUDE=presets/standard.env\n" > "$(tui_appid_env_path "$appid")"
+		tui_toggle_game_key "$appid" DLSS_SWAPPER
+		v1="$(tui_env_file_get "$(tui_appid_env_path "$appid")" DLSS_SWAPPER)"
+		tui_toggle_game_key "$appid" DLSS_SWAPPER
+		v2="$(tui_env_file_get "$(tui_appid_env_path "$appid")" DLSS_SWAPPER)"
+		tui_toggle_game_key "$appid" DLSS_SWAPPER
+		v3="$(tui_env_file_get "$(tui_appid_env_path "$appid")" DLSS_SWAPPER)"
+		printf "v1=%s v2=%s v3=%s\n" "$v1" "$v2" "$v3"
+		tui_bool_on dll && echo dll_on
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"v1=1"* ]]
+	[[ "$output" == *"v2=dll"* ]]
+	[[ "$output" == *"v3=0"* ]]
+	[[ "$output" == *"dll_on"* ]]
+}
+
+@test "tui_pick_enum_key maps specialty and adaptive choices" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib load-modules
+		launchlayer_source_tui
+		tui_menu() { printf "%s\n" "boxtron"; }
+		tui_pick_enum_key SPECIALTY_RUNTIME
+		tui_menu() { printf "%s\n" "(auto / empty)"; }
+		out="$(tui_pick_enum_key GAMESCOPE_ADAPTIVE_SYNC)"; printf "vrr:[%s]\n" "$out"
+		tui_menu() { printf "%s\n" "dll (presets only)"; }
+		tui_pick_enum_key DLSS_SWAPPER
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"boxtron"* ]]
+	[[ "$output" == *"vrr:[]"* ]]
+	[[ "$output" == *"dll"* ]]
+}
+
+@test "tui_assist_only_key_p marks Depth3D and Geo11" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib load-modules
+		launchlayer_source_tui
+		tui_assist_only_key_p DEPTH3D && echo d3d
+		tui_assist_only_key_p GEO11 && echo geo
+		tui_assist_only_key_p GAMEMODE && echo bad || echo gamemode_ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"d3d"* ]]
+	[[ "$output" == *"geo"* ]]
+	[[ "$output" == *"gamemode_ok"* ]]
+}
+
+@test "TUI_TOGGLE_KEYS include DISABLE_STEAM_DECK" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib load-modules
+		launchlayer_source_tui
+		printf "%s\n" "${TUI_TOGGLE_KEYS[@]}" | grep -qx DISABLE_STEAM_DECK && echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
+@test "TUI_TOGGLE_KEYS include Arch latency flags" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib load-modules
+		launchlayer_source_tui
+		for key in LD_BIND_NOW VKBASALT LATENCYFLEX DISABLE_VBLANK; do
+			printf "%s\n" "${TUI_TOGGLE_KEYS[@]}" | grep -qx "$key" || {
+				echo "missing:$key"
+				exit 1
+			}
+		done
+		echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
+@test "TUI_TOGGLE_KEYS include upscaler and shader-boost flags" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib load-modules
+		launchlayer_source_tui
+		for key in DLSS_SWAPPER SHADER_CACHE_BOOST PROTON_DLSS_UPGRADE \
+			PROTON_FSR4_UPGRADE PROTON_XESS_UPGRADE; do
+			printf "%s\n" "${TUI_TOGGLE_KEYS[@]}" | grep -qx "$key" || {
+				echo "missing:$key"
+				exit 1
+			}
+		done
+		echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
 }

@@ -54,6 +54,81 @@ doctor_issue_count() {
 	printf '%s\n' "$issues"
 }
 
+# doctor_print_gaming_tips — Non-critical CachyOS / Arch / upscaler / sched tips.
+doctor_print_gaming_tips() {
+	local cachyos_tool="" vendor
+	vendor="$(detect_gpu_vendor 2>/dev/null || true)"
+
+	echo "-- Gaming tips --"
+	if [[ "${GAMEMODE:-1}" == "1" ]] && ananicy_cpp_active; then
+		echo "tip: GameMode and ananicy-cpp both adjust process niceness — stop ananicy-cpp before using GameMode: systemctl stop ananicy-cpp"
+		echo "  wiki: https://wiki.cachyos.org/configuration/gaming/#do-not-combine-gamemode-and-ananicy-cpp"
+	fi
+
+	if cachyos_tool="$(prefer_proton_cachyos 2>/dev/null)"; then
+		echo "tip: Proton-CachyOS available ($cachyos_tool) — set OVERRIDE_PROTON=$cachyos_tool for PROTON_DLSS_UPGRADE / PROTON_FSR4_UPGRADE / PROTON_XESS_UPGRADE"
+	fi
+
+	if [[ "$vendor" == nvidia ]]; then
+		if optional_tool_installed dlss-swapper; then
+			echo "tip: DLSS via launch wrapper: DLSS_SWAPPER=1 (NGX updater) or DLSS_SWAPPER=dll (presets only after manual DLL replace)"
+		fi
+		if optional_tool_installed dlss-updater; then
+			echo "tip: dlss-updater is installed (GUI only — no CLI). Use it offline to replace game DLLs; at launch prefer DLSS_SWAPPER or PROTON_DLSS_UPGRADE"
+		elif [[ "$(detect_os_id 2>/dev/null || true)" == cachyos ]]; then
+			echo "tip: optional GUI DLL updater: pacman -S dlss-updater (no launch CLI; pair with DLSS_SWAPPER for presets)"
+		fi
+	fi
+
+	if [[ "${SHADER_CACHE_BOOST:-0}" != "1" ]]; then
+		echo "tip: SHADER_CACHE_BOOST=1 raises Mesa/NVIDIA shader cache size limits (reduces recompile stutters)"
+	fi
+
+	if [[ "$vendor" == amd ]]; then
+		echo "tip: AMD/RADV — optional per-game RADV_PERFTEST=… (e.g. sam,nggc) for some titles; start unset and test carefully"
+		echo "  wiki: https://wiki.archlinux.org/title/Gaming#Improving_performance"
+	fi
+
+	if sched_ext_supported 2>/dev/null; then
+		if sched_ext_loaded 2>/dev/null; then
+			echo "tip: sched_ext active ($(sched_ext_ops_name 2>/dev/null || echo unknown)) — complements GameMode; avoid stacking with conflicting CPUfreq daemons"
+		else
+			echo "tip: kernel supports sched_ext — optional gaming schedulers: scx_lavd / scx_bpfland (Arch: pacman -S scx-scheds)"
+			echo "  wiki: https://wiki.archlinux.org/title/sched_ext"
+		fi
+	fi
+
+	if [[ "${LD_BIND_NOW:-0}" != "1" || "${DISABLE_VBLANK:-0}" != "1" \
+		|| "${VKBASALT:-0}" != "1" || "${LATENCYFLEX:-0}" != "1" ]]; then
+		echo "tip: Arch Gaming latency knobs: LD_BIND_NOW=1, DISABLE_VBLANK=1, VKBASALT=1 (vkBasalt), LATENCYFLEX=1 (LFX)"
+		echo "  wiki: https://wiki.archlinux.org/title/Gaming"
+	fi
+	if [[ "${LSFG_VK:-0}" != "1" ]] && optional_tool_installed lsfg-vk 2>/dev/null; then
+		echo "tip: LSFG_VK=1 enables lsfg-vk (GPL) — requires owned Lossless Scaling on Steam (docs/third-party.md)"
+	fi
+	if command_available goverlay 2>/dev/null; then
+		echo "tip: goverlay is installed — use it to configure MangoHud / lsfg-vk externally (not embedded in LaunchLayer)"
+	elif [[ "${MANGOHUD:-0}" == "1" || "${LSFG_VK:-0}" == "1" ]]; then
+		echo "tip: install goverlay for a GUI to configure MangoHud/lsfg-vk"
+	fi
+
+	local os_id=""
+	os_id="$(detect_os_id 2>/dev/null || true)"
+	if [[ "$os_id" == bazzite ]] || is_immutable_os 2>/dev/null; then
+		if [[ "${DISABLE_STEAM_DECK:-0}" != "1" ]]; then
+			echo "tip: DISABLE_STEAM_DECK=1 exports SteamDeck=0 (Bazzite sd0) — unlocks full graphics menus on titles that force Deck limits"
+			echo "  docs: https://docs.bazzite.gg/Gaming/launch-options-env-variables/"
+		fi
+		if [[ "$os_id" == bazzite ]] && [[ "$(detect_gpu_vendor 2>/dev/null || true)" == nvidia ]]; then
+			echo "tip: Bazzite ships dlss-swapper — prefer DLSS_SWAPPER=1 over pasting the wrapper into Steam launch options"
+		fi
+		if [[ -z "${FRAME_RATE:-}" || "${FRAME_RATE}" == "0" ]]; then
+			echo "tip: FRAME_RATE=N sets DXVK_FRAME_RATE/VKD3D_FRAME_RATE (lowest-latency API caps; restart to change)"
+			echo "  docs: https://docs.bazzite.gg/Gaming/launch-options-env-variables/#frame-rate-limiting-issues-and-inconsistency"
+		fi
+	fi
+}
+
 # show_doctor — Full health check for a new or moved machine.
 show_doctor() {
 	local json=${1:-0} issues=0 config_issues=0 current required access
@@ -91,7 +166,10 @@ show_doctor() {
 			"$config_issues" \
 			"$issues"
 		doctor_collect_json_issues "$current" "$required" "$access" "$config_issues" "$validation_out"
-		printf ',"package_manager":%s,"optional_tools":' "$(json_string "$(detect_package_manager)")"
+		printf ',"ananicy_cpp_active":%s,"proton_cachyos":%s,"package_manager":%s,"optional_tools":' \
+			"$(json_bool "$(ananicy_cpp_active && echo 1 || echo 0)")" \
+			"$(json_string "$(prefer_proton_cachyos 2>/dev/null || true)")" \
+			"$(json_string "$(detect_package_manager)")"
 		optional_tools_json_array
 		printf '}\n'
 		(( issues == 0 )) || return 1
@@ -123,6 +201,8 @@ show_doctor() {
 	echo
 	echo "-- Config validation --"
 	echo "$validation_out"
+	echo
+	doctor_print_gaming_tips
 	echo
 	echo "-- Completions --"
 	completions_bash_status

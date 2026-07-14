@@ -48,7 +48,11 @@
 #
 # Per-game .env keys (see launch.d/presets/ and examples/games/2357570.env):
 #   INCLUDE=presets/competitive.env
-#   LAUNCH_WRAPPERS="dlss-swapper"   LAUNCH_WRAPPERS_BEFORE=""
+#   DLSS_SWAPPER=1                   # or dll for dlss-swapper-dll (manual DLL path)
+#     https://wiki.cachyos.org/configuration/gaming/#forcing-the-latest-dlss-preset
+#   PROTON_DLSS_UPGRADE / PROTON_FSR4_UPGRADE / PROTON_XESS_UPGRADE
+#   SHADER_CACHE_BOOST=1             # raise Mesa/NVIDIA shader cache size limits
+#   LAUNCH_WRAPPERS=""               LAUNCH_WRAPPERS_BEFORE=""  (don't also list dlss-swapper)
 #   GAME_EXTRA_ARGS="-flag1 -flag2"  UNSET_VARS="DXVK_ASYNC"
 #   PRE_LAUNCH_CMD=""  POST_LAUNCH_CMD=""
 #   FORCE_NATIVE=1 / FORCE_PROTON=1  BENCHMARK=1  DEBUG=1

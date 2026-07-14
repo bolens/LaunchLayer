@@ -132,6 +132,182 @@ apply_anticheat_guardrails() {
 	fi
 }
 
+# apply_shader_cache_boost — Raise vendor shader-cache size limits (CachyOS wiki).
+# See: https://wiki.cachyos.org/configuration/gaming/#increase-maximum-shader-cache-size
+apply_shader_cache_boost() {
+	[[ "${SHADER_CACHE_BOOST:-0}" == "1" ]] || return 0
+	local gb="${SHADER_CACHE_BOOST_GB:-12}"
+	local nvidia_bytes
+	[[ "$gb" =~ ^[0-9]+$ ]] || gb=12
+	nvidia_bytes=$((gb * 1000000000))
+
+	case "$(detect_gpu_vendor 2>/dev/null || true)" in
+		amd|intel)
+			export MESA_SHADER_CACHE_MAX_SIZE="${MESA_SHADER_CACHE_MAX_SIZE:-${gb}G}"
+			debug "SHADER_CACHE_BOOST: MESA_SHADER_CACHE_MAX_SIZE=$MESA_SHADER_CACHE_MAX_SIZE"
+			;;
+		nvidia)
+			export __GL_SHADER_DISK_CACHE_SIZE="${__GL_SHADER_DISK_CACHE_SIZE:-$nvidia_bytes}"
+			export __GL_SHADER_DISK_CACHE="${__GL_SHADER_DISK_CACHE:-1}"
+			export __GL_SHADER_DISK_CACHE_SKIP_CLEANUP="${__GL_SHADER_DISK_CACHE_SKIP_CLEANUP:-1}"
+			debug "SHADER_CACHE_BOOST: __GL_SHADER_DISK_CACHE_SIZE=$__GL_SHADER_DISK_CACHE_SIZE"
+			;;
+		*)
+			export MESA_SHADER_CACHE_MAX_SIZE="${MESA_SHADER_CACHE_MAX_SIZE:-${gb}G}"
+			export __GL_SHADER_DISK_CACHE_SIZE="${__GL_SHADER_DISK_CACHE_SIZE:-$nvidia_bytes}"
+			debug "SHADER_CACHE_BOOST: vendor unknown — set both Mesa and NVIDIA cache limits"
+			;;
+	esac
+}
+
+# apply_proton_nvidia_libs — Proton-CachyOS / GE NVIDIA library knobs.
+apply_proton_nvidia_libs() {
+	[[ "$(detect_gpu_vendor 2>/dev/null || true)" == nvidia ]] || return 0
+	if [[ "${PROTON_NVIDIA_LIBS:-0}" == "1" ]]; then
+		export PROTON_NVIDIA_LIBS=1
+		debug "PROTON_NVIDIA_LIBS=1 (PhysX/CUDA libs)"
+	fi
+	if [[ "${PROTON_NVIDIA_LIBS_NO_32BIT:-0}" == "1" ]]; then
+		export PROTON_NVIDIA_LIBS_NO_32BIT=1
+		debug "PROTON_NVIDIA_LIBS_NO_32BIT=1 (64-bit only)"
+	fi
+}
+
+# apply_upscaler_upgrades — PROTON_*_UPGRADE env for GE / CachyOS / EM forks.
+#
+# Prefer these when the active Proton ships upscaler downloaders. For NGX + latest
+# DLSS presets without replacing game files, use DLSS_SWAPPER instead (CachyOS
+# dlss-swapper). dlss-updater is GUI-only — detect/suggest, do not invoke at launch.
+apply_upscaler_upgrades() {
+	local tool="" family="" vendor=""
+	local want_dlss=0 want_fsr4=0 want_fsr4_rdna3=0 want_xess=0
+	local any=0
+
+	[[ "${PROTON_DLSS_UPGRADE:-0}" == "1" ]] && want_dlss=1
+	[[ "${PROTON_FSR4_UPGRADE:-0}" == "1" ]] && want_fsr4=1
+	[[ "${PROTON_FSR4_RDNA3_UPGRADE:-0}" == "1" ]] && want_fsr4_rdna3=1
+	[[ "${PROTON_XESS_UPGRADE:-0}" == "1" ]] && want_xess=1
+	(( want_dlss || want_fsr4 || want_fsr4_rdna3 || want_xess )) || return 0
+
+	tool="$(resolve_effective_proton_tool 2>/dev/null || true)"
+	family="$(proton_tool_family "$tool")"
+	vendor="$(detect_gpu_vendor 2>/dev/null || true)"
+
+	if ! proton_tool_supports_upscaler_upgrades "$tool"; then
+		warn "PROTON_*_UPGRADE enabled but Proton tool '${tool:-Valve default}' lacks fork upscaler downloaders — use Proton-CachyOS/GE/EM, or DLSS_SWAPPER=1 for NGX presets"
+	fi
+
+	if (( want_dlss )); then
+		if resolve_dlss_swapper_bin >/dev/null 2>&1; then
+			warn "DLSS_SWAPPER=${DLSS_SWAPPER} with PROTON_DLSS_UPGRADE=1 — both can update DLSS; prefer one path"
+		fi
+		export PROTON_DLSS_UPGRADE=1
+		[[ "${PROTON_DLSS_INDICATOR:-0}" == "1" ]] && export PROTON_DLSS_INDICATOR=1
+		any=1
+	fi
+
+	if (( want_fsr4_rdna3 )); then
+		export PROTON_FSR4_RDNA3_UPGRADE=1
+		any=1
+	elif (( want_fsr4 )); then
+		if [[ "$vendor" == amd ]] && detect_gpu_is_rdna3 2>/dev/null; then
+			export PROTON_FSR4_RDNA3_UPGRADE=1
+			debug "PROTON_FSR4_UPGRADE on RDNA3 → PROTON_FSR4_RDNA3_UPGRADE=1"
+		else
+			export PROTON_FSR4_UPGRADE=1
+		fi
+		any=1
+	fi
+	if (( want_fsr4 || want_fsr4_rdna3 )) && [[ "${PROTON_FSR4_INDICATOR:-0}" == "1" ]]; then
+		export PROTON_FSR4_INDICATOR=1
+	fi
+
+	if (( want_xess )); then
+		export PROTON_XESS_UPGRADE=1
+		any=1
+	fi
+
+	(( any )) && debug "upscaler upgrades: tool=${tool:-default} family=$family dlss=$want_dlss fsr4=$want_fsr4/$want_fsr4_rdna3 xess=$want_xess"
+}
+
+# apply_ld_bind_now — Eager symbol resolution (Arch Gaming: first-call latency).
+# See: https://wiki.archlinux.org/title/Gaming#Load_shared_objects_immediately_for_better_first_time_latency
+apply_ld_bind_now() {
+	[[ "${LD_BIND_NOW:-0}" == "1" ]] || return 0
+	export LD_BIND_NOW=1
+	debug "LD_BIND_NOW=1 (eager dynamic linking)"
+}
+
+# apply_vkbasalt — Enable vkBasalt Vulkan post-process layer (ENABLE_VKBASALT=1).
+# Missing-layer warnings come from warn_enabled_missing_tools.
+apply_vkbasalt() {
+	[[ "${VKBASALT:-0}" == "1" ]] || return 0
+	export ENABLE_VKBASALT=1
+	debug "ENABLE_VKBASALT=1"
+	if declare -f apply_vkbasalt_config >/dev/null 2>&1; then
+		apply_vkbasalt_config
+	fi
+}
+
+# apply_latencyflex — Enable LatencyFleX (LFX=1).
+# See: https://github.com/ishitatsuyuki/LatencyFleX
+# Missing-layer warnings come from warn_enabled_missing_tools.
+apply_latencyflex() {
+	[[ "${LATENCYFLEX:-0}" == "1" ]] || return 0
+	export LFX=1
+	# Reflex-path games under Proton need NVAPI; already default for Proton titles.
+	if [[ "${is_native:-0}" != "1" || "${FORCE_PROTON:-0}" == "1" ]]; then
+		export PROTON_ENABLE_NVAPI="${PROTON_ENABLE_NVAPI:-1}"
+		export DXVK_NVAPI_ALLOW_OTHER_DRIVERS="${DXVK_NVAPI_ALLOW_OTHER_DRIVERS:-1}"
+	fi
+	debug "LFX=1 (LatencyFleX)"
+	if [[ "${DISABLE_VBLANK:-0}" != "1" ]]; then
+		debug "LATENCYFLEX=1 works best with DISABLE_VBLANK=1 (and in-game VSync/Reflex settings)"
+	fi
+}
+
+# apply_disable_vblank — Reduce DRI/compositor wait (Arch Gaming: Reducing DRI latency).
+# Mesa: vblank_mode=0 + immediate present; NVIDIA: __GL_SYNC_TO_VBLANK=0.
+apply_disable_vblank() {
+	[[ "${DISABLE_VBLANK:-0}" == "1" ]] || return 0
+	export vblank_mode="${vblank_mode:-0}"
+	export __GL_SYNC_TO_VBLANK=0
+	export MESA_VK_WSI_PRESENT_MODE="${MESA_VK_WSI_PRESENT_MODE:-immediate}"
+	debug "DISABLE_VBLANK=1 (vblank_mode=0 __GL_SYNC_TO_VBLANK=0 MESA_VK_WSI_PRESENT_MODE=immediate)"
+}
+
+# apply_disable_steam_deck — Hide Deck hardware identity (Bazzite sd0 / SteamDeck=0).
+# See: https://docs.bazzite.gg/Gaming/launch-options-env-variables/
+apply_disable_steam_deck() {
+	[[ "${DISABLE_STEAM_DECK:-0}" == "1" ]] || return 0
+	export SteamDeck=0
+	debug "SteamDeck=0 (DISABLE_STEAM_DECK=1; Bazzite sd0 equivalent)"
+}
+
+# apply_frame_rate — DXVK/VKD3D in-process FPS caps (best latency per Bazzite docs).
+# Sets both DXVK_FRAME_RATE and VKD3D_FRAME_RATE; restart required to change.
+apply_frame_rate() {
+	local fps="${FRAME_RATE:-}"
+	[[ -n "$fps" && "$fps" != "0" ]] || return 0
+	if ! [[ "$fps" =~ ^[1-9][0-9]*$ ]]; then
+		warn "FRAME_RATE=$fps is not a positive integer — ignoring"
+		return 0
+	fi
+	export DXVK_FRAME_RATE="$fps"
+	export VKD3D_FRAME_RATE="$fps"
+	debug "FRAME_RATE=$fps (DXVK_FRAME_RATE=$fps VKD3D_FRAME_RATE=$fps)"
+}
+
+# apply_launch_env_tuning — Env knobs for native and Proton (Arch / Bazzite gaming docs).
+apply_launch_env_tuning() {
+	apply_ld_bind_now
+	apply_vkbasalt
+	apply_latencyflex
+	apply_disable_vblank
+	apply_disable_steam_deck
+	apply_frame_rate
+}
+
 # apply_proton_env — Export Proton/DXVK/VKD3D/NVIDIA tuning variables.
 #
 # Skipped entirely for native games unless FORCE_PROTON=1.
@@ -159,6 +335,10 @@ apply_proton_env() {
 	export __VK_LAYER_NV_optimus=${__VK_LAYER_NV_optimus:-NVIDIA_only}
 	export VKD3D_FEATURE_LEVEL=${VKD3D_FEATURE_LEVEL:-12_2}
 	export DXVK_HUD=${DXVK_HUD:-0}
+
+	apply_shader_cache_boost
+	apply_proton_nvidia_libs
+	apply_upscaler_upgrades
 
 	if [[ "${DEBUG:-0}" == "1" ]]; then
 		export PROTON_LOG=1
@@ -240,14 +420,33 @@ apply_malloc_allocator() {
 	fi
 }
 
-# detect_hdr_support — Return 1 if any active display supports HDR, 0 otherwise.
+# detect_hdr_support — Return 1 only when HDR appears *enabled* (not mere EDID capability).
 detect_hdr_support() {
+	# Prefer compositor "enabled" signals. EDID "HDR Static Metadata" is capability only
+	# (see detect_hdr_capable) and must not auto-enable Gamescope/DXVK HDR.
 	if command_available kscreen-doctor; then
-		if kscreen-doctor -o 2>/dev/null | grep -i "HDR" | grep -q -iv "incapable"; then
+		local ks
+		ks="$(kscreen-doctor -j 2>/dev/null || true)"
+		if [[ -n "$ks" ]] && command_available jq; then
+			if echo "$ks" | jq -e '
+				[.outputs[]? | select(.enabled == true) | .hdr // .hdrMetadata // empty]
+				| map(select(. == true or . == "enabled" or (type=="object" and .enabled==true)))
+				| length > 0
+			' >/dev/null 2>&1; then
+				echo 1
+				return 0
+			fi
+		fi
+		if kscreen-doctor -o 2>/dev/null | grep -i "HDR" | grep -qiE 'enabled|active|on'; then
 			echo 1
 			return 0
 		fi
 	fi
+	echo 0
+}
+
+# detect_hdr_capable — Return 1 if EDID advertises HDR Static Metadata (capability tip).
+detect_hdr_capable() {
 	local edid
 	for edid in /sys/class/drm/card*-*/edid; do
 		[[ -f "$edid" ]] || continue
@@ -268,6 +467,9 @@ apply_hdr_tuning() {
 		hdr_support=1
 	elif [[ -z "${ENABLE_HDR:-}" ]]; then
 		hdr_support="$(detect_hdr_support)"
+		if [[ "$hdr_support" != "1" && "$(detect_hdr_capable 2>/dev/null || echo 0)" == "1" ]]; then
+			debug "HDR capable (EDID) but not enabled in compositor — set ENABLE_HDR=1 to force"
+		fi
 	fi
 
 	if (( hdr_support == 1 )); then

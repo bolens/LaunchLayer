@@ -5,7 +5,8 @@
 _validate_file_wrapper_flag_overlaps() {
 	local file=$1
 	local line_num=0 line key value
-	local file_gamemode=0 file_gamescope=0 file_mangohud=0 file_game_perf=1
+	local file_gamemode=0 file_gamescope=0 file_mangohud=0 file_game_perf=1 file_dlss_swapper=0
+	local file_disable_steam_deck=0
 	local wrappers_before="" wrappers="" msg issues=0
 	local -a msgs=()
 
@@ -26,6 +27,12 @@ _validate_file_wrapper_flag_overlaps() {
 			GAMESCOPE) [[ "$value" == "1" ]] && file_gamescope=1 ;;
 			MANGOHUD) [[ "$value" == "1" ]] && file_mangohud=1 ;;
 			GAME_PERFORMANCE) [[ "$value" == "0" ]] && file_game_perf=0 ;;
+			DISABLE_STEAM_DECK) [[ "$value" == "1" ]] && file_disable_steam_deck=1 ;;
+			DLSS_SWAPPER)
+				case "$value" in
+					1|yes|true|on|dll|DLL|YES|TRUE|ON) file_dlss_swapper="$value" ;;
+				esac
+				;;
 			LAUNCH_WRAPPERS_BEFORE) wrappers_before="$value" ;;
 			LAUNCH_WRAPPERS) wrappers="$value" ;;
 		esac
@@ -35,7 +42,9 @@ _validate_file_wrapper_flag_overlaps() {
 		[[ -n "$msg" ]] || continue
 		msgs+=("$msg")
 	done < <(
-		GAMEMODE=$file_gamemode GAMESCOPE=$file_gamescope MANGOHUD=$file_mangohud GAME_PERFORMANCE=$file_game_perf \
+		GAMEMODE=$file_gamemode GAMESCOPE=$file_gamescope MANGOHUD=$file_mangohud \
+			GAME_PERFORMANCE=$file_game_perf DLSS_SWAPPER=$file_dlss_swapper \
+			DISABLE_STEAM_DECK=$file_disable_steam_deck \
 			LAUNCH_WRAPPERS_BEFORE="$wrappers_before" LAUNCH_WRAPPERS="$wrappers" \
 			launch_wrapper_config_conflict_errors
 	)
@@ -140,6 +149,13 @@ validate_single_config_file() {
 					}
 				done
 				;;
+			FRAME_RATE)
+				value="${value#\"}"; value="${value%\"}"
+				if [[ -n "$value" && "$value" != "0" ]] && ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+					echo "$file:$line_num: FRAME_RATE must be a positive integer (got: $value)"
+					((issues++)) || true
+				fi
+				;;
 			GAMESCOPE)
 				[[ "$value" == "1" ]] && [[ "${FORCE_PROTON:-0}" != "1" ]] && {
 					local appid_from_file
@@ -231,9 +247,12 @@ scan_detections() {
 		if detect_dlss_present "$appid"; then
 			local dlss_cfg
 			dlss_cfg="$(resolve_appid_env_path "$appid")"
-			[[ -f "$dlss_cfg" ]] \
-				&& grep -q 'dlss-swapper' "$dlss_cfg" 2>/dev/null && return 0
-			echo "dlss present: $appid ($name) — consider LAUNCH_WRAPPERS=dlss-swapper"
+			if [[ -f "$dlss_cfg" ]] && grep -Eq \
+				'^[[:space:]]*(DLSS_SWAPPER=(1|dll|yes|true|on)|PROTON_DLSS_UPGRADE=1)|(^|[[:space:]=])dlss-swapper(-dll)?([[:space:]]|$)' \
+				"$dlss_cfg" 2>/dev/null; then
+				return 0
+			fi
+			echo "dlss present: $appid ($name) — consider DLSS_SWAPPER=1 or PROTON_DLSS_UPGRADE=1"
 		fi
 	}
 

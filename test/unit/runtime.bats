@@ -264,6 +264,28 @@ setup() {
 	[[ "$output" == *"gamemoderun"* ]]
 }
 
+@test "print_dry_run environment section shows Arch and Bazzite exports" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform runtime keys config
+		steam_app_id=1 steam_game_name=x is_native=0 is_anticheat=0
+		config_layers=()
+		launch=(true)
+		game_extra_argv=()
+		export LD_BIND_NOW=1 ENABLE_VKBASALT=1 LFX=1 SteamDeck=0
+		export vblank_mode=0 MESA_VK_WSI_PRESENT_MODE=immediate DXVK_FRAME_RATE=60
+		print_dry_run
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"LD_BIND_NOW=1"* ]]
+	[[ "$output" == *"ENABLE_VKBASALT=1"* ]]
+	[[ "$output" == *"LFX=1"* ]]
+	[[ "$output" == *"SteamDeck=0"* ]]
+	[[ "$output" == *"MESA_VK_WSI_PRESENT_MODE=immediate"* ]]
+	[[ "$output" == *"DXVK_FRAME_RATE=60"* ]]
+}
+
 @test "append_launch_wrappers adds installed LAUNCH_WRAPPERS_BEFORE" {
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"

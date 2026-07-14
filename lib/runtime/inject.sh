@@ -1,0 +1,309 @@
+# shellcheck shell=bash
+# lib/runtime/inject.sh — Shared download → cache → inject → track → cleanup.
+#
+# Never vendorizes third-party binaries into the LaunchLayer source tree.
+# Artifacts live under XDG data with NOTICE metadata for license compliance.
+
+[[ -n "${LAUNCHLAYER_RUNTIME_INJECT_LOADED:-}" ]] && return 0
+LAUNCHLAYER_RUNTIME_INJECT_LOADED=1
+
+# launchlayer_data_dir — User data root for caches and inject tracking.
+launchlayer_data_dir() {
+	printf '%s/launchlayer' "${XDG_DATA_HOME:-$HOME/.local/share}"
+}
+
+# inject_cache_root — Artifact cache (third-party downloads).
+inject_cache_root() {
+	printf '%s/cache' "$(launchlayer_data_dir)"
+}
+
+# inject_track_root — Per-AppID tracked inject manifests.
+inject_track_root() {
+	printf '%s/inject-track' "$(launchlayer_data_dir)"
+}
+
+# inject_tool_cache_dir — Cache directory for one logical tool name.
+inject_tool_cache_dir() {
+	local tool=$1
+	printf '%s/%s' "$(inject_cache_root)" "$tool"
+}
+
+# inject_ensure_dirs — Create cache/track directories.
+inject_ensure_dirs() {
+	mkdir -p "$(inject_cache_root)" "$(inject_track_root)"
+}
+
+# inject_store_notice — Write NOTICE for a cached tool (license + upstream URL).
+# Args: tool_id version upstream_url license_spdx [extra_note]
+inject_store_notice() {
+	local tool=$1 version=$2 url=$3 license=$4
+	local extra=${5:-}
+	local dir notice
+	inject_ensure_dirs
+	dir="$(inject_tool_cache_dir "$tool")"
+	mkdir -p "$dir"
+	notice="$dir/NOTICE"
+	{
+		printf 'Tool: %s\n' "$tool"
+		printf 'Version: %s\n' "$version"
+		printf 'Upstream: %s\n' "$url"
+		printf 'License: %s\n' "$license"
+		printf 'Cached by LaunchLayer for local use only — not part of the CC BY-NC-SA source tree.\n'
+		[[ -n "$extra" ]] && printf '%s\n' "$extra"
+	} > "$notice"
+}
+
+# inject_verify_sha256 — Opt-in checksum: INJECT_SHA256 or arg; skip when unset.
+inject_verify_sha256() {
+	local file=$1
+	local expect=${2:-${INJECT_SHA256:-}}
+	local got
+	[[ -n "$expect" ]] || return 0
+	[[ -f "$file" ]] || return 1
+	if command_available sha256sum; then
+		got="$(sha256sum "$file" | awk '{print $1}')"
+	elif command_available shasum; then
+		got="$(shasum -a 256 "$file" | awk '{print $1}')"
+	else
+		warn "inject_verify_sha256: sha256sum/shasum missing — cannot verify $file"
+		return 1
+	fi
+	[[ "${got,,}" == "${expect,,}" ]] || {
+		warn "inject checksum mismatch for $file (expected $expect, got $got)"
+		return 1
+	}
+	debug "inject sha256 ok: $file"
+	return 0
+}
+
+# inject_fetch_url — Download URL to dest path (honors LAUNCHLAYER_FETCH_CMD for tests).
+# Returns 1 on failure. Does not overwrite unless LAUNCHLAYER_FETCH_FORCE=1.
+# Optional INJECT_SHA256 verifies the downloaded file when set.
+inject_fetch_url() {
+	local url=$1 dest=$2
+	local dir
+	[[ -n "$url" && -n "$dest" ]] || return 1
+	dir="$(dirname "$dest")"
+	mkdir -p "$dir"
+	if [[ -f "$dest" && "${LAUNCHLAYER_FETCH_FORCE:-0}" != "1" ]]; then
+		debug "inject cache hit: $dest"
+		inject_verify_sha256 "$dest" || return 1
+		return 0
+	fi
+	if [[ -n "${LAUNCHLAYER_FETCH_CMD:-}" ]]; then
+		# shellcheck disable=SC2086
+		eval "$LAUNCHLAYER_FETCH_CMD" || return 1
+		inject_verify_sha256 "$dest" || return 1
+		return 0
+	fi
+	if command_available curl; then
+		curl -fsSL --connect-timeout 15 -o "$dest" "$url" || return 1
+	elif command_available wget; then
+		wget -q -O "$dest" "$url" || return 1
+	else
+		warn "inject_fetch_url: curl/wget missing — cannot fetch $url"
+		return 1
+	fi
+	inject_verify_sha256 "$dest" || return 1
+	debug "inject fetched: $url → $dest"
+}
+
+# inject_refuse_proprietary_redistrib — Warn and return 1 (caller should use user-supplied path).
+inject_refuse_proprietary_redistrib() {
+	local tool=$1 reason=${2:-EULA/redistribution not permitted}
+	warn "$tool: automated download refused ($reason) — set a user-supplied path instead"
+	return 1
+}
+
+# inject_extract_archive — Extract zip/7z/tar into dest_dir. Returns 1 on failure.
+inject_extract_archive() {
+	local archive=$1 dest_dir=$2
+	[[ -f "$archive" && -n "$dest_dir" ]] || return 1
+	mkdir -p "$dest_dir"
+	case "${archive,,}" in
+		*.zip)
+			command_available unzip || {
+				warn "inject_extract: unzip missing for $archive"
+				return 1
+			}
+			unzip -qo "$archive" -d "$dest_dir" || return 1
+			;;
+		*.7z)
+			if command_available 7z; then
+				7z x -y -o"$dest_dir" "$archive" >/dev/null || return 1
+			elif command_available 7za; then
+				7za x -y -o"$dest_dir" "$archive" >/dev/null || return 1
+			else
+				warn "inject_extract: 7z missing for $archive"
+				return 1
+			fi
+			;;
+		*.tar|*.tar.gz|*.tgz|*.tar.xz|*.tar.bz2)
+			command_available tar || return 1
+			tar -xf "$archive" -C "$dest_dir" || return 1
+			;;
+		*)
+			# Magic: zip PK header
+			if command_available unzip && [[ "$(head -c 2 "$archive" 2>/dev/null || true)" == PK ]]; then
+				unzip -qo "$archive" -d "$dest_dir" || return 1
+			else
+				warn "inject_extract: unknown archive type: $archive"
+				return 1
+			fi
+			;;
+	esac
+	return 0
+}
+
+# inject_find_file — Find first matching filename under dir (maxdepth 6).
+inject_find_file() {
+	local dir=$1 name=$2
+	[[ -d "$dir" && -n "$name" ]] || return 1
+	find "$dir" -maxdepth 6 -type f -name "$name" 2>/dev/null | head -1
+}
+
+# inject_track_file — Record a file path installed for appid+tool for later cleanup.
+inject_track_file() {
+	local appid=$1 tool=$2 path=$3
+	local manifest
+	[[ -n "$appid" && -n "$tool" && -n "$path" ]] || return 1
+	inject_ensure_dirs
+	manifest="$(inject_track_root)/${appid}-${tool}.txt"
+	touch "$manifest"
+	grep -Fxq "$path" "$manifest" 2>/dev/null || printf '%s\n' "$path" >> "$manifest"
+}
+
+# inject_cleanup_tracked — Restore *.ll-bak then remove other tracked inject files.
+inject_cleanup_tracked() {
+	local appid=$1 tool=$2
+	local manifest path orig
+	local -a restored=()
+	manifest="$(inject_track_root)/${appid}-${tool}.txt"
+	[[ -f "$manifest" ]] || return 0
+	# Pass 1: restore backups
+	while IFS= read -r path || [[ -n "$path" ]]; do
+		[[ -n "$path" ]] || continue
+		if [[ "$path" == *.ll-bak ]]; then
+			orig="${path%.ll-bak}"
+			if [[ -f "$path" ]]; then
+				mv -f "$path" "$orig" && debug "inject restored: $orig"
+				restored+=("$orig")
+			fi
+		fi
+	done < "$manifest"
+	# Pass 2: remove inject copies that were not just restored from a backup
+	while IFS= read -r path || [[ -n "$path" ]]; do
+		[[ -n "$path" ]] || continue
+		[[ "$path" == *.ll-bak ]] && continue
+		local skip=0 r
+		for r in "${restored[@]+"${restored[@]}"}"; do
+			[[ "$path" == "$r" ]] && {
+				skip=1
+				break
+			}
+		done
+		(( skip )) && continue
+		if [[ -f "$path" || -L "$path" ]]; then
+			rm -f "$path" && debug "inject cleaned: $path"
+		fi
+	done < "$manifest"
+	rm -f "$manifest"
+}
+
+# inject_cleanup_launch_tracks — Clean known inject tools for the current AppID.
+inject_cleanup_launch_tracks() {
+	local appid=${1:-${steam_app_id:-}}
+	[[ -n "$appid" ]] || return 0
+	local tool
+	for tool in specialk reshade openvr_fsr valveplug; do
+		inject_cleanup_tracked "$appid" "$tool"
+	done
+}
+
+# inject_copy_renamed — Copy src to dest_dir/dest_name; bak existing; track when appid set.
+inject_copy_renamed() {
+	local src=$1 dest_dir=$2 dest_name=$3
+	local appid=${4:-} tool=${5:-}
+	local dest
+	[[ -f "$src" && -n "$dest_dir" && -n "$dest_name" ]] || return 1
+	mkdir -p "$dest_dir"
+	dest="${dest_dir%/}/$dest_name"
+	if [[ -f "$dest" && ! -f "${dest}.ll-bak" ]]; then
+		cp -f "$dest" "${dest}.ll-bak" || true
+		if [[ -n "$appid" && -n "$tool" ]]; then
+			inject_track_file "$appid" "$tool" "${dest}.ll-bak"
+		fi
+	fi
+	cp -f "$src" "$dest" || return 1
+	if [[ -n "$appid" && -n "$tool" ]]; then
+		inject_track_file "$appid" "$tool" "$dest"
+	fi
+	printf '%s\n' "$dest"
+}
+
+# inject_merge_winedlloverrides — Merge dll=n,b into WINEDLLOVERRIDES (no clobber).
+inject_merge_winedlloverrides() {
+	local dll=$1
+	local entry existing
+	[[ -n "$dll" ]] || return 0
+	dll="${dll%.dll}"
+	entry="${dll}=n,b"
+	existing="${WINEDLLOVERRIDES:-}"
+	if [[ -z "$existing" ]]; then
+		export WINEDLLOVERRIDES="$entry"
+		return 0
+	fi
+	case ";${existing};" in
+		*";${dll}="*|*"${dll}="*) ;;
+		*)
+			export WINEDLLOVERRIDES="${existing};${entry}"
+			;;
+	esac
+	debug "WINEDLLOVERRIDES=$WINEDLLOVERRIDES"
+}
+
+# inject_ensure_ini_key — Ensure key=value exists in an INI-like file.
+inject_ensure_ini_key() {
+	local file=$1 key=$2 value=$3
+	local tmp
+	[[ -n "$file" && -n "$key" ]] || return 1
+	mkdir -p "$(dirname "$file")"
+	if [[ -f "$file" ]] && grep -qE "^[[:space:]]*${key}[[:space:]]*=" "$file" 2>/dev/null; then
+		tmp="$(mktemp)"
+		awk -v k="$key" -v v="$value" '
+			BEGIN { done=0 }
+			$0 ~ "^[[:space:]]*" k "[[:space:]]*=" {
+				print k "=" v
+				done=1
+				next
+			}
+			{ print }
+			END { if (!done) print k "=" v }
+		' "$file" > "$tmp"
+		mv "$tmp" "$file"
+	else
+		printf '%s=%s\n' "$key" "$value" >> "$file"
+	fi
+}
+
+# inject_resolve_game_dir — Best-effort Steam game install directory for AppID.
+inject_resolve_game_dir() {
+	local appid="${steam_app_id:-}"
+	local dir=""
+	[[ -n "$appid" ]] || return 1
+	if declare -f get_game_dir_for_appid >/dev/null 2>&1; then
+		dir="$(get_game_dir_for_appid "$appid" 2>/dev/null || true)"
+	fi
+	[[ -n "$dir" && -d "$dir" ]] || return 1
+	printf '%s\n' "$dir"
+}
+
+# gamescope_session_active — True when already inside gamescope/Deck gamemode.
+gamescope_session_active() {
+	local desktop
+	desktop="$(detect_desktop_session 2>/dev/null || true)"
+	[[ "$desktop" == gamescope ]] && return 0
+	[[ "${XDG_CURRENT_DESKTOP:-}" == *gamescope* ]] && return 0
+	[[ -n "${STEAMDeck:-}${STEAMDECK:-}" ]] && [[ "${XDG_CURRENT_DESKTOP:-}" == *gamescope* ]] && return 0
+	return 1
+}

@@ -108,3 +108,68 @@ setup() {
 	[[ $status -eq 0 ]]
 	[[ "$output" == single ]]
 }
+
+@test "compute_detected_defaults adds SHADER_CACHE_BOOST off Steam Deck" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib detected-defaults platform
+		is_steam_deck() { return 1; }
+		is_wsl2() { return 1; }
+		is_container() { return 1; }
+		has_systemd_user() { return 1; }
+		detect_gpu_vendor() { echo nvidia; }
+		detect_desktop_session() { echo kde; }
+		detect_audio_server() { echo pulse; }
+		detect_os_family() { echo arch; }
+		is_immutable_os() { return 1; }
+		is_wayland_session() { return 1; }
+		command_available() { return 1; }
+		detect_default_nic() { return 1; }
+		is_multi_ccd_cpu() { return 1; }
+		df_avail_gb() { echo 100; }
+		compute_detected_defaults
+		i=0
+		while (( i < ${#_detected_default_keys[@]} )); do
+			[[ "${_detected_default_keys[$i]}" == SHADER_CACHE_BOOST ]] && {
+				echo "${_detected_default_values[$i]}"
+				exit 0
+			}
+			((i++))
+		done
+		echo missing
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "1" ]]
+}
+
+@test "compute_detected_defaults skips SHADER_CACHE_BOOST on Steam Deck" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib detected-defaults platform
+		is_steam_deck() { return 0; }
+		is_wsl2() { return 1; }
+		is_container() { return 1; }
+		has_systemd_user() { return 1; }
+		detect_gpu_vendor() { echo amd; }
+		detect_desktop_session() { echo gamescope; }
+		detect_audio_server() { echo pulse; }
+		detect_os_family() { echo steamos; }
+		is_immutable_os() { return 1; }
+		is_wayland_session() { return 1; }
+		command_available() { return 1; }
+		compute_detected_defaults
+		i=0
+		while (( i < ${#_detected_default_keys[@]} )); do
+			[[ "${_detected_default_keys[$i]}" == SHADER_CACHE_BOOST ]] && {
+				echo present
+				exit 0
+			}
+			((i++))
+		done
+		echo absent
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == absent ]]
+}

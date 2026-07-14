@@ -14,6 +14,7 @@ Toggles (* = per-game override):
   GPU_POWER_CHECK=1
   LAUNCH_WATCHDOG=1
   GAME_PERFORMANCE=1
+  DLSS_SWAPPER=1
   BENCHMARK=0
   DEBUG=0
   FORCE_NATIVE=0
@@ -24,7 +25,7 @@ Effective settings:
   GAMEMODE=1  (presets/standard.env)
   MANGOHUD=1  (presets/competitive.env)
   GAMESCOPE=1  (presets/competitive.env)
-  LAUNCH_WRAPPERS=dlss-swapper  (games/2357570.env)
+  DLSS_SWAPPER=1  (games/2357570.env)
   GAMESCOPE_W=3440  (games/2357570.env)
   GAMESCOPE_H=1440  (games/2357570.env)
   GAMESCOPE_R=120  (games/2357570.env)
