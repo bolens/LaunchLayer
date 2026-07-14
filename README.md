@@ -686,7 +686,11 @@ make lint-hub          # hub ESLint + tsc
 make check-hub         # lint-hub + test-hub
 make test-all          # shell bats + test-hub
 make check-all         # check + check-hub (full local gate matching CI)
+make bump-version VERSION=X.Y.Z
+make check-version     # LAUNCHLAYER_VERSION consistency gate
 ```
+
+Releases: follow [docs/release_runbook.md](docs/release_runbook.md). Notes live in [CHANGELOG.md](CHANGELOG.md).
 
 Or directly:
 

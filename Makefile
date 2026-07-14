@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration test-hub test-all lint lint-hub shellcheck check-hub-git check check-hub check-all tui-screenshots
+.PHONY: test test-unit test-integration test-hub test-all lint lint-hub shellcheck check-hub-git check check-hub check-all check-version bump-version tui-screenshots
 
 SHELL := /bin/bash
 BATS ?= bats
@@ -29,6 +29,14 @@ lint-hub:
 
 check-hub-git:
 	bash scripts/check-staged-hub-secrets.sh
+
+check-version:
+	bash scripts/check-version.sh
+
+# Example: make bump-version VERSION=0.10.0
+bump-version:
+	@[[ -n "$(VERSION)" ]] || { echo "usage: make bump-version VERSION=X.Y.Z" >&2; exit 2; }
+	bash scripts/bump-version.sh "$(VERSION)"
 
 # Shell gate (matches CI shell suite). Hub is separate — see check-hub / check-all.
 check: shellcheck check-hub-git test

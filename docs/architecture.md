@@ -230,6 +230,8 @@ make lint-hub          # hub ESLint + tsc
 make check-hub         # lint-hub + test-hub
 make test-all          # shell bats + test-hub
 make check-all         # check + check-hub
+make bump-version VERSION=X.Y.Z
+make check-version
 ```
 
 CI (`.github/workflows/ci.yml`) uses path filters:
