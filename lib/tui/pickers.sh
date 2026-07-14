@@ -464,6 +464,67 @@ tui_pick_preset() {
 	tui_menu "Choose preset (default: $default)" "${TUI_PRESETS[@]}"
 }
 
+# tui_pick_enum_key — Menu picker for known enum-style advanced keys.
+# Prints the value to set (may be empty). Returns 1 on cancel.
+tui_pick_enum_key() {
+	local key=$1 choice
+	local -a opts=()
+	case "$key" in
+		DLSS_SWAPPER)
+			opts=("0 (off)" "1 (NGX + presets)" "dll (presets only)")
+			choice="$(tui_menu "DLSS_SWAPPER" "${opts[@]}" "Back")" || return 1
+			[[ "$choice" == Back || -z "$choice" ]] && return 1
+			case "$choice" in
+				0*) printf '0' ;;
+				1*) printf '1' ;;
+				dll*) printf 'dll' ;;
+				*) return 1 ;;
+			esac
+			;;
+		SPECIALTY_RUNTIME)
+			opts=("(clear)" "boxtron" "luxtorpeda" "roberta")
+			choice="$(tui_menu "SPECIALTY_RUNTIME" "${opts[@]}" "Back")" || return 1
+			[[ "$choice" == Back || -z "$choice" ]] && return 1
+			[[ "$choice" == "(clear)" ]] && {
+				printf ''
+				return 0
+			}
+			printf '%s' "$choice"
+			;;
+		REPLAY_TOOL)
+			opts=("auto" "gpu-screen-recorder" "replay-sorcery")
+			choice="$(tui_menu "REPLAY_TOOL" "${opts[@]}" "Back")" || return 1
+			[[ "$choice" == Back || -z "$choice" ]] && return 1
+			printf '%s' "$choice"
+			;;
+		GAMESCOPE_FILTER)
+			opts=("(clear)" "fsr" "nis" "linear" "nearest" "place")
+			choice="$(tui_menu "GAMESCOPE_FILTER" "${opts[@]}" "Back")" || return 1
+			[[ "$choice" == Back || -z "$choice" ]] && return 1
+			[[ "$choice" == "(clear)" ]] && {
+				printf ''
+				return 0
+			}
+			printf '%s' "$choice"
+			;;
+		GAMESCOPE_ADAPTIVE_SYNC)
+			opts=("(auto / empty)" "auto" "0 (force off)" "1 (force on)")
+			choice="$(tui_menu "GAMESCOPE_ADAPTIVE_SYNC (VRR)" "${opts[@]}" "Back")" || return 1
+			[[ "$choice" == Back || -z "$choice" ]] && return 1
+			case "$choice" in
+				"(auto / empty)") printf '' ;;
+				auto) printf 'auto' ;;
+				0*) printf '0' ;;
+				1*) printf '1' ;;
+				*) return 1 ;;
+			esac
+			;;
+		*)
+			return 1
+			;;
+	esac
+}
+
 # tui_game_scope_count_configured — Count games with per-game configs.
 tui_game_scope_count_configured() {
 	"$LAUNCHLAYER_MAIN_SCRIPT" --list-games 2>/dev/null \

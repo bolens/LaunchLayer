@@ -130,9 +130,18 @@ tui_glyph_doctor() {
 	fi
 }
 
-# tui_glyph_bool_onoff — ● on · ○ off (override off = red ○).
+# tui_glyph_bool_onoff — ● on · ○ off (override off = red ○). Shows dll/mid values.
 tui_glyph_bool_onoff() {
 	local val=$1 dim=${2:-0}
+	# Distinct glyph for ternary DLSS dll (on, but labeled in menu line separately).
+	if [[ "${val,,}" == dll ]]; then
+		if [[ "$dim" == 1 ]]; then
+			tui_glyph_paint "◐" off
+		else
+			tui_glyph_paint "◐" ok
+		fi
+		return 0
+	fi
 	if tui_bool_on "$val"; then
 		if [[ "$dim" == 1 ]]; then
 			tui_glyph_paint "$TUI_GLYPH_OK" off

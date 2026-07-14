@@ -84,23 +84,33 @@ EOF
 		toggles)
 			cat <<'EOF'
 Quick toggles
-  Enter             Flip the highlighted 0/1 setting (per-game override)
+  Enter             Flip the highlighted setting (per-game override)
   ↑ / ↓             Move selection
   ?                 Show this help
   Esc               Back to game actions
 
 Green/red ●/○ = per-game override in GAMES_DIR/<AppID>.env
 Dim ○ = inherited layer. Override off uses red ○.
-Dim labels = inherited from config layers
-String keys (FRAME_RATE, OVERRIDE_PROTON, …) live under Advanced config.
+◐ = DLSS_SWAPPER=dll (cycle: 0 → 1 → dll → 0)
+"assist" suffix = path/env helper only (Geo11, Flat2VR, SBS, Depth3D)
+
+String / enum keys (FRAME_RATE, OVERRIDE_PROTON, VRR, specialty runtime, …)
+live under Advanced config. Adaptive Sync is Advanced (not a boolean flip).
+SKIF_LAUNCH=1 one-shots SKIF when SKIF_PATH is set. CRASH_GUESS=1 defaults
+to a 5s retry prompt (set CRASH_GUESS_TIMEOUT to change).
+FWS is an Advanced alias of FLAWLESS_WIDESCREEN — prefer the long name here.
 EOF
 			;;
 		advanced)
 			cat <<'EOF'
 Advanced config
   Enter             Open a key group (Proton, Gamescope, …)
-  Within a group    Edit KEY prompts; empty keeps, "-" clears
+  Within a group    Edit KEY — enums use a picker; others prompt
+                    empty keeps, "-" clears
   Esc               Back
+
+Pickers: DLSS_SWAPPER, SPECIALTY_RUNTIME, REPLAY_TOOL,
+GAMESCOPE_FILTER, GAMESCOPE_ADAPTIVE_SYNC (VRR empty|auto|0|1).
 
 Every non-boolean launch.d key is reachable here (or via Open in $EDITOR).
 EOF

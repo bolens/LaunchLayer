@@ -21,23 +21,27 @@ tui_games_hub_menu_select_fallback() {
 
 # tui_format_toggle_option — Menu line using already-loaded effective settings.
 tui_format_toggle_option() {
-	local appid=$1 key=$2 effective override file label
+	local appid=$1 key=$2 effective override file label suffix value_note
 	file="$(tui_appid_env_path "$appid")"
 	effective="${!key-}"
 	override=""
 	[[ -f "$file" ]] && override="$(tui_env_file_get "$file" "$key")"
+	suffix=""
+	tui_assist_only_key_p "$key" && suffix=" assist"
+	value_note=""
+	[[ "$key" == DLSS_SWAPPER && "${effective,,}" == dll ]] && value_note="=dll"
 	if [[ -n "$override" ]]; then
 		if cli_uses_color; then
-			label="$(printf '%s %s' "$key" "$(tui_glyph_bool_onoff "$effective")")"
-			printf '%s  %s' "$label" "$(cli_dim override)"
+			label="$(printf '%s%s %s' "$key" "$value_note" "$(tui_glyph_bool_onoff "$effective")")"
+			printf '%s  %s%s' "$label" "$(cli_dim override)" "$(cli_dim "$suffix")"
 		else
-			printf '%s=%s  (override)' "$key" "$(tui_glyph_bool_onoff "$effective")"
+			printf '%s%s=%s  (override)%s' "$key" "$value_note" "$(tui_glyph_bool_onoff "$effective")" "$suffix"
 		fi
 	else
 		if cli_uses_color; then
-			printf '%s  %s  %s' "$key" "$(tui_glyph_bool_onoff "$effective" 1)" "$(cli_dim inherited)"
+			printf '%s%s  %s  %s%s' "$key" "$value_note" "$(tui_glyph_bool_onoff "$effective" 1)" "$(cli_dim inherited)" "$(cli_dim "$suffix")"
 		else
-			printf '%s=%s  (inherited)' "$key" "$(tui_glyph_bool_onoff "$effective")"
+			printf '%s%s=%s  (inherited)%s' "$key" "$value_note" "$(tui_glyph_bool_onoff "$effective")" "$suffix"
 		fi
 	fi
 }
@@ -127,6 +131,7 @@ tui_advanced_config() {
 			"Change INCLUDE preset" \
 			"Proton & tools" \
 			"Gamescope" \
+			"Inject & Wine" \
 			"Shader & storage" \
 			"Affinity & network" \
 			"VRAM & preflight" \
@@ -142,11 +147,24 @@ tui_advanced_config() {
 				;;
 			"Proton & tools")
 				tui_advanced_config_group "$appid" "Proton & tools" \
-					OVERRIDE_PROTON DLSS_SWAPPER FRAME_RATE ENABLE_HDR MALLOC_ALLOCATOR
+					OVERRIDE_PROTON DLSS_SWAPPER FRAME_RATE ENABLE_HDR MALLOC_ALLOCATOR \
+					SPECIALTY_RUNTIME
 				;;
 			"Gamescope")
 				tui_advanced_config_group "$appid" "Gamescope" \
-					GAMESCOPE_W GAMESCOPE_H GAMESCOPE_R GAMESCOPE_FSR_SHARPNESS
+					GAMESCOPE_W GAMESCOPE_H GAMESCOPE_R GAMESCOPE_FSR_SHARPNESS GAMESCOPE_ADAPTIVE_SYNC \
+					GAMESCOPE_EXTRA_ARGS GAMESCOPE_PREFER_OUTPUT GAMESCOPE_FRAME_LIMIT \
+					GAMESCOPE_FILTER GAMESCOPE_FOCUSED_FPS GAMESCOPE_UNFOCUSED_FPS
+				;;
+			"Inject & Wine")
+				tui_advanced_config_group "$appid" "Inject & Wine" \
+					VKBASALT_CONFIG_FILE VKBASALT_LOG_LEVEL LSFG_PROCESS LSFG_CONFIG_FILE \
+					WINETRICKS_VERBS REGISTRY_FILES WINE_FSR_STRENGTH WINE_FSR_MODE \
+					SPECIAL_K_DLL SPECIAL_K_SOURCE SPECIAL_K_INI SPECIAL_K_FETCH_URL SPECIAL_K_VERSION \
+					RESHADE_DLL RESHADE_SOURCE RESHADE_SK_VERSION DEPTH3D_SOURCE DEPTH3D_FETCH_URL \
+					FWS FWS_PATH CONTY_PATH OPENVR_FSR_SOURCE GEO11_SOURCE \
+					SBS_VR_PLAYER FLAT2VR_SOURCE SKIF_PATH \
+					VALVEPLUG_SOURCE VALVEPLUG_STEAM_DIR INJECT_SHA256
 				;;
 			"Shader & storage")
 				tui_advanced_config_group "$appid" "Shader & storage" \
@@ -165,7 +183,7 @@ tui_advanced_config() {
 			"HUD & hooks")
 				tui_advanced_config_group "$appid" "HUD & hooks" \
 					MANGOHUD_CONFIG MANGOHUD_CONFIGFILE \
-					PRE_LAUNCH_CMD POST_LAUNCH_CMD LAUNCH_LOG_MAX_LINES
+					PRE_LAUNCH_CMD POST_LAUNCH_CMD LAUNCH_LOG_MAX_LINES REPLAY_TOOL CRASH_GUESS_TIMEOUT
 				;;
 			"Wrappers & args")
 				tui_advanced_config_group "$appid" "Wrappers & args" \

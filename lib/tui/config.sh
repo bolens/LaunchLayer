@@ -27,8 +27,8 @@ tui_json_flag() {
 # Boolean keys exposed in the quick-toggle menu (per-game overrides).
 # Every 0/1 LAUNCHLAYER_CONFIG_KEYS flag that is safe to flip should appear here.
 TUI_TOGGLE_KEYS=(
-	GAMEMODE MANGOHUD MANGOHUD_LOG GAMESCOPE GAMESCOPE_ADAPTIVE_SYNC
-	GAMESCOPE_EXPOSE_WAYLAND GAMESCOPE_FSR GAMESCOPE_HDR VRAM_HOGS
+	GAMEMODE MANGOHUD MANGOHUD_LOG GAMESCOPE
+	GAMESCOPE_EXPOSE_WAYLAND GAMESCOPE_FSR GAMESCOPE_HDR GAMESCOPE_NESTED_FIX VRAM_HOGS
 	NETWORK_TUNE PIPEWIRE_LOW_LATENCY SHADER_CACHE_CHECK SHADER_CACHE_TRIM SHADER_CACHE_BOOST
 	COMPATDATA_CHECK COMPATDATA_TRIM VM_MAX_MAP_COUNT_FIX
 	LAUNCH_WATCHDOG GAME_PERFORMANCE GPU_POWER_CHECK NVIDIA_POWER_MODE
@@ -37,14 +37,41 @@ TUI_TOGGLE_KEYS=(
 	PROTON_FSR4_UPGRADE PROTON_FSR4_RDNA3_UPGRADE PROTON_FSR4_INDICATOR
 	PROTON_XESS_UPGRADE PROTON_NVIDIA_LIBS PROTON_NVIDIA_LIBS_NO_32BIT
 	LD_BIND_NOW VKBASALT LATENCYFLEX DISABLE_VBLANK DISABLE_STEAM_DECK
+	LSFG_VK OBS_VKCAPTURE DISCORD_IPC REPLAY_CAPTURE BLOCK_INTERNET CONTY
+	SPECIAL_K SPECIAL_K_FETCH RESHADE DEPTH3D WINE_FSR WINECFG_BEFORE WINETRICKS_GUI
+	FLAWLESS_WIDESCREEN FWS_COLAUNCH SKIF SKIF_LAUNCH VALVEPLUG
+	OPENVR_FSR GEO11 GEO11_SBS_VR SBS_VR SBS_VR_REQUIRE_HMD FLAT2VR
+	PLAYTIME_LOG CRASH_GUESS
 	BENCHMARK DEBUG FORCE_NATIVE FORCE_PROTON DISABLE_CPU_AFFINITY
+)
+
+# Keys that are path/env assist only (no first-party inject) — labeled in toggle rows.
+TUI_ASSIST_ONLY_KEYS=(
+	DEPTH3D GEO11 GEO11_SBS_VR SBS_VR FLAT2VR
+)
+
+# Compact preview: always show these toggles, plus any per-game overrides.
+TUI_PREVIEW_HOT_KEYS=(
+	GAMEMODE MANGOHUD GAMESCOPE DLSS_SWAPPER SPECIAL_K RESHADE LSFG_VK
+	OBS_VKCAPTURE CONTY BLOCK_INTERNET PLAYTIME_LOG CRASH_GUESS
 )
 
 # Advanced-config string/numeric keys (edited via prompts; not boolean flips).
 # INCLUDE is handled as a preset picker, not listed here.
+# GAMESCOPE_ADAPTIVE_SYNC is 3-state (empty/auto/0/1) — Advanced, not a boolean flip.
+# FWS is an alias of FLAWLESS_WIDESCREEN — Advanced only (prefer the long name in toggles).
 TUI_ADVANCED_KEYS=(
 	OVERRIDE_PROTON DLSS_SWAPPER FRAME_RATE ENABLE_HDR MALLOC_ALLOCATOR
-	GAMESCOPE_W GAMESCOPE_H GAMESCOPE_R GAMESCOPE_FSR_SHARPNESS
+	GAMESCOPE_W GAMESCOPE_H GAMESCOPE_R GAMESCOPE_FSR_SHARPNESS GAMESCOPE_ADAPTIVE_SYNC
+	GAMESCOPE_EXTRA_ARGS GAMESCOPE_PREFER_OUTPUT GAMESCOPE_FRAME_LIMIT GAMESCOPE_FILTER
+	GAMESCOPE_FOCUSED_FPS GAMESCOPE_UNFOCUSED_FPS
+	VKBASALT_CONFIG_FILE VKBASALT_LOG_LEVEL LSFG_PROCESS LSFG_CONFIG_FILE
+	REPLAY_TOOL WINETRICKS_VERBS REGISTRY_FILES WINE_FSR_STRENGTH WINE_FSR_MODE
+	SPECIAL_K_DLL SPECIAL_K_SOURCE SPECIAL_K_INI SPECIAL_K_FETCH_URL SPECIAL_K_VERSION
+	RESHADE_DLL RESHADE_SOURCE RESHADE_SK_VERSION DEPTH3D_SOURCE DEPTH3D_FETCH_URL
+	SKIF_PATH VALVEPLUG_SOURCE VALVEPLUG_STEAM_DIR FWS FWS_PATH CONTY_PATH
+	SPECIALTY_RUNTIME OPENVR_FSR_SOURCE GEO11_SOURCE SBS_VR_PLAYER FLAT2VR_SOURCE
+	CRASH_GUESS_TIMEOUT INJECT_SHA256
 	SHADER_CACHE_MAX_GB SHADER_CACHE_BOOST_GB SHADER_CACHE_CHECK_INTERVAL_HOURS
 	COMPATDATA_MAX_GB VM_MAX_MAP_COUNT_MIN
 	X3D_CPUS CPU_AFFINITY_RANGE GAME_NIC
@@ -99,17 +126,38 @@ tui_effective_key() {
 	printf '%s' "${!key-}"
 }
 
-# tui_toggle_game_key — Flip a boolean-ish key in the per-game .env file.
+# tui_assist_only_key_p — True when key is path/env assist (no first-party inject).
+tui_assist_only_key_p() {
+	local key=$1 k
+	for k in "${TUI_ASSIST_ONLY_KEYS[@]}"; do
+		[[ "$k" == "$key" ]] && return 0
+	done
+	return 1
+}
+
+# tui_toggle_game_key — Flip a boolean-ish key (DLSS_SWAPPER cycles 0→1→dll→0).
 tui_toggle_game_key() {
 	local appid=$1 key=$2 effective new_val file
 	tui_ensure_appid_env "$appid"
 	file="$(tui_appid_env_path "$appid")"
 	effective="$(tui_effective_key "$appid" "$key")"
-	case "$effective" in
-		1|yes|true|on|YES|TRUE|ON) new_val=0 ;;
-		*) new_val=1 ;;
-	esac
+	if [[ "$key" == DLSS_SWAPPER ]]; then
+		case "${effective,,}" in
+			1|yes|true|on) new_val=dll ;;
+			dll) new_val=0 ;;
+			*) new_val=1 ;;
+		esac
+	else
+		case "$effective" in
+			1|yes|true|on|YES|TRUE|ON) new_val=0 ;;
+			*) new_val=1 ;;
+		esac
+	fi
 	tui_env_upsert "$file" "$key" "$new_val"
+	# Prefer FLAWLESS_WIDESCREEN in the UI; keep alias FWS from drifting opposite.
+	if [[ "$key" == FLAWLESS_WIDESCREEN ]]; then
+		tui_env_upsert "$file" FWS "$new_val"
+	fi
 	tui_panel_note "Set $key=$new_val in $(basename "$file") (was: ${effective:-unset})" "Toggle"
 }
 
@@ -159,6 +207,45 @@ tui_advanced_key_prompt() {
 		GAMESCOPE_H) printf '%s' "Gamescope height" ;;
 		GAMESCOPE_R) printf '%s' "Gamescope refresh Hz" ;;
 		GAMESCOPE_FSR_SHARPNESS) printf '%s' "Gamescope FSR sharpness (0-20)" ;;
+		GAMESCOPE_EXTRA_ARGS) printf '%s' "Extra gamescope argv (before --)" ;;
+		GAMESCOPE_PREFER_OUTPUT) printf '%s' "Gamescope -O / prefer-output" ;;
+		GAMESCOPE_FRAME_LIMIT) printf '%s' "Gamescope --framerate-limit" ;;
+		GAMESCOPE_FILTER) printf '%s' "Gamescope --filter — picker (fsr|nis|linear|…)" ;;
+		GAMESCOPE_FOCUSED_FPS) printf '%s' "Gamescope focused FPS limit" ;;
+		GAMESCOPE_UNFOCUSED_FPS) printf '%s' "Gamescope unfocused FPS limit" ;;
+		VKBASALT_CONFIG_FILE) printf '%s' "vkBasalt config file path" ;;
+		VKBASALT_LOG_LEVEL) printf '%s' "vkBasalt log level" ;;
+		LSFG_PROCESS) printf '%s' "lsfg-vk LSFG_PROCESS profile" ;;
+		LSFG_CONFIG_FILE) printf '%s' "lsfg-vk config path" ;;
+		REPLAY_TOOL) printf '%s' "replay: auto|gpu-screen-recorder|replay-sorcery (picker)" ;;
+		WINETRICKS_VERBS) printf '%s' "protontricks verbs (space-separated)" ;;
+		REGISTRY_FILES) printf '%s' ".reg files to apply (space-separated)" ;;
+		WINE_FSR_STRENGTH) printf '%s' "WINE_FULLSCREEN_FSR_STRENGTH" ;;
+		WINE_FSR_MODE) printf '%s' "WINE_FULLSCREEN_FSR_MODE" ;;
+		SPECIAL_K_DLL) printf '%s' "Special K proxy DLL name (dxgi|d3d11|…)" ;;
+		SPECIAL_K_SOURCE) printf '%s' "Dir with SpecialK32/64.dll" ;;
+		SPECIAL_K_INI) printf '%s' "Special K INI path (UsingWINE)" ;;
+		SPECIAL_K_FETCH_URL) printf '%s' "Optional Special K download URL" ;;
+		SPECIAL_K_VERSION) printf '%s' "Special K cache version label" ;;
+		RESHADE_DLL) printf '%s' "ReShade proxy DLL name" ;;
+		RESHADE_SOURCE) printf '%s' "Dir with ReShade DLL" ;;
+		RESHADE_SK_VERSION) printf '%s' "ReShade version pin for SK cohab" ;;
+		DEPTH3D_SOURCE) printf '%s' "Depth3D shader directory (assist-only)" ;;
+		DEPTH3D_FETCH_URL) printf '%s' "Optional Depth3D archive URL (user-supplied)" ;;
+		SKIF_PATH) printf '%s' "Path to SKIF.exe" ;;
+		VALVEPLUG_SOURCE) printf '%s' "Dir with ValvePlug XInput1_4.dll" ;;
+		VALVEPLUG_STEAM_DIR) printf '%s' "Windows Steam client dir for ValvePlug" ;;
+		FWS_PATH) printf '%s' "FlawlessWidescreen executable path" ;;
+		FWS) printf '%s' "Alias of FLAWLESS_WIDESCREEN (prefer long name in Quick toggles)" ;;
+		CONTY_PATH) printf '%s' "Conty binary path" ;;
+		SPECIALTY_RUNTIME) printf '%s' "boxtron|luxtorpeda|roberta|(clear) — picker" ;;
+		OPENVR_FSR_SOURCE) printf '%s' "OpenVR-FSR files directory" ;;
+		GEO11_SOURCE) printf '%s' "Geo11 directory (assist-only)" ;;
+		SBS_VR_PLAYER) printf '%s' "SBS VR player hint (assist-only)" ;;
+		FLAT2VR_SOURCE) printf '%s' "Flat2VR directory (assist-only)" ;;
+		CRASH_GUESS_TIMEOUT) printf '%s' "Crash-guess seconds (0 with CRASH_GUESS=1 → default 5)" ;;
+		INJECT_SHA256) printf '%s' "Optional SHA256 for inject_fetch_url" ;;
+		GAMESCOPE_ADAPTIVE_SYNC) printf '%s' "VRR: empty(auto)|auto|0|1 — picker" ;;
 		SHADER_CACHE_MAX_GB) printf '%s' "Shader cache max GB" ;;
 		SHADER_CACHE_BOOST_GB) printf '%s' "Shader cache boost size GB" ;;
 		SHADER_CACHE_CHECK_INTERVAL_HOURS) printf '%s' "Shader cache check interval (hours)" ;;
@@ -185,9 +272,29 @@ tui_advanced_key_prompt() {
 	esac
 }
 
-# tui_edit_advanced_key — Prompt and validate one advanced key for an appid.
+# tui_edit_advanced_key — Prompt (or picker) and validate one advanced key for an appid.
 tui_edit_advanced_key() {
-	local appid=$1 key=$2
+	local appid=$1 key=$2 picked file
+	case "$key" in
+		SPECIALTY_RUNTIME|REPLAY_TOOL|GAMESCOPE_FILTER|GAMESCOPE_ADAPTIVE_SYNC|DLSS_SWAPPER)
+			picked="$(tui_pick_enum_key "$key")" || return 0
+			tui_ensure_appid_env "$appid"
+			file="$(tui_appid_env_path "$appid")"
+			tui_env_upsert "$file" "$key" "$picked"
+			tui_panel_note "Set $key=${picked:-<empty>}" "Config"
+			tui_validate_game_config_brief "$appid"
+			return 0
+			;;
+		FWS)
+			# Keep alias in sync with the preferred long name when editing from Advanced.
+			tui_prompt_env_key "$appid" "$key" "$(tui_advanced_key_prompt "$key")"
+			file="$(tui_appid_env_path "$appid")"
+			picked="$(tui_env_file_get "$file" FWS)"
+			tui_env_upsert "$file" FLAWLESS_WIDESCREEN "${picked:-0}"
+			tui_validate_game_config_brief "$appid"
+			return 0
+			;;
+	esac
 	tui_prompt_env_key "$appid" "$key" "$(tui_advanced_key_prompt "$key")"
 	tui_validate_game_config_brief "$appid"
 }
