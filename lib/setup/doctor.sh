@@ -54,6 +54,37 @@ doctor_issue_count() {
 	printf '%s\n' "$issues"
 }
 
+# doctor_print_gaming_tips — Non-critical CachyOS / upscaler / sched tips.
+doctor_print_gaming_tips() {
+	local cachyos_tool="" vendor
+	vendor="$(detect_gpu_vendor 2>/dev/null || true)"
+
+	echo "-- Gaming tips --"
+	if [[ "${GAMEMODE:-1}" == "1" ]] && ananicy_cpp_active; then
+		echo "tip: GameMode and ananicy-cpp both adjust process niceness — stop ananicy-cpp before using GameMode: systemctl stop ananicy-cpp"
+		echo "  wiki: https://wiki.cachyos.org/configuration/gaming/#do-not-combine-gamemode-and-ananicy-cpp"
+	fi
+
+	if cachyos_tool="$(prefer_proton_cachyos 2>/dev/null)"; then
+		echo "tip: Proton-CachyOS available ($cachyos_tool) — set OVERRIDE_PROTON=$cachyos_tool for PROTON_DLSS_UPGRADE / PROTON_FSR4_UPGRADE / PROTON_XESS_UPGRADE"
+	fi
+
+	if [[ "$vendor" == nvidia ]]; then
+		if optional_tool_installed dlss-swapper; then
+			echo "tip: DLSS via launch wrapper: DLSS_SWAPPER=1 (NGX updater) or DLSS_SWAPPER=dll (presets only after manual DLL replace)"
+		fi
+		if optional_tool_installed dlss-updater; then
+			echo "tip: dlss-updater is installed (GUI only — no CLI). Use it offline to replace game DLLs; at launch prefer DLSS_SWAPPER or PROTON_DLSS_UPGRADE"
+		elif [[ "$(detect_os_id 2>/dev/null || true)" == cachyos ]]; then
+			echo "tip: optional GUI DLL updater: pacman -S dlss-updater (no launch CLI; pair with DLSS_SWAPPER for presets)"
+		fi
+	fi
+
+	if [[ "${SHADER_CACHE_BOOST:-0}" != "1" ]]; then
+		echo "tip: SHADER_CACHE_BOOST=1 raises Mesa/NVIDIA shader cache size limits (reduces recompile stutters)"
+	fi
+}
+
 # show_doctor — Full health check for a new or moved machine.
 show_doctor() {
 	local json=${1:-0} issues=0 config_issues=0 current required access
@@ -91,7 +122,10 @@ show_doctor() {
 			"$config_issues" \
 			"$issues"
 		doctor_collect_json_issues "$current" "$required" "$access" "$config_issues" "$validation_out"
-		printf ',"package_manager":%s,"optional_tools":' "$(json_string "$(detect_package_manager)")"
+		printf ',"ananicy_cpp_active":%s,"proton_cachyos":%s,"package_manager":%s,"optional_tools":' \
+			"$(json_bool "$(ananicy_cpp_active && echo 1 || echo 0)")" \
+			"$(json_string "$(prefer_proton_cachyos 2>/dev/null || true)")" \
+			"$(json_string "$(detect_package_manager)")"
 		optional_tools_json_array
 		printf '}\n'
 		(( issues == 0 )) || return 1
@@ -123,6 +157,8 @@ show_doctor() {
 	echo
 	echo "-- Config validation --"
 	echo "$validation_out"
+	echo
+	doctor_print_gaming_tips
 	echo
 	echo "-- Completions --"
 	completions_bash_status

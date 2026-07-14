@@ -73,3 +73,34 @@ games/42424242.env:3: unknown key: BADKEY"
 	(( output >= 3 ))
 	rm -rf "$bad_games"
 }
+
+@test "show_doctor json includes ananicy and proton_cachyos fields" {
+	run env CONFIG_DIR="$DOCTOR_TMP" LAUNCHD_DIR="$DOCTOR_TMP/launch.d" bash -c '
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib setup platform steam keys config inspect cli tools
+		sysctl_required_value() { echo 262144; }
+		sysctl_current_value() { echo 262144; }
+		flatpak_script_access() { echo ok; }
+		validate_config() { return 0; }
+		ananicy_cpp_active() { return 0; }
+		prefer_proton_cachyos() { echo proton-cachyos-slr; }
+		optional_tools_json_array() { printf "[]"; }
+		print_detect_environment_body() { :; }
+		detect_default_profiles() { echo arch-linux; }
+		detect_gpu_vendor() { echo nvidia; }
+		detect_desktop_session() { echo kde; }
+		detect_audio_server() { echo pipewire; }
+		is_wsl2() { return 1; }
+		is_flatpak_steam() { return 1; }
+		has_systemd_user() { return 0; }
+		detect_package_manager() { echo pacman; }
+		show_doctor 1
+	'
+	[[ $status -eq 0 ]]
+	python3 -c '
+import json,sys
+d=json.loads(sys.argv[1])
+assert d["ananicy_cpp_active"] is True
+assert d["proton_cachyos"] == "proton-cachyos-slr"
+' "$output"
+}
