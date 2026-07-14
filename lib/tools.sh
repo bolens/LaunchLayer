@@ -12,6 +12,8 @@ LAUNCHLAYER_OPTIONAL_TOOLS=(
 	mangohud
 	dlss-swapper
 	dlss-updater
+	vkbasalt
+	latencyflex
 	fzf
 	taskset
 	cpupower
@@ -100,6 +102,23 @@ optional_tool_relevant() {
 	esac
 }
 
+# vulkan_layer_json_present — True when a matching Vulkan implicit/explicit layer JSON exists.
+vulkan_layer_json_present() {
+	local pattern=$1 dir f
+	for dir in \
+		/usr/share/vulkan/implicit_layer.d \
+		/usr/share/vulkan/explicit_layer.d \
+		/usr/local/share/vulkan/implicit_layer.d \
+		"${XDG_DATA_HOME:-$HOME/.local/share}/vulkan/implicit_layer.d"; do
+		[[ -d "$dir" ]] || continue
+		for f in "$dir"/*; do
+			[[ -f "$f" ]] || continue
+			[[ "${f,,}" == *"${pattern,,}"* ]] && return 0
+		done
+	done
+	return 1
+}
+
 # optional_tool_installed — True when the tool (or accepted fallback) is available.
 optional_tool_installed() {
 	local tool=$1
@@ -122,6 +141,17 @@ optional_tool_installed() {
 			command_available dlss-updater \
 				|| command_available DLSS_Updater \
 				|| { command_available flatpak && flatpak info io.github.recol.dlss-updater >/dev/null 2>&1; }
+			;;
+		vkbasalt)
+			# Vulkan layer (ENABLE_VKBASALT); not a launch wrapper binary.
+			vulkan_layer_json_present vkbasalt \
+				|| command_available vkbasalt
+			;;
+		latencyflex)
+			# LatencyFleX layer (LFX=1); Wine/Proton side may also ship separately.
+			vulkan_layer_json_present latencyflex \
+				|| vulkan_layer_json_present lfx \
+				|| command_available latencyflex
 			;;
 		*)
 			command_available "$tool"
@@ -267,8 +297,12 @@ tool_install_hint() {
 					printf 'sudo pacman -S cachyos-settings  # CachyOS; provides dlss-swapper\n'
 					return 0
 					;;
+				rpm-ostree|dnf)
+					printf 'dlss-swapper ships on Bazzite — set DLSS_SWAPPER=1 (https://docs.bazzite.gg/Gaming/launch-options-env-variables/)\n'
+					return 0
+					;;
 			esac
-			printf 'install dlss-swapper (CachyOS: cachyos-settings) — https://wiki.cachyos.org/configuration/gaming/#forcing-the-latest-dlss-preset\n'
+			printf 'install dlss-swapper (CachyOS: cachyos-settings; Bazzite: preinstalled) — https://wiki.cachyos.org/configuration/gaming/#forcing-the-latest-dlss-preset\n'
 			return 0
 			;;
 		dlss-updater)
@@ -279,6 +313,26 @@ tool_install_hint() {
 					;;
 			esac
 			printf 'install dlss-updater (GUI DLL updater) — https://github.com/Recol/DLSS-Updater\n'
+			return 0
+			;;
+		vkbasalt)
+			case "$pm" in
+				pacman)
+					printf 'sudo pacman -S vkbasalt\n'
+					return 0
+					;;
+			esac
+			printf 'install vkbasalt (Vulkan post-process layer) — https://github.com/DadSchoorse/vkBasalt\n'
+			return 0
+			;;
+		latencyflex)
+			case "$pm" in
+				pacman)
+					printf 'yay -S latencyflex  # AUR; or build from https://github.com/ishitatsuyuki/LatencyFleX\n'
+					return 0
+					;;
+			esac
+			printf 'install LatencyFleX — https://github.com/ishitatsuyuki/LatencyFleX\n'
 			return 0
 			;;
 		nvidia-smi)
@@ -353,6 +407,10 @@ warn_enabled_missing_tools() {
 		"GAMESCOPE=1 but gamescope is not installed"
 	warn_if_feature_enabled_needs_tool MANGOHUD mangohud \
 		"MANGOHUD=1 but mangohud is not installed"
+	warn_if_feature_enabled_needs_tool VKBASALT vkbasalt \
+		"VKBASALT=1 but vkBasalt Vulkan layer not found"
+	warn_if_feature_enabled_needs_tool LATENCYFLEX latencyflex \
+		"LATENCYFLEX=1 but LatencyFleX layer not found"
 	if dlss_bin="$(resolve_dlss_swapper_bin)"; then
 		if ! command_available "$dlss_bin"; then
 			hint="$(tool_install_hint dlss-swapper 2>/dev/null || true)"

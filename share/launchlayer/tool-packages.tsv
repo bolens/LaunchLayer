@@ -19,6 +19,9 @@ dlss-swapper	pacman	cachyos-settings
 dlss-swapper	*	-
 dlss-updater	pacman	dlss-updater
 dlss-updater	*	-
+vkbasalt	*	vkbasalt
+latencyflex	pacman	latencyflex
+latencyflex	*	-
 fzf	*	fzf
 taskset	emerge	sys-apps/util-linux
 taskset	*	util-linux

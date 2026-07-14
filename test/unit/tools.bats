@@ -132,12 +132,16 @@ setup() {
 		echo ---
 		detect_package_manager() { echo apt; }
 		tool_install_hint dlss-swapper
+		echo ---
+		detect_package_manager() { echo rpm-ostree; }
+		tool_install_hint dlss-swapper
 	'
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"cachyos-settings"* ]]
 	[[ "$output" == *"dlss-swapper"* ]]
-	# Non-pacman path includes the wiki URL for manual install guidance.
-	[[ "$output" == *$'---\n'*wiki.cachyos.org* ]]
+	[[ "$output" == *wiki.cachyos.org* ]]
+	[[ "$output" == *"Bazzite"* ]]
+	[[ "$output" == *"docs.bazzite.gg"* ]]
 }
 
 @test "optional_tool_installed dlss-updater accepts binary or flatpak" {
@@ -177,6 +181,96 @@ setup() {
 	[[ "$output" == *"dlss-updater"* ]]
 	[[ "$output" == *"GUI"* ]]
 	[[ "$output" == *"github.com/Recol/DLSS-Updater"* ]]
+}
+
+@test "LAUNCHLAYER_OPTIONAL_TOOLS catalogs vkbasalt and latencyflex" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		printf "%s\n" "${LAUNCHLAYER_OPTIONAL_TOOLS[@]}" | grep -qx vkbasalt || exit 1
+		printf "%s\n" "${LAUNCHLAYER_OPTIONAL_TOOLS[@]}" | grep -qx latencyflex || exit 1
+		echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
+@test "optional_tool_installed vkbasalt detects layer JSON" {
+	local tmp
+	tmp="$(mktemp -d)"
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export XDG_DATA_HOME="'"$tmp"'"
+		mkdir -p "'"$tmp"'/vulkan/implicit_layer.d"
+		touch "'"$tmp"'/vulkan/implicit_layer.d/vkBasalt.json"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		command_available() { return 1; }
+		optional_tool_installed vkbasalt && echo yes || echo no
+	'
+	local st=$status out=$output
+	rm -rf "$tmp"
+	[[ $st -eq 0 ]]
+	[[ "$out" == yes ]]
+}
+
+@test "optional_tool_installed latencyflex detects lfx layer JSON" {
+	local tmp
+	tmp="$(mktemp -d)"
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export XDG_DATA_HOME="'"$tmp"'"
+		mkdir -p "'"$tmp"'/vulkan/implicit_layer.d"
+		touch "'"$tmp"'/vulkan/implicit_layer.d/LFX.json"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		command_available() { return 1; }
+		optional_tool_installed latencyflex && echo yes || echo no
+	'
+	local st=$status out=$output
+	rm -rf "$tmp"
+	[[ $st -eq 0 ]]
+	[[ "$out" == yes ]]
+}
+
+@test "warn_enabled_missing_tools reports VKBASALT" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export VKBASALT=1 LATENCYFLEX=0
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		command_available() { return 1; }
+		optional_tool_installed() { return 1; }
+		optional_tool_relevant() { return 0; }
+		detect_package_manager() { echo pacman; }
+		tool_install_hint() { echo "sudo pacman -S vkbasalt"; }
+		warn_enabled_missing_tools 2>&1
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"VKBASALT=1"* ]]
+	[[ "$output" == *"vkBasalt"* ]]
+}
+
+@test "tool_install_hint vkbasalt and latencyflex" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib platform
+		source "'"$CONFIG_DIR"'/lib/tools.sh"
+		optional_tool_installed() { return 1; }
+		optional_tool_relevant() { return 0; }
+		detect_package_manager() { echo pacman; }
+		tool_install_hint vkbasalt
+		tool_install_hint latencyflex
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"vkbasalt"* ]]
+	[[ "$output" == *"LatencyFleX"* || "$output" == *"latencyflex"* ]]
 }
 
 @test "LAUNCHLAYER_OPTIONAL_TOOLS catalogs dlss-updater" {
