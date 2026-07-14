@@ -231,6 +231,28 @@ detect_gpu_vendor() {
 	printf 'unknown\n'
 }
 
+# detect_primary_gpu_name — Print primary GPU marketing/name string when known.
+detect_primary_gpu_name() {
+	local name="" pri
+	while IFS=$'\t' read -r _ _ pri _ _ _ name; do
+		[[ "$pri" == "1" ]] && {
+			printf '%s\n' "$name"
+			return 0
+		}
+	done < <(detect_gpus_enumerate)
+	name="$(detect_gpus_enumerate | awk -F'\t' 'NR == 1 { print $7; exit }')"
+	[[ -n "$name" ]] && printf '%s\n' "$name"
+}
+
+# detect_gpu_is_rdna3 — True when primary AMD GPU looks like RDNA3 (RX 7000 / gfx110x).
+detect_gpu_is_rdna3() {
+	local name
+	[[ "$(detect_gpu_vendor)" == amd ]] || return 1
+	name="$(detect_primary_gpu_name 2>/dev/null || true)"
+	[[ -n "$name" ]] || return 1
+	[[ "${name,,}" =~ rx[[:space:]]*7[6-9][0-9]{2} || "${name,,}" =~ gfx110 ]]
+}
+
 # detect_gpu_summary — Compact human-readable multi-GPU summary.
 detect_gpu_summary() {
 	local -a parts=()

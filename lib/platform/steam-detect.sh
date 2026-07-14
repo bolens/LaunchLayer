@@ -48,22 +48,39 @@ detect_steam_root() {
 	printf '%s\n' "${HOME}/.local/share/Steam"
 }
 
+# steam_compat_tool_roots — Print candidate compatibilitytools.d directories.
+steam_compat_tool_roots() {
+	local root
+	[[ -n "${STEAM_ROOT:-}" ]] && printf '%s\n' "${STEAM_ROOT}/compatibilitytools.d"
+	for root in \
+		"${HOME}/.local/share/Steam/compatibilitytools.d" \
+		"${HOME}/.steam/root/compatibilitytools.d" \
+		"${HOME}/.steam/steam/compatibilitytools.d" \
+		"/usr/share/steam/compatibilitytools.d"; do
+		printf '%s\n' "$root"
+	done
+}
+
 # resolve_proton_path — Resolve version name to absolute proton script path.
 resolve_proton_path() {
 	local version=$1
-	local path
+	local path root
 
 	if [[ "$version" == */proton && -f "$version" ]]; then
 		echo "$version"
 		return 0
 	fi
 
-	if [[ -n "${STEAM_ROOT:-}" ]]; then
-		path="${STEAM_ROOT}/compatibilitytools.d/${version}/proton"
+	while IFS= read -r root; do
+		[[ -n "$root" ]] || continue
+		path="${root}/${version}/proton"
 		if [[ -f "$path" ]]; then
 			echo "$path"
 			return 0
 		fi
+	done < <(steam_compat_tool_roots)
+
+	if [[ -n "${STEAM_ROOT:-}" ]]; then
 		path="${STEAM_ROOT}/steamapps/common/${version}/proton"
 		if [[ -f "$path" ]]; then
 			echo "$path"
@@ -71,18 +88,10 @@ resolve_proton_path() {
 		fi
 	fi
 
-	local fallback_roots=(
-		"${HOME}/.local/share/Steam"
-		"${HOME}/.steam/root"
-		"${HOME}/.steam/steam"
-	)
-	local root
-	for root in "${fallback_roots[@]}"; do
-		path="${root}/compatibilitytools.d/${version}/proton"
-		if [[ -f "$path" ]]; then
-			echo "$path"
-			return 0
-		fi
+	for root in \
+		"${HOME}/.local/share/Steam" \
+		"${HOME}/.steam/root" \
+		"${HOME}/.steam/steam"; do
 		path="${root}/steamapps/common/${version}/proton"
 		if [[ -f "$path" ]]; then
 			echo "$path"
@@ -90,6 +99,85 @@ resolve_proton_path() {
 		fi
 	done
 	return 1
+}
+
+# list_installed_compat_tools — Print installed compatibility tool directory names.
+list_installed_compat_tools() {
+	local root entry name
+	local -A seen=()
+	while IFS= read -r root; do
+		[[ -d "$root" ]] || continue
+		for entry in "$root"/*; do
+			[[ -d "$entry" ]] || continue
+			[[ -f "$entry/proton" || -f "$entry/compatibilitytool.vdf" ]] || continue
+			name="$(basename "$entry")"
+			[[ -n "${seen[$name]+x}" ]] && continue
+			seen["$name"]=1
+			printf '%s\n' "$name"
+		done
+	done < <(steam_compat_tool_roots)
+}
+
+# prefer_proton_cachyos — Print preferred installed Proton-CachyOS tool name, or empty.
+prefer_proton_cachyos() {
+	local name
+	local -a preferred=(proton-cachyos-slr proton-cachyos-native)
+	for name in "${preferred[@]}"; do
+		if resolve_proton_path "$name" >/dev/null 2>&1; then
+			printf '%s\n' "$name"
+			return 0
+		fi
+	done
+	while IFS= read -r name; do
+		[[ "${name,,}" == *cachyos* ]] || continue
+		printf '%s\n' "$name"
+		return 0
+	done < <(list_installed_compat_tools)
+	return 1
+}
+
+# proton_tool_family — Classify a Proton/compat tool name: valve|ge|cachyos|em|unknown.
+proton_tool_family() {
+	local name=${1:-}
+	local n=${name,,}
+	[[ -z "$n" ]] && {
+		printf 'valve\n'
+		return 0
+	}
+	case "$n" in
+		ge-proton*|proton-ge*|geproton*) printf 'ge\n' ;;
+		*cachyos*) printf 'cachyos\n' ;;
+		proton-em*|proton_em*|em-proton*) printf 'em\n' ;;
+		proton_*|proton-stable*|proton\ experimental*) printf 'valve\n' ;;
+		*) printf 'unknown\n' ;;
+	esac
+}
+
+# proton_tool_supports_upscaler_upgrades — True for GE / CachyOS / (FSR4-only) EM forks.
+proton_tool_supports_upscaler_upgrades() {
+	local name=${1:-} family
+	family="$(proton_tool_family "$name")"
+	case "$family" in
+		ge|cachyos|em) return 0 ;;
+		*) return 1 ;;
+	esac
+}
+
+# resolve_effective_proton_tool — OVERRIDE_PROTON, else AppID tool, else empty.
+resolve_effective_proton_tool() {
+	local appid=${1:-${steam_app_id:-}}
+	if [[ -n "${OVERRIDE_PROTON:-}" ]]; then
+		printf '%s\n' "${OVERRIDE_PROTON}"
+		return 0
+	fi
+	[[ -n "$appid" ]] || return 1
+	get_proton_tool_for_appid "$appid" 2>/dev/null
+}
+
+# ananicy_cpp_active — True when ananicy-cpp systemd unit is active.
+ananicy_cpp_active() {
+	command_available systemctl || return 1
+	systemctl is-active --quiet ananicy-cpp 2>/dev/null
 }
 
 # apply_override_proton — Rewrite */proton entries in an argv array (nameref).
