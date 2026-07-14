@@ -26,6 +26,7 @@ prepare_launch_context() {
 	apply_proton_env
 	apply_hdr_tuning
 	apply_malloc_allocator
+	apply_launch_extras_pre
 	build_launch_chain
 	warn_launch_chain_issues
 }
@@ -105,9 +106,13 @@ run_game_launch() {
 	apply_disk_tuning
 	apply_hdr_tuning
 	apply_malloc_allocator
+	apply_launch_extras_pre
+	apply_launch_extras_inject
+	apply_launch_extras_wine
 	build_launch_chain
 	warn_launch_chain_issues || true
 
+	playtime_record_start
 	run_pre_launch_cmd
 
 	launch+=("${launch_args[@]}")
@@ -118,6 +123,9 @@ run_game_launch() {
 
 	"${launch[@]}" || exit_code=$?
 	run_post_launch_cmd
+	playtime_record_end
+	inject_cleanup_launch_tracks "${steam_app_id:-}"
+	crash_guess_maybe_prompt "$exit_code"
 	duration=$(( $(date +%s) - launch_start_time ))
 	log_launch_event "$exit_code" "$duration"
 	exit "$exit_code"

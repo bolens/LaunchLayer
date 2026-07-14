@@ -25,6 +25,7 @@ run_launch_chain_case() {
 				*) return 1 ;;
 			esac
 		}
+		gamescope_session_active() { return 1; }
 		default_online_cpus() { echo 0-3; }
 		launch=()
 		build_launch_chain
@@ -286,6 +287,7 @@ run_launch_chain_case() {
 			source_lib platform runtime
 			optional_tool_installed() { [[ "$1" == gamescope ]]; }
 			command_available() { return 1; }
+			gamescope_session_active() { return 1; }
 			steam_app_id=42424242
 			steam_game_name="Overlay Game"
 			is_anticheat=0

@@ -37,16 +37,44 @@ parse_game_extra_args() {
 	done
 }
 
+# append_gamescope_extra_argv — Split GAMESCOPE_EXTRA_ARGS into launch[].
+append_gamescope_extra_argv() {
+	local arg
+	[[ -n "${GAMESCOPE_EXTRA_ARGS:-}" ]] || return 0
+	# shellcheck disable=SC2086
+	read -r -a _gs_extra <<< "$GAMESCOPE_EXTRA_ARGS"
+	for arg in "${_gs_extra[@]}"; do
+		launch+=("$arg")
+	done
+}
+
 # build_launch_chain — Assemble the wrapper prefix executed before Steam's %command%.
 #
 # Typical chain:
-#   [wrappers_before] → gamemoderun → taskset → game-performance
-#   → [dlss-swapper] → [wrappers] → [gamescope --mangoapp] → [mangohud]
+#   [unshare -n?] → [conty?] → [wrappers_before] → gamemoderun → taskset → game-performance
+#   → [dlss-swapper] → [wrappers] → [env -u LD_PRELOAD] gamescope … -- [env LD_PRELOAD=]
+#   → [obs/replay/discord] → [mangohud]
 build_launch_chain() {
 	local use_mangoapp=0
-	local dlss_bin=""
+	local dlss_bin="" conty_bin="" obs_bin="" replay_bin="" discord_bin=""
+	local skip_gamescope=0
+	local nested_preload=""
+	local use_nested_fix=0
 
 	launch=( )
+
+	if [[ "${BLOCK_INTERNET:-0}" == "1" && "${LAUNCHLAYER_BLOCK_INTERNET_WRAP:-}" == unshare ]]; then
+		if command_available unshare; then
+			launch+=(unshare -n -r)
+		fi
+	fi
+
+	if conty_bin="$(resolve_conty_bin 2>/dev/null)"; then
+		launch+=("$conty_bin")
+	elif [[ "${CONTY:-0}" == "1" ]]; then
+		debug "CONTY=1 but conty binary unavailable"
+	fi
+
 	append_launch_wrappers
 
 	if [[ "${GAMEMODE:-1}" == "1" ]] && optional_tool_installed gamemoderun; then
@@ -76,22 +104,78 @@ build_launch_chain() {
 		warn "GAMESCOPE=1 on native game — set FORCE_PROTON=1 if intentional"
 	fi
 
-	if [[ "${GAMESCOPE:-0}" == "1" ]] && optional_tool_installed gamescope; then
+	# Skip nested Gamescope inside gamescope-session / Deck gamemode.
+	if [[ "${GAMESCOPE:-0}" == "1" ]] && gamescope_session_active 2>/dev/null; then
+		skip_gamescope=1
+		warn "GAMESCOPE=1 skipped — already inside gamescope-session (ScopeBuddy-style nest skip)"
+	fi
+
+	if [[ "${GAMESCOPE:-0}" == "1" && "$skip_gamescope" != "1" ]] && optional_tool_installed gamescope; then
+		# Nested desktop fix: strip Steam/overlay LD_PRELOAD from gamescope, re-apply after --.
+		if [[ "${GAMESCOPE_NESTED_FIX:-1}" == "1" ]]; then
+			nested_preload="${LD_PRELOAD:-}"
+			use_nested_fix=1
+			launch+=(env -u LD_PRELOAD)
+		fi
 		launch+=(gamescope)
-		launch+=(-W "${GAMESCOPE_W}" -H "${GAMESCOPE_H}" -r "${GAMESCOPE_R:-120}")
+		[[ -n "${GAMESCOPE_W:-}" ]] && launch+=(-W "${GAMESCOPE_W}")
+		[[ -n "${GAMESCOPE_H:-}" ]] && launch+=(-H "${GAMESCOPE_H}")
+		[[ -n "${GAMESCOPE_R:-}" ]] && launch+=(-r "${GAMESCOPE_R}")
 		launch+=(-f --force-grab-cursor)
 		[[ "${GAMESCOPE_ADAPTIVE_SYNC:-0}" == "1" ]] && launch+=(--adaptive-sync)
 		[[ "${GAMESCOPE_EXPOSE_WAYLAND:-0}" == "1" ]] && launch+=(--expose-wayland)
 		[[ "${GAMESCOPE_FSR:-0}" == "1" ]] && launch+=(--fsr-sharpness "${GAMESCOPE_FSR_SHARPNESS:-5}")
 		[[ "${GAMESCOPE_HDR:-0}" == "1" ]] && launch+=(--hdr-enabled)
+		if [[ -n "${GAMESCOPE_PREFER_OUTPUT:-}" ]]; then
+			launch+=(-O "${GAMESCOPE_PREFER_OUTPUT}")
+		fi
+		if [[ -n "${GAMESCOPE_FRAME_LIMIT:-}" ]]; then
+			launch+=(--framerate-limit "${GAMESCOPE_FRAME_LIMIT}")
+		fi
+		if [[ -n "${GAMESCOPE_FILTER:-}" ]]; then
+			launch+=(--filter "${GAMESCOPE_FILTER}")
+		fi
+		if [[ -n "${GAMESCOPE_FOCUSED_FPS:-}" ]]; then
+			# Newer gamescope: --fps-limit; keep as focused when only one set.
+			launch+=(--fps-limit "${GAMESCOPE_FOCUSED_FPS}")
+		fi
+		if [[ -n "${GAMESCOPE_UNFOCUSED_FPS:-}" ]]; then
+			launch+=(--unfocused-fps-limit "${GAMESCOPE_UNFOCUSED_FPS}")
+		fi
+		append_gamescope_extra_argv
 		# --mangoapp integrates MangoHUD inside gamescope (avoids double-wrapping).
 		if [[ "${BENCHMARK:-0}" != "1" && "${MANGOHUD:-0}" == "1" ]]; then
 			launch+=(--mangoapp)
 			use_mangoapp=1
 		fi
 		launch+=(--)
-	elif [[ "${GAMESCOPE:-0}" == "1" ]]; then
+		if [[ "$use_nested_fix" == "1" && -n "$nested_preload" ]]; then
+			launch+=(env "LD_PRELOAD=${nested_preload}")
+		fi
+	elif [[ "${GAMESCOPE:-0}" == "1" && "$skip_gamescope" != "1" ]]; then
 		debug "gamescope unavailable — continuing without Gamescope wrapper"
+	fi
+
+	if obs_bin="$(resolve_obs_vkcapture_bin 2>/dev/null)"; then
+		launch+=("$obs_bin")
+	elif [[ "${OBS_VKCAPTURE:-0}" == "1" ]]; then
+		debug "OBS_VKCAPTURE=1 but obs-gamecapture/obs-vkcapture missing"
+	fi
+
+	if replay_bin="$(resolve_replay_bin 2>/dev/null)"; then
+		# gpu-screen-recorder is often a companion, not a %command% wrapper — only wrap PATH tools that take a command.
+		case "$replay_bin" in
+			replay-sorcery) launch+=("$replay_bin") ;;
+			*)
+				debug "REPLAY_CAPTURE tool=$replay_bin — start externally or via PRE_LAUNCH_CMD (not chain-wrapped)"
+				;;
+		esac
+	elif [[ "${REPLAY_CAPTURE:-0}" == "1" ]]; then
+		debug "REPLAY_CAPTURE=1 but no replay tool found"
+	fi
+
+	if discord_bin="$(resolve_discord_ipc_bin 2>/dev/null)"; then
+		launch+=("$discord_bin")
 	fi
 
 	if [[ "${BENCHMARK:-0}" != "1" && "${MANGOHUD:-0}" == "1" && "$use_mangoapp" != "1" ]] \
@@ -125,9 +209,9 @@ launch_wrapper_config_conflict_errors() {
 				[[ "${GAMEMODE:-0}" == "1" ]] \
 					&& errors+=("LAUNCH_WRAPPERS includes gamemoderun while GAMEMODE=1")
 				;;
-			gamescope)
+			gamescope|scopebuddy|scb)
 				[[ "${GAMESCOPE:-0}" == "1" ]] \
-					&& errors+=("LAUNCH_WRAPPERS includes gamescope while GAMESCOPE=1")
+					&& errors+=("LAUNCH_WRAPPERS includes $wrapper while GAMESCOPE=1")
 				;;
 			mangohud)
 				[[ "${MANGOHUD:-0}" == "1" ]] \
@@ -144,6 +228,14 @@ launch_wrapper_config_conflict_errors() {
 			sd0)
 				[[ "${DISABLE_STEAM_DECK:-0}" == "1" ]] \
 					&& errors+=("LAUNCH_WRAPPERS includes sd0 while DISABLE_STEAM_DECK=1 (use one path)")
+				;;
+			obs-gamecapture|obs-vkcapture)
+				[[ "${OBS_VKCAPTURE:-0}" == "1" ]] \
+					&& errors+=("LAUNCH_WRAPPERS includes $wrapper while OBS_VKCAPTURE=1")
+				;;
+			conty)
+				[[ "${CONTY:-0}" == "1" ]] \
+					&& errors+=("LAUNCH_WRAPPERS includes conty while CONTY=1")
 				;;
 		esac
 	done
@@ -196,7 +288,8 @@ launch_chain_duplicate_wrapper_errors() {
 	local -a errors=()
 	local has_mangohud=0 has_mangoapp=0
 
-	for wrapper in gamemoderun game-performance dlss-swapper dlss-swapper-dll gamescope mangohud; do
+	for wrapper in gamemoderun game-performance dlss-swapper dlss-swapper-dll gamescope mangohud \
+		obs-gamecapture obs-vkcapture conty; do
 		count="$(launch_chain_count_token "$wrapper")"
 		if (( count > 1 )); then
 			errors+=("duplicate $wrapper in launch chain (count=$count)")

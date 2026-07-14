@@ -105,6 +105,25 @@ setup() {
 	[[ "$output" == ok ]]
 }
 
+@test "known_config_key includes extended first-party tools" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib keys
+		for key in LSFG_VK OBS_VKCAPTURE SPECIAL_K RESHADE GAMESCOPE_EXTRA_ARGS \
+			WINETRICKS_VERBS CONTY BLOCK_INTERNET OPENVR_FSR PLAYTIME_LOG VKBASALT_CONFIG_FILE; do
+			known_config_key "$key" || { echo "missing:$key"; exit 1; }
+			printf "%s\n" "${LAUNCHLAYER_CONFIG_KEYS[@]}" | grep -qx "$key" || {
+				echo "missing-config:$key"
+				exit 1
+			}
+		done
+		echo ok
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == ok ]]
+}
+
 @test "known_config_key accepts proton and wine prefixes" {
 	run bash -c '
 		export CONFIG_DIR="'"$CONFIG_DIR"'"

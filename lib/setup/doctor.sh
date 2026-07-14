@@ -103,6 +103,14 @@ doctor_print_gaming_tips() {
 		echo "tip: Arch Gaming latency knobs: LD_BIND_NOW=1, DISABLE_VBLANK=1, VKBASALT=1 (vkBasalt), LATENCYFLEX=1 (LFX)"
 		echo "  wiki: https://wiki.archlinux.org/title/Gaming"
 	fi
+	if [[ "${LSFG_VK:-0}" != "1" ]] && optional_tool_installed lsfg-vk 2>/dev/null; then
+		echo "tip: LSFG_VK=1 enables lsfg-vk (GPL) — requires owned Lossless Scaling on Steam (docs/third-party.md)"
+	fi
+	if command_available goverlay 2>/dev/null; then
+		echo "tip: goverlay is installed — use it to configure MangoHud / lsfg-vk externally (not embedded in LaunchLayer)"
+	elif [[ "${MANGOHUD:-0}" == "1" || "${LSFG_VK:-0}" == "1" ]]; then
+		echo "tip: install goverlay for a GUI to configure MangoHud/lsfg-vk"
+	fi
 
 	local os_id=""
 	os_id="$(detect_os_id 2>/dev/null || true)"

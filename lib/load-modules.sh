@@ -179,6 +179,10 @@ launchlayer_source_runtime() {
 	source "$LIB_DIR/runtime/summary.sh"
 	# shellcheck source=runtime/tuning.sh
 	source "$LIB_DIR/runtime/tuning.sh"
+	# shellcheck source=runtime/inject.sh
+	source "$LIB_DIR/runtime/inject.sh"
+	# shellcheck source=runtime/extras.sh
+	source "$LIB_DIR/runtime/extras.sh"
 	# shellcheck source=runtime/chain.sh
 	source "$LIB_DIR/runtime/chain.sh"
 	# shellcheck source=runtime/logging.sh

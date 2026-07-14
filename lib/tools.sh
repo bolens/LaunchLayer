@@ -14,6 +14,16 @@ LAUNCHLAYER_OPTIONAL_TOOLS=(
 	dlss-updater
 	vkbasalt
 	latencyflex
+	lsfg-vk
+	obs-vkcapture
+	protontricks
+	winetricks
+	conty
+	replay-sorcery
+	gpu-screen-recorder
+	wine-discord-ipc-bridge
+	discord-ipc-bridge
+	goverlay
 	fzf
 	taskset
 	cpupower
@@ -153,6 +163,18 @@ optional_tool_installed() {
 				|| vulkan_layer_json_present lfx \
 				|| command_available latencyflex
 			;;
+		lsfg-vk)
+			vulkan_layer_json_present lsfg \
+				|| vulkan_layer_json_present lossless \
+				|| command_available lsfg-vk \
+				|| command_available lsfg-vk-ui
+			;;
+		obs-vkcapture)
+			command_available obs-gamecapture || command_available obs-vkcapture
+			;;
+		wine-discord-ipc-bridge|discord-ipc-bridge)
+			command_available wine-discord-ipc-bridge || command_available discord-ipc-bridge
+			;;
 		*)
 			command_available "$tool"
 			;;
@@ -170,7 +192,7 @@ launch_wrapper_available() {
 		dlss-swapper|dlss-swapper-dll)
 			command_available "$wrapper"
 			;;
-		gamemoderun|gamescope|mangohud|taskset)
+		gamemoderun|gamescope|mangohud|taskset|obs-gamecapture|obs-vkcapture|conty)
 			optional_tool_installed "$wrapper"
 			;;
 		*)
@@ -411,6 +433,28 @@ warn_enabled_missing_tools() {
 		"VKBASALT=1 but vkBasalt Vulkan layer not found"
 	warn_if_feature_enabled_needs_tool LATENCYFLEX latencyflex \
 		"LATENCYFLEX=1 but LatencyFleX layer not found"
+	warn_if_feature_enabled_needs_tool LSFG_VK lsfg-vk \
+		"LSFG_VK=1 but lsfg-vk layer not found (requires owned Lossless Scaling — docs/third-party.md)"
+	warn_if_feature_enabled_needs_tool OBS_VKCAPTURE obs-vkcapture \
+		"OBS_VKCAPTURE=1 but obs-gamecapture/obs-vkcapture not installed"
+	warn_if_feature_enabled_needs_tool CONTY conty \
+		"CONTY=1 but conty is not installed"
+	if [[ "${DISCORD_IPC:-0}" == "1" ]]; then
+		if ! command_available discord-ipc-bridge && ! command_available wine-discord-ipc-bridge; then
+			hint="$(tool_install_hint wine-discord-ipc-bridge 2>/dev/null || true)"
+			warn "DISCORD_IPC=1 but wine-discord-ipc-bridge / discord-ipc-bridge not on PATH${hint:+ — $hint}"
+		fi
+	fi
+	if [[ "${REPLAY_CAPTURE:-0}" == "1" ]]; then
+		if ! command_available replay-sorcery && ! command_available gpu-screen-recorder; then
+			hint="$(tool_install_hint replay-sorcery 2>/dev/null || true)"
+			warn "REPLAY_CAPTURE=1 but replay-sorcery/gpu-screen-recorder missing${hint:+ — $hint} (gsr is external — not chain-wrapped)"
+		fi
+	fi
+	if [[ -n "${WINETRICKS_VERBS:-}" ]] && ! command_available protontricks && ! command_available winetricks; then
+		hint="$(tool_install_hint protontricks 2>/dev/null || true)"
+		warn "WINETRICKS_VERBS set but protontricks/winetricks missing${hint:+ — $hint}"
+	fi
 	if dlss_bin="$(resolve_dlss_swapper_bin)"; then
 		if ! command_available "$dlss_bin"; then
 			hint="$(tool_install_hint dlss-swapper 2>/dev/null || true)"
@@ -441,6 +485,10 @@ warn_enabled_missing_tools() {
 	if [[ "${VRAM_HOGS:-0}" == "1" ]] && ! has_systemd_user \
 		&& [[ -z "${VRAM_HOG_PIDS:-}" ]]; then
 		warn "VRAM_HOGS=1 but systemd user session is unavailable and VRAM_HOG_PIDS is unset — hogs will not be paused"
+	fi
+	if [[ "${MANGOHUD:-0}" == "1" || "${LSFG_VK:-0}" == "1" ]] && ! command_available goverlay; then
+		hint="$(tool_install_hint goverlay 2>/dev/null || true)"
+		debug "tip: goverlay can configure MangoHud/lsfg-vk${hint:+ — $hint}"
 	fi
 	for wrapper in ${LAUNCH_WRAPPERS_BEFORE:-} ${LAUNCH_WRAPPERS:-}; do
 		launch_wrapper_available "$wrapper" && continue

@@ -244,6 +244,9 @@ apply_vkbasalt() {
 	[[ "${VKBASALT:-0}" == "1" ]] || return 0
 	export ENABLE_VKBASALT=1
 	debug "ENABLE_VKBASALT=1"
+	if declare -f apply_vkbasalt_config >/dev/null 2>&1; then
+		apply_vkbasalt_config
+	fi
 }
 
 # apply_latencyflex — Enable LatencyFleX (LFX=1).
@@ -417,14 +420,33 @@ apply_malloc_allocator() {
 	fi
 }
 
-# detect_hdr_support — Return 1 if any active display supports HDR, 0 otherwise.
+# detect_hdr_support — Return 1 only when HDR appears *enabled* (not mere EDID capability).
 detect_hdr_support() {
+	# Prefer compositor "enabled" signals. EDID "HDR Static Metadata" is capability only
+	# (see detect_hdr_capable) and must not auto-enable Gamescope/DXVK HDR.
 	if command_available kscreen-doctor; then
-		if kscreen-doctor -o 2>/dev/null | grep -i "HDR" | grep -q -iv "incapable"; then
+		local ks
+		ks="$(kscreen-doctor -j 2>/dev/null || true)"
+		if [[ -n "$ks" ]] && command_available jq; then
+			if echo "$ks" | jq -e '
+				[.outputs[]? | select(.enabled == true) | .hdr // .hdrMetadata // empty]
+				| map(select(. == true or . == "enabled" or (type=="object" and .enabled==true)))
+				| length > 0
+			' >/dev/null 2>&1; then
+				echo 1
+				return 0
+			fi
+		fi
+		if kscreen-doctor -o 2>/dev/null | grep -i "HDR" | grep -qiE 'enabled|active|on'; then
 			echo 1
 			return 0
 		fi
 	fi
+	echo 0
+}
+
+# detect_hdr_capable — Return 1 if EDID advertises HDR Static Metadata (capability tip).
+detect_hdr_capable() {
 	local edid
 	for edid in /sys/class/drm/card*-*/edid; do
 		[[ -f "$edid" ]] || continue
@@ -445,6 +467,9 @@ apply_hdr_tuning() {
 		hdr_support=1
 	elif [[ -z "${ENABLE_HDR:-}" ]]; then
 		hdr_support="$(detect_hdr_support)"
+		if [[ "$hdr_support" != "1" && "$(detect_hdr_capable 2>/dev/null || echo 0)" == "1" ]]; then
+			debug "HDR capable (EDID) but not enabled in compositor — set ENABLE_HDR=1 to force"
+		fi
 	fi
 
 	if (( hdr_support == 1 )); then
