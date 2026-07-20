@@ -985,3 +985,21 @@ orphan line'"'"'
 	[[ $status -eq 0 ]]
 	[[ "$output" == ok ]]
 }
+
+@test "main menu Doctor prefix row matches Doctor* case pattern" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export NO_COLOR=1
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib load-modules
+		launchlayer_source_tui
+		row="Doctor $(tui_glyph_doctor 2 | tui_strip_ansi)"
+		case "$row" in
+			Doctor:*) echo "colon-only" ;;
+			Doctor*) echo "matched" ;;
+			*) echo "miss:$row" ;;
+		esac
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "matched" ]]
+}

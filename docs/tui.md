@@ -93,7 +93,7 @@ Header `LaunchLayer 0.11.0` (version from `LAUNCHLAYER_VERSION`). Footer shows l
 ```
 LaunchLayer 0.11.0                          ← fzf --header
 ────────────────────────────────────────
-Doctor: 2 issue(s)                         ← only when doctor finds issues
+Doctor ⚠2                                   ← only when doctor finds issues
 ▶ Resume: Games                            ← when a previous hub was saved
 Status                                     ← sidebar shows grouped health/timers/hub
 Games

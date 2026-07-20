@@ -9,6 +9,10 @@ and this project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Main-menu **Doctor** shortcut (`Doctor ⚠N`) actually runs doctor (case was `Doctor:*`)
+
 ### Changed
 
 - TUI parity seams: ProtonDB **Suggest from ProtonDB** (preview/apply), per-game **Runtime status**, restore **merge** paths, hub Apply-by-ID **history** / apply-historical
