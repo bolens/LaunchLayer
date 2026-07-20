@@ -558,8 +558,9 @@ tui_game_scope_count() {
 }
 
 # tui_collect_appids — Collect AppIDs for a bulk preset scope.
+# Optional second arg: name substring for scope=grep.
 tui_collect_appids() {
-	local scope=$1 line appid -a appids=()
+	local scope=$1 grep_pattern=${2:-} line appid -a appids=()
 	case "$scope" in
 		filter)
 			while IFS= read -r line || [[ -n "$line" ]]; do
@@ -573,6 +574,13 @@ tui_collect_appids() {
 				[[ "$appid" =~ ^[0-9]+$ ]] && appids+=("$appid")
 			done < <("$LAUNCHLAYER_MAIN_SCRIPT" --list-games 2>/dev/null | tail -n +2 | awk '$2 == "yes"')
 			;;
+		grep)
+			[[ -n "$grep_pattern" ]] || return 1
+			while IFS= read -r line || [[ -n "$line" ]]; do
+				appid="${line%% *}"
+				[[ "$appid" =~ ^[0-9]+$ ]] && appids+=("$appid")
+			done < <("$LAUNCHLAYER_MAIN_SCRIPT" --list-games --grep "$grep_pattern" 2>/dev/null | tail -n +2)
+			;;
 		multi)
 			mapfile -t appids < <(tui_pick_game_appids_multi)
 			;;
@@ -583,7 +591,7 @@ tui_collect_appids() {
 
 # tui_pick_game_appids_multi — Fuzzy multi-select installed games; prints AppIDs.
 tui_pick_game_appids_multi() {
-	local -a lines=() pick_lines=() selected=() line appid
+	local -a lines=() selected=() line appid
 	tui_has_fzf || {
 		tui_show_text "Multi-select requires fzf$(tool_warn_suffix fzf)." "Games"
 		return 1
@@ -602,22 +610,58 @@ tui_pick_game_appids_multi() {
 	done
 }
 
+# tui_bulk_preset_run — Preview or apply INCLUDE preset for collected AppIDs.
+tui_bulk_preset_run() {
+	local preset=$1
+	shift
+	local -a appids=("$@")
+	local action
+
+	((${#appids[@]})) || {
+		tui_show_text "No games matched that scope." "Bulk preset"
+		return 0
+	}
+
+	action="$(tui_menu "Bulk INCLUDE: $preset (${#appids[@]} games)" \
+		"Preview (dry-run)" \
+		"Apply" \
+		"Back")" || return 0
+
+	case "$action" in
+		"Preview (dry-run)")
+			tui_run_paged bulk_set_include_preset "$preset" --dry-run "${appids[@]}" || true
+			;;
+		"Apply")
+			tui_confirm "Set INCLUDE=presets/${preset}.env on ${#appids[@]} game(s)?" || return 0
+			tui_run_paged bulk_set_include_preset "$preset" "${appids[@]}" || true
+			;;
+		*) return 0 ;;
+	esac
+}
+
 # tui_bulk_preset_menu — Apply INCLUDE preset to many games at once.
 tui_bulk_preset_menu() {
-	local action scope preset appid -a appids=()
+	local action scope preset grep_pattern="" -a appids=()
 	local filter_n configured_n
+
 	filter_n="$(tui_game_scope_count filter)"
 	configured_n="$(tui_game_scope_count configured)"
 
 	action="$(tui_menu "Bulk INCLUDE preset" \
 		"Current filter ($filter_n games)" \
 		"All configured ($configured_n games)" \
+		"Match name substring…" \
 		"Pick games (multi-select)" \
 		"Back")" || return 0
 
 	case "$action" in
 		"Current filter"*) scope=filter ;;
 		"All configured"*) scope=configured ;;
+		"Match name substring…"|"Match name substring...")
+			scope=grep
+			read -r -p "Name substring: " grep_pattern </dev/tty || return 0
+			[[ -n "$grep_pattern" ]] || return 0
+			;;
 		"Pick games (multi-select)")
 			scope=multi
 			;;
@@ -631,6 +675,12 @@ tui_bulk_preset_menu() {
 				return 0
 			}
 			;;
+		grep)
+			mapfile -t appids < <(tui_spinner_capture "Collecting games…" tui_collect_appids grep "$grep_pattern") || {
+				tui_show_text "No games matched: $grep_pattern" "Bulk preset"
+				return 0
+			}
+			;;
 		*)
 			mapfile -t appids < <(tui_spinner_capture "Collecting games…" tui_collect_appids "$scope") || {
 				tui_show_text "No games matched that scope." "Bulk preset"
@@ -638,9 +688,9 @@ tui_bulk_preset_menu() {
 			}
 			;;
 	esac
+
 	preset="$(tui_pick_preset)" || return 0
-	tui_confirm "Set INCLUDE=presets/${preset}.env on ${#appids[@]} game(s)?" || return 0
-	tui_run_paged bulk_set_include_preset "$preset" "${appids[@]}" || true
+	tui_bulk_preset_run "$preset" "${appids[@]}"
 }
 
 # tui_games_cache_lines — Print normalized cache rows (legacy EAC column + wrapped names).
