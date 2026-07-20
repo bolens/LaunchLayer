@@ -82,6 +82,8 @@ _tui_hub_shell() {
 			action="$(tui_menu "Apply hub config" \
 				"Preview (dry-run)" \
 				"Apply" \
+				"View history" \
+				"Apply historical version" \
 				"Back")" || return 0
 			case "$action" in
 				"Preview (dry-run)")
@@ -94,6 +96,32 @@ _tui_hub_shell() {
 	'
 	[[ $status -eq 0 ]]
 	[[ "$output" == "args:hub_apply_config cfgtest00001 --dry-run" ]]
+}
+
+@test "tui_hub_apply_menu view history delegates to hub_history_config" {
+	run _tui_hub_shell '
+		_test_apply_history_branch() {
+			local config_id="cfghist00001" action
+			HISTORY_ARGS=()
+			tui_run_paged() { HISTORY_ARGS=("$@"); return 0; }
+			_tui_menu_queue=("View history")
+			action="$(tui_menu "Apply hub config" \
+				"Preview (dry-run)" \
+				"Apply" \
+				"View history" \
+				"Apply historical version" \
+				"Back")" || return 0
+			case "$action" in
+				"View history")
+					tui_run_paged hub_history_config "$config_id" || true
+					;;
+			esac
+			printf "args:%s\n" "${HISTORY_ARGS[*]}"
+		}
+		_test_apply_history_branch
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "args:hub_history_config cfghist00001" ]]
 }
 
 @test "tui_hub_delete_menu delegates to hub_delete_config when confirmed" {
