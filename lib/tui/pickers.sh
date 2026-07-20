@@ -655,15 +655,15 @@ tui_bulk_preset_menu() {
 		"Back")" || return 0
 
 	case "$action" in
-		"Current filter"*) scope=filter ;;
-		"All configured"*) scope=configured ;;
+		"Current filter"*) scope="filter" ;;
+		"All configured"*) scope="configured" ;;
 		"Match name substring…"|"Match name substring...")
-			scope=grep
+			scope="grep"
 			read -r -p "Name substring: " grep_pattern </dev/tty || return 0
 			[[ -n "$grep_pattern" ]] || return 0
 			;;
 		"Pick games (multi-select)")
-			scope=multi
+			scope="multi"
 			;;
 		*) return 0 ;;
 	esac
