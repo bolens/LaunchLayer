@@ -16,6 +16,7 @@ and this project uses [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - TUI parity seams: ProtonDB **Suggest from ProtonDB** (preview/apply), per-game **Runtime status**, restore **merge** paths, hub Apply-by-ID **history** / apply-historical
+- TUI bulk INCLUDE: name **grep** scope plus Preview (dry-run) / Apply; global **Launch stats** on Status and System & tools
 
 ## [0.11.0] - 2026-07-14
 

@@ -117,7 +117,7 @@ Single entry point for all preference files:
 
 ### Status › At-a-glance system health
 
-Sidebar shows grouped rows (Health, Automation, Library, Community). Actions run doctor / runtime / detect checks; output appears in the sidebar. **Runtime status for game** picks a title and runs `--status APPID` (cache sizes for that game).
+Sidebar shows grouped rows (Health, Automation, Library, Community). Actions run doctor / runtime / detect checks; output appears in the sidebar. **Runtime status for game** picks a title and runs `--status APPID` (cache sizes for that game). **Launch stats** summarizes all of `launch.log` (same as `--launch-stats` without AppID).
 
 ---
 
@@ -129,7 +129,7 @@ Exact labels from the TUI.
 
 - Browse & configure game
 - Recent games
-- Bulk change INCLUDE preset
+- Bulk change INCLUDE preset — scopes: current filter · all configured · **name substring (grep)** · multi-select; then **Preview (dry-run)** or **Apply**
 - Init unconfigured games
 - Prune uninstalled configs
 
@@ -187,7 +187,7 @@ Footer: `[·] Show all` · Reset · Save. Saving auto-refreshes installed system
 
 ### System & tools › Diagnostics & setup
 
-- Doctor · Detect environment · Runtime status · CPU topology · vm.max_map_count
+- Doctor · Detect environment · Runtime status · Launch stats · CPU topology · vm.max_map_count
 - VRAM hogs & launch cleanup · Cache report · Setup / onboarding (includes **Backup timer settings**)
 
 ### Interface › `tui.conf`
