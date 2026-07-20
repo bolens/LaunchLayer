@@ -57,7 +57,7 @@ Place before subcommands:
 | `--edit-appid APPID\|NAME` | Open/create per-game config in `$EDITOR` |
 | `--paths APPID\|NAME [--json]` | Shader cache, compatdata, install paths |
 | `--validate-config [APPID\|NAME\|all] [--json]` | Lint `.env` files |
-| `--suggest-config APPID\|NAME [--apply]` | Suggest optimizations from ProtonDB reports |
+| `--suggest-config APPID\|NAME [--apply]` | Suggest optimizations from ProtonDB reports (TUI: **Games → *Game* → Suggest from ProtonDB**) |
 | `--scan-anticheat [--update-list]` | Find EAC/BattlEye vs known list |
 | `--scan-detections` | Audit heuristic vs list mismatches (native/anticheat/DLSS; tips suggest `DLSS_SWAPPER=1` or `PROTON_DLSS_UPGRADE=1` when either is unset) |
 

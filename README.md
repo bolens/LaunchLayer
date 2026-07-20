@@ -565,9 +565,9 @@ Hub publish/delete is **fail-closed**: set `HUB_PUBLISH_TOKEN` on the Convex dep
 
 **Hub CLI commands:** [docs/cli.md § Community hub](docs/cli.md#community-hub)
 
-Also useful without the hub: `--suggest-config APPID|NAME [--apply]` ranks ProtonDB reports for this machine and can write allowlisted knobs into `games/<AppID>.env` ([docs/cli.md § Games and config](docs/cli.md#games-and-config)).
+Also useful without the hub: `--suggest-config APPID|NAME [--apply]` ranks ProtonDB reports for this machine and can write allowlisted knobs into `games/<AppID>.env` ([docs/cli.md § Games and config](docs/cli.md#games-and-config)). TUI: **Games → *Game* → [Edit] Suggest from ProtonDB**.
 
-The TUI exposes hub flows under **Community hub** (main menu) and **[Hub] Community configs** (per-game actions), including viewing history and applying a historical version.
+The TUI exposes hub flows under **Community hub** (main menu) and **[Hub] Community configs** (per-game actions), including viewing history and applying a historical version (also on **Apply config by ID**).
 
 Deploy or develop the backend from `hub/` (Node **22+**, pnpm pinned via `hub/package.json` `packageManager`). The repo root `package.json` is a scripts-only shim (no lockfile) — always install inside `hub/`. Prefer [Vite+](https://viteplus.dev/) (`vp`) when available — it resolves the pinned pnpm. Otherwise enable [Corepack](https://nodejs.org/api/corepack.html) and call pnpm directly. From the repo root you can also use `bash scripts/hub-pm.sh …` / `make test-hub` / `make lint-hub`.
 

@@ -175,7 +175,7 @@ ProtonDB suggestions (client-side, no hub required):
 
 | `--suggest-config APPID\|NAME [--apply]` | Rank ProtonDB reports for this machine and optionally write allowlisted knobs |
 
-The interactive TUI exposes the same flows under **Community hub** (main menu) and **[Hub] Community configs** (per-game actions).
+The interactive TUI exposes the same flows under **Community hub** (main menu) and **[Hub] Community configs** (per-game actions). ProtonDB suggestions: **Games → *Game* → [Edit] Suggest from ProtonDB**.
 
 Deploy the hub backend from `hub/` (Node **22+**, pnpm via `hub/package.json` `packageManager`). The repo root `package.json` is a scripts-only shim with no lockfile — install inside `hub/`. Prefer [Vite+](https://viteplus.dev/) (`vp`) when available; otherwise enable [Corepack](https://nodejs.org/api/corepack.html) and use pnpm. Repo helpers: `scripts/hub-pm.sh`, `make test-hub`, `make lint-hub`.
 

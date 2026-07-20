@@ -117,7 +117,7 @@ Single entry point for all preference files:
 
 ### Status › At-a-glance system health
 
-Sidebar shows grouped rows (Health, Automation, Library, Community). Actions run doctor / runtime / detect checks; output appears in the sidebar.
+Sidebar shows grouped rows (Health, Automation, Library, Community). Actions run doctor / runtime / detect checks; output appears in the sidebar. **Runtime status for game** picks a title and runs `--status APPID` (cache sizes for that game).
 
 ---
 
@@ -137,10 +137,12 @@ Game picker filter lives in **Settings → Interface → [Games]** (footer still
 
 ### Games › *Game* › Actions `(config ok | validation issues | inherits layers)`
 
-- `[View]` Resolved config · Dry-run launch chain · Paths · Launch stats
-- `[Edit]` Quick toggles (all 0/1 flags) · Advanced config (grouped string/numeric keys) · Clear override · Open in `$EDITOR` · Set preset (re-init)
+- `[View]` Resolved config · Dry-run launch chain · Paths · Launch stats · Runtime status
+- `[Edit]` Quick toggles (all 0/1 flags) · Advanced config (grouped string/numeric keys) · Suggest from ProtonDB · Clear override · Open in `$EDITOR` · Set preset (re-init)
 - `[Manage]` Validate config · Delete per-game config
 - `[Hub]` Community configs
+
+**Suggest from ProtonDB** opens Preview / Apply (same as `--suggest-config` / `--suggest-config --apply`). Allowlisted knobs only; network required.
 
 ### Game picker (fzf)
 
@@ -162,6 +164,8 @@ Header: `Select a game (filter=…)` · Footer: `↑↓ filter · enter select �
 
 - Settings · Backup actions · Restore from backup · Export & import · Prune archives
 
+**Restore from backup** offers replace and merge (skip existing) for latest archive, picked archive, and per-game restore from latest (same as `--restore-backup --merge` / `--replace`).
+
 **Settings** (also under **Settings → Backup**) — five compact rows, each opens a detail submenu when needed:
 
 | Row | Opens / shows |
@@ -179,6 +183,7 @@ Footer: `[·] Show all` · Reset · Save. Saving auto-refreshes installed system
 - Hub settings · Machine fingerprint · Similar machines
 - Recommend configs (pick game) · Publish config · Update shared configs · Delete config by ID · Apply config by ID
 - Publish/update flows support optional **config ID** and **include-new** (same as `--config-id` / `--include-new` on the CLI)
+- **Apply config by ID** and recommend pickers both support Preview · Apply · View history · Apply historical version (`--hub-history` / `--hub-apply --history`)
 
 ### System & tools › Diagnostics & setup
 
