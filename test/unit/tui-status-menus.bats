@@ -66,3 +66,20 @@ _tui_status_shell() {
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"args:show_status 42424242"* ]]
 }
+
+@test "tui_status_menu launch stats runs global launch_stats" {
+	run _tui_status_shell '
+		_test_launch_stats() {
+			_tui_menu_queue=("Launch stats" "Back")
+			STATS_ARGS=()
+			tui_run_paged() { STATS_ARGS=("$@"); return 0; }
+			tui_status_menu
+			printf "args:%s\n" "${STATS_ARGS[*]}"
+		}
+		_test_launch_stats
+	'
+	[[ $status -eq 0 ]]
+	# Empty AppID filter (global) then json flag
+	[[ "$output" == *"args:launch_stats"* ]]
+	[[ "$output" != *"launch_stats 42424242"* ]]
+}

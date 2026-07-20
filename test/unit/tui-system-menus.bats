@@ -107,3 +107,23 @@ _tui_system_shell() {
 	[[ $status -eq 0 ]]
 	[[ "$output" == "paused:1" ]]
 }
+
+@test "tui_system_menu launch stats runs global launch_stats" {
+	run _tui_system_shell '
+		_test_system_stats() {
+			tui_bats_menu_stub_install
+			_tui_menu_queue=("Launch stats" "Back")
+			tui_crumb_enter() { :; }
+			tui_crumb_leave() { :; }
+			tui_remember_main_menu() { :; }
+			STATS_ARGS=()
+			tui_run_paged() { STATS_ARGS=("$@"); return 0; }
+			tui_system_menu
+			printf "args:%s\n" "${STATS_ARGS[*]}"
+			tui_bats_menu_stub_teardown
+		}
+		_test_system_stats
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"args:launch_stats"* ]]
+}

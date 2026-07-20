@@ -15,6 +15,7 @@ tui_status_menu() {
 			"Run doctor" \
 			"Runtime status" \
 			"Runtime status for game" \
+			"Launch stats" \
 			"Detect environment" \
 			"Back")" || {
 			tui_crumb_leave
@@ -31,6 +32,9 @@ tui_status_menu() {
 			"Runtime status for game")
 				appid="$(tui_pick_game_appid)" || continue
 				tui_run_paged show_status "$appid" "$(tui_json_flag)" || true
+				;;
+			"Launch stats")
+				tui_run_paged launch_stats "" "$(tui_json_flag)" || true
 				;;
 			"Detect environment")
 				tui_run_paged show_detect_environment "$(tui_json_flag)" || true
