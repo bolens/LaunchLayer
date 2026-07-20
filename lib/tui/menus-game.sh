@@ -253,6 +253,28 @@ tui_show_dry_run() {
 	print_dry_run /bin/true
 }
 
+# tui_suggest_config_menu — ProtonDB suggest preview / apply (parity with --suggest-config).
+tui_suggest_config_menu() {
+	local appid=$1 name action
+	name="$(get_game_name "$appid" 2>/dev/null || echo "AppID $appid")"
+
+	action="$(tui_menu "ProtonDB suggestions: $name" \
+		"Preview suggestions" \
+		"Apply allowlisted knobs" \
+		"Back")" || return 0
+
+	case "$action" in
+		"Preview suggestions")
+			tui_run_paged suggest_config "$appid" 0 || true
+			;;
+		"Apply allowlisted knobs")
+			tui_confirm "Apply ProtonDB allowlisted knobs to $name?" || return 0
+			tui_run_capture "Fetching ProtonDB suggestions…" suggest_config "$appid" 1 || true
+			;;
+		*) return 0 ;;
+	esac
+}
+
 # tui_game_actions — Action menu for one game.
 tui_game_actions() {
 	local appid=$1 name action status_label
@@ -268,9 +290,11 @@ tui_game_actions() {
 			"[View] Dry-run launch chain" \
 			"[View] Paths (cache / install)" \
 			"[View] Launch stats" \
+			"[View] Runtime status" \
 			"" \
 			"[Edit] Quick toggles" \
 			"[Edit] Advanced config" \
+			"[Edit] Suggest from ProtonDB" \
 			"[Edit] Clear override" \
 			"[Edit] Open in \$EDITOR" \
 			"[Edit] Set preset (re-init)" \
@@ -302,11 +326,17 @@ tui_game_actions() {
 			"[View] Launch stats")
 				tui_run_paged launch_stats "$appid" "$(tui_json_flag)" || true
 				;;
+			"[View] Runtime status")
+				tui_run_paged show_status "$appid" "$(tui_json_flag)" || true
+				;;
 			"[Edit] Quick toggles")
 				tui_quick_toggles "$appid"
 				;;
 			"[Edit] Advanced config")
 				tui_advanced_config "$appid"
+				;;
+			"[Edit] Suggest from ProtonDB")
+				tui_suggest_config_menu "$appid"
 				;;
 			"[Edit] Clear override")
 				tui_clear_override_menu "$appid"

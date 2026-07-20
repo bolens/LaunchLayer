@@ -136,3 +136,49 @@ _tui_game_shell() {
 	[[ "$output" == *"after:1"* ]]
 	[[ "$output" == *"file:DLSS_SWAPPER=1"* ]]
 }
+
+@test "tui_suggest_config_menu preview delegates to suggest_config" {
+	run _tui_game_shell '
+		tui_bats_menu_stub_install
+		_tui_menu_queue=("Preview suggestions")
+		SUGGEST_ARGS=()
+		tui_run_paged() { SUGGEST_ARGS=("$@"); return 0; }
+		tui_suggest_config_menu 42424242
+		printf "args:%s\n" "${SUGGEST_ARGS[*]}"
+		tui_bats_menu_stub_teardown
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "args:suggest_config 42424242 0" ]]
+}
+
+@test "tui_suggest_config_menu apply confirms then calls suggest_config" {
+	run _tui_game_shell '
+		tui_bats_menu_stub_install
+		_tui_menu_queue=("Apply allowlisted knobs")
+		tui_confirm() { return 0; }
+		SUGGEST_ARGS=()
+		tui_run_capture() { shift; SUGGEST_ARGS=("$@"); return 0; }
+		tui_suggest_config_menu 42424242
+		printf "args:%s\n" "${SUGGEST_ARGS[*]}"
+		tui_bats_menu_stub_teardown
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "args:suggest_config 42424242 1" ]]
+}
+
+@test "tui_game_actions runtime status delegates to show_status with appid" {
+	run _tui_game_shell '
+		tui_bats_menu_stub_install
+		_tui_menu_queue=("[View] Runtime status" "Back to games menu")
+		tui_crumb_enter() { :; }
+		tui_crumb_leave() { :; }
+		tui_game_validation_label() { echo "config ok"; }
+		STATUS_ARGS=()
+		tui_run_paged() { STATUS_ARGS=("$@"); return 0; }
+		tui_game_actions 42424242
+		printf "args:%s\n" "${STATUS_ARGS[*]}"
+		tui_bats_menu_stub_teardown
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"args:show_status 42424242"* ]]
+}
