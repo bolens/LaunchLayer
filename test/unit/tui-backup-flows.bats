@@ -120,3 +120,38 @@ _tui_backup_flow_shell() {
 	[[ $status -eq 0 ]]
 	[[ "$output" == "local:1 profiles:1 tui:0" ]]
 }
+
+@test "tui_backup_restore_menu merge latest uses merge mode" {
+	run _tui_backup_flow_shell '
+		_test_restore_merge() {
+			_tui_menu_queue=("Restore latest (merge, skip existing)")
+			RESTORE_ARGS=()
+			tui_confirm() { return 1; }
+			tui_run_paged() { RESTORE_ARGS+=("$*"); return 0; }
+			tui_backup_restore_menu
+			printf "first:%s\n" "${RESTORE_ARGS[0]}"
+		}
+		_test_restore_merge
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"restore_backup"* ]]
+	[[ "$output" == *" merge "* ]]
+}
+
+@test "tui_backup_restore_latest merge confirms with skip-existing prompt" {
+	run _tui_backup_flow_shell '
+		_test_restore_latest_merge() {
+			CONFIRM_MSG=""
+			tui_confirm() { CONFIRM_MSG=$1; return 1; }
+			tui_run_paged() { return 0; }
+			BACKUP_PREFS_INCLUDE_LOCAL=1
+			BACKUP_PREFS_INCLUDE_PROFILES=1
+			BACKUP_PREFS_INCLUDE_TUI=0
+			tui_backup_restore_latest /tmp/backups merge
+			printf "confirm:%s\n" "$CONFIRM_MSG"
+		}
+		_test_restore_latest_merge
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == *"merge"* ]]
+}

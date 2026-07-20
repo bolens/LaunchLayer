@@ -90,7 +90,7 @@ tui_hub_publish_menu() {
 	esac
 }
 
-# tui_hub_apply_menu — Apply a shared config by id.
+# tui_hub_apply_menu — Apply a shared config by id (preview / apply / history).
 tui_hub_apply_menu() {
 	local config_id action
 	tui_hub_require_ready || return 0
@@ -102,6 +102,8 @@ tui_hub_apply_menu() {
 	action="$(tui_menu "Apply hub config" \
 		"Preview (dry-run)" \
 		"Apply" \
+		"View history" \
+		"Apply historical version" \
 		"Back")" || return 0
 
 	case "$action" in
@@ -111,6 +113,12 @@ tui_hub_apply_menu() {
 		"Apply")
 			tui_confirm "Apply hub config $config_id?" || return 0
 			tui_run_capture "Applying shared config…" hub_apply_config "$config_id" || true
+			;;
+		"View history")
+			tui_run_paged hub_history_config "$config_id" || true
+			;;
+		"Apply historical version")
+			tui_hub_apply_historical "$config_id" "config $config_id" || true
 			;;
 		*) ;;
 	esac

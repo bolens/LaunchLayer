@@ -59,7 +59,7 @@ run_tui() {
 		unset TUI_MENU_CONTEXT TUI_FZF_EXTRA_BINDS TUI_FZF_FOOTER_SUFFIX
 
 		case "$choice" in
-			Doctor:*)
+			Doctor*)
 				tui_run_paged show_doctor "$(tui_json_flag)" || true
 				;;
 			Status)

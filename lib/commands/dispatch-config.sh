@@ -247,7 +247,7 @@ dispatch_config_subcommand() {
 			scan_detections
 			;;
 		--suggest-config)
-			local suggest_query="" suggest_apply=0 arg
+			local suggest_query="" suggest_apply=0
 			while [[ $# -gt 0 ]]; do
 				case "$1" in
 					--apply) suggest_apply=1; shift ;;
@@ -262,16 +262,7 @@ dispatch_config_subcommand() {
 			if [[ ! "$appid" =~ ^[0-9]+$ ]]; then
 				appid="$(resolve_appid_arg "$appid")" || return $?
 			fi
-			
-			load_profile_config
-			load_config_file "$LAUNCHD_DIR/default.env" 0
-			[[ -f "$LAUNCHD_DIR/local.env" ]] && load_config_file "$LAUNCHD_DIR/local.env" 0
-			apply_defaults
-			
-			local env_json
-			env_json="$(show_detect_environment --json)"
-			
-			python3 "$SCRIPT_DIR/scripts/protondb_suggest.py" "$appid" "$env_json" "$suggest_apply" "$GAMES_DIR"
+			suggest_config "$appid" "$suggest_apply"
 			;;
 		--bulk-set-include)
 			bulk_set_include_preset "$@"

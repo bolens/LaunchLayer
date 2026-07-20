@@ -96,3 +96,42 @@ setup() {
 	'
 	[[ $status -ne 0 ]]
 }
+
+@test "tui_bulk_preset_run preview passes --dry-run to bulk_set_include_preset" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export NO_COLOR=1
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib load-modules
+		launchlayer_source_tui
+		tui_bats_menu_stub_install
+		_tui_menu_queue=("Preview (dry-run)")
+		BULK_ARGS=()
+		tui_run_paged() { BULK_ARGS=("$@"); return 0; }
+		tui_bulk_preset_run standard 111 222
+		printf "args:%s\n" "${BULK_ARGS[*]}"
+		tui_bats_menu_stub_teardown
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "args:bulk_set_include_preset standard --dry-run 111 222" ]]
+}
+
+@test "tui_bulk_preset_run apply confirms then calls bulk_set_include_preset" {
+	run bash -c '
+		export CONFIG_DIR="'"$CONFIG_DIR"'"
+		export NO_COLOR=1
+		source "'"$BATS_TEST_DIRNAME"'/../helpers.bash"
+		source_lib load-modules
+		launchlayer_source_tui
+		tui_bats_menu_stub_install
+		_tui_menu_queue=("Apply")
+		tui_confirm() { return 0; }
+		BULK_ARGS=()
+		tui_run_paged() { BULK_ARGS=("$@"); return 0; }
+		tui_bulk_preset_run competitive 42424242
+		printf "args:%s\n" "${BULK_ARGS[*]}"
+		tui_bats_menu_stub_teardown
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "args:bulk_set_include_preset competitive 42424242" ]]
+}

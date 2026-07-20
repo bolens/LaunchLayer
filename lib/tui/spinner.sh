@@ -51,6 +51,8 @@ tui_spinner_message_for() {
 		show_config) printf '%s' 'Loading game config…' ;;
 		show_paths) printf '%s' 'Resolving paths…' ;;
 		launch_stats) printf '%s' 'Loading launch stats…' ;;
+		suggest_config) printf '%s' 'Fetching ProtonDB suggestions…' ;;
+		hub_history_config) printf '%s' 'Loading hub history…' ;;
 		tui_show_dry_run) printf '%s' 'Building launch chain…' ;;
 		show_tui_prefs) printf '%s' 'Loading TUI preferences…' ;;
 		show_backup_prefs) printf '%s' 'Loading backup preferences…' ;;

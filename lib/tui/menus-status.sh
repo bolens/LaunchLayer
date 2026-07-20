@@ -6,7 +6,7 @@ LAUNCHLAYER_TUI_MENUS_STATUS_LOADED=1
 
 # tui_status_menu — Glanceable status in the sidebar plus common checks.
 tui_status_menu() {
-	local action
+	local action appid
 	tui_crumb_enter "Status"
 
 	while true; do
@@ -14,6 +14,8 @@ tui_status_menu() {
 		action="$(tui_menu "At-a-glance system health" \
 			"Run doctor" \
 			"Runtime status" \
+			"Runtime status for game" \
+			"Launch stats" \
 			"Detect environment" \
 			"Back")" || {
 			tui_crumb_leave
@@ -26,6 +28,13 @@ tui_status_menu() {
 				;;
 			"Runtime status")
 				tui_run_paged show_status "" "$(tui_json_flag)" || true
+				;;
+			"Runtime status for game")
+				appid="$(tui_pick_game_appid)" || continue
+				tui_run_paged show_status "$appid" "$(tui_json_flag)" || true
+				;;
+			"Launch stats")
+				tui_run_paged launch_stats "" "$(tui_json_flag)" || true
 				;;
 			"Detect environment")
 				tui_run_paged show_detect_environment "$(tui_json_flag)" || true

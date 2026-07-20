@@ -50,14 +50,14 @@ Place before subcommands:
 |---------|-------------|
 | `--list-games [--configured] [--json] [--grep NAME]` | Installed games with native/EAC hints |
 | `--init-appid APPID\|NAME [preset] [--force]` | Create per-game config |
-| `--bulk-set-include PRESET [--all-configured\|--all-installed] [--grep NAME] [APPID\|NAME...] [--dry-run] [--json]` | Set `INCLUDE=presets/PRESET.env` on many games (TUI: **Games → Bulk change INCLUDE preset**) |
+| `--bulk-set-include PRESET [--all-configured\|--all-installed] [--grep NAME] [APPID\|NAME...] [--dry-run] [--json]` | Set `INCLUDE=presets/PRESET.env` on many games (TUI: **Games → Bulk change INCLUDE preset** — grep + dry-run/apply) |
 | `--init-unconfigured [--preset P] [--eac-only] [--dry-run]` | Bulk-scaffold missing configs |
 | `--prune-uninstalled [--dry-run] [--yes]` | Remove configs for uninstalled games |
 | `--show-config APPID\|NAME [--json]` | Resolved layers, settings, launch chain |
 | `--edit-appid APPID\|NAME` | Open/create per-game config in `$EDITOR` |
 | `--paths APPID\|NAME [--json]` | Shader cache, compatdata, install paths |
 | `--validate-config [APPID\|NAME\|all] [--json]` | Lint `.env` files |
-| `--suggest-config APPID\|NAME [--apply]` | Suggest optimizations from ProtonDB reports |
+| `--suggest-config APPID\|NAME [--apply]` | Suggest optimizations from ProtonDB reports (TUI: **Games → *Game* → Suggest from ProtonDB**) |
 | `--scan-anticheat [--update-list]` | Find EAC/BattlEye vs known list |
 | `--scan-detections` | Audit heuristic vs list mismatches (native/anticheat/DLSS; tips suggest `DLSS_SWAPPER=1` or `PROTON_DLSS_UPGRADE=1` when either is unset) |
 
@@ -70,7 +70,7 @@ Place before subcommands:
 | `--status [AppID\|NAME] [--json]` | Runtime state, cache sizes |
 | `--show-cpu-topology` | CPU summary + X3D V-Cache CCD range |
 | `--cache-report [--min-gb N] [--grep NAME] [--json] [--shader-only\|--compat-only]` | Large cache directories |
-| `--launch-stats [AppID\|NAME] [--json]` | Summarize `launch.log` |
+| `--launch-stats [AppID\|NAME] [--json]` | Summarize `launch.log` (TUI: per-game **Launch stats**; global on **Status** / **System & tools**) |
 | `--dry-run %command%` | Print env + chain without running |
 | `--pause-vram-hogs` / `--resume-vram-hogs` | Manual VRAM service control |
 | `--cleanup-stale-launch [pid]` | Recover after crash or force-quit |

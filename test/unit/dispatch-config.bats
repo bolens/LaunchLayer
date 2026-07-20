@@ -79,14 +79,29 @@ _dispatch_config_shell() {
 	[[ "$output" == "write:1 1" ]]
 }
 
-@test "dispatch_config_subcommand suggest-config delegates appid and arguments to python" {
+@test "dispatch_config_subcommand suggest-config delegates to suggest_config" {
 	run _dispatch_config_shell '
-		source_lib platform config detected-defaults
+		SUGGEST_ARGS=()
+		suggest_config() { SUGGEST_ARGS=("$@"); echo "suggest:${*}"; }
+		dispatch_config_subcommand --suggest-config 1091500 --apply
+	'
+	[[ $status -eq 0 ]]
+	[[ "$output" == "suggest:1091500 1" ]]
+}
+
+@test "suggest_config invokes protondb_suggest.py with apply flag" {
+	run _dispatch_config_shell '
+		source_lib platform config detected-defaults tools
+		show_detect_environment() { echo "{\"gpu\":\"test\"}"; }
+		command_required_or_fail() { return 0; }
+		load_profile_config() { :; }
+		load_config_file() { :; }
+		apply_defaults() { :; }
 		python3() {
 			echo "python3 called with: $*"
 		}
 		export -f python3
-		dispatch_config_subcommand --suggest-config 1091500 --apply
+		suggest_config 1091500 1
 	'
 	[[ $status -eq 0 ]]
 	[[ "$output" == *"python3 called with: "* ]]

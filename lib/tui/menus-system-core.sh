@@ -67,6 +67,7 @@ tui_system_menu() {
 			"Doctor (health check)" \
 			"Detect environment" \
 			"Runtime status" \
+			"Launch stats" \
 			"CPU topology" \
 			"vm.max_map_count (sysctl)" \
 			"VRAM hogs & launch cleanup" \
@@ -86,6 +87,9 @@ tui_system_menu() {
 				;;
 			"Runtime status")
 				tui_run_paged show_status "" "$(tui_json_flag)" || true
+				;;
+			"Launch stats")
+				tui_run_paged launch_stats "" "$(tui_json_flag)" || true
 				;;
 			"CPU topology")
 				tui_run_paged show_cpu_topology || true

@@ -225,3 +225,24 @@ bulk_set_include_preset() {
 		echo "Updated INCLUDE preset on $updated game(s)."
 	fi
 }
+
+# suggest_config — Rank ProtonDB reports for this machine; optionally apply allowlisted knobs.
+# apply: 0 = preview only, 1 = write allowlisted keys into games/<AppID>.env
+suggest_config() {
+	local appid=$1 apply=${2:-0}
+	local env_json
+
+	command_required_or_fail python3 "ProtonDB suggest" || return 1
+	[[ -n "$appid" ]] || {
+		echo "suggest_config: AppID required" >&2
+		return 1
+	}
+
+	load_profile_config
+	load_config_file "$LAUNCHD_DIR/default.env" 0
+	[[ -f "$LAUNCHD_DIR/local.env" ]] && load_config_file "$LAUNCHD_DIR/local.env" 0
+	apply_defaults
+
+	env_json="$(show_detect_environment --json)"
+	python3 "$SCRIPT_DIR/scripts/protondb_suggest.py" "$appid" "$env_json" "$apply" "$GAMES_DIR"
+}
