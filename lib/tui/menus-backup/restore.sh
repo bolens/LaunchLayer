@@ -50,9 +50,49 @@ tui_restore_backup_flow() {
 		"$include_local" "$include_profiles" "$include_tui" 0 "$filter_appid" || return 1
 }
 
+# tui_backup_restore_latest — Preview then apply restore of the latest archive.
+tui_backup_restore_latest() {
+	local dir=$1 mode=$2
+	local confirm_msg
+
+	tui_run_paged restore_backup "" "$dir" 1 "$mode" 0 \
+		"${BACKUP_PREFS_INCLUDE_LOCAL}" \
+		"${BACKUP_PREFS_INCLUDE_PROFILES}" \
+		"${BACKUP_PREFS_INCLUDE_TUI}" 0 || return 0
+	if [[ "$mode" == merge ]]; then
+		confirm_msg="Restore latest backup (merge — skip existing files)?"
+	else
+		confirm_msg="Restore all configs from the latest backup (replace)?"
+	fi
+	tui_confirm "$confirm_msg" || return 0
+	tui_run_paged restore_backup "" "$dir" 0 "$mode" 1 \
+		"${BACKUP_PREFS_INCLUDE_LOCAL}" \
+		"${BACKUP_PREFS_INCLUDE_PROFILES}" \
+		"${BACKUP_PREFS_INCLUDE_TUI}" 0 || true
+}
+
+# tui_backup_restore_game_from_latest — Restore one game from the latest archive.
+tui_backup_restore_game_from_latest() {
+	local dir=$1 filter_appid mode action archive
+
+	read -r -p "AppID or game name: " filter_appid </dev/tty || return 0
+	[[ -n "$filter_appid" ]] || return 0
+	action="$(tui_menu "Restore mode for $filter_appid" \
+		"Replace existing" \
+		"Merge (skip existing)" \
+		"Back")" || return 0
+	case "$action" in
+		"Replace existing") mode=replace ;;
+		"Merge (skip existing)") mode=merge ;;
+		*) return 0 ;;
+	esac
+	archive="$(resolve_restore_archive "" "$dir")" || return 0
+	tui_restore_backup_flow "$archive" "$mode" "$filter_appid"
+}
+
 # tui_backup_restore_menu — Restore from latest or chosen backup archive.
 tui_backup_restore_menu() {
-	local action archive dir filter_appid
+	local action archive dir
 
 	load_backup_prefs
 	dir="${BACKUP_PREFS_DIR}"
@@ -60,12 +100,14 @@ tui_backup_restore_menu() {
 		"List backup archives" \
 		"Preview latest backup" \
 		"Restore latest (replace existing)" \
+		"Restore latest (merge, skip existing)" \
 		"Pick archive → preview" \
 		"Pick archive → restore (replace)" \
+		"Pick archive → restore (merge)" \
 		"Restore game from latest backup" \
 		"Back")" || return 0
 
-		case "$action" in
+	case "$action" in
 		"List backup archives")
 			tui_run_paged list_backups "$dir" 0 || true
 			;;
@@ -76,15 +118,10 @@ tui_backup_restore_menu() {
 				"${BACKUP_PREFS_INCLUDE_TUI}" 0 || true
 			;;
 		"Restore latest (replace existing)")
-			tui_run_paged restore_backup "" "$dir" 1 replace 0 \
-				"${BACKUP_PREFS_INCLUDE_LOCAL}" \
-				"${BACKUP_PREFS_INCLUDE_PROFILES}" \
-				"${BACKUP_PREFS_INCLUDE_TUI}" 0 || return 0
-			tui_confirm "Restore all configs from the latest backup?" || return 0
-			tui_run_paged restore_backup "" "$dir" 0 replace 1 \
-				"${BACKUP_PREFS_INCLUDE_LOCAL}" \
-				"${BACKUP_PREFS_INCLUDE_PROFILES}" \
-				"${BACKUP_PREFS_INCLUDE_TUI}" 0 || true
+			tui_backup_restore_latest "$dir" replace
+			;;
+		"Restore latest (merge, skip existing)")
+			tui_backup_restore_latest "$dir" merge
 			;;
 		"Pick archive → preview")
 			archive="$(tui_pick_backup_archive "$dir")" || return 0
@@ -97,11 +134,12 @@ tui_backup_restore_menu() {
 			archive="$(tui_pick_backup_archive "$dir")" || return 0
 			tui_restore_backup_flow "$archive" replace
 			;;
+		"Pick archive → restore (merge)")
+			archive="$(tui_pick_backup_archive "$dir")" || return 0
+			tui_restore_backup_flow "$archive" merge
+			;;
 		"Restore game from latest backup")
-			read -r -p "AppID or game name: " filter_appid </dev/tty || return 0
-			[[ -n "$filter_appid" ]] || return 0
-			archive="$(resolve_restore_archive "" "$dir")" || return 0
-			tui_restore_backup_flow "$archive" replace "$filter_appid"
+			tui_backup_restore_game_from_latest "$dir"
 			;;
 		*) return 0 ;;
 	esac
